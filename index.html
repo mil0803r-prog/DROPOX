@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es-PE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="DROPOX">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>DROPOX · Ecommerce y finanzas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="styles.css?v=34">
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <div class="brand"><img class="logo" src="icon.svg" alt="DROPOX"><div><b>DROPOX</b><small>ECOMMERCE &amp; FINANZAS</small></div></div>
+    <div class="head-r">
+      <div class="seg pill" id="monSeg"><button data-m="PEN">S/</button><button data-m="USD">$</button></div>
+      <button class="ic" id="tema" aria-label="Cambiar tema"></button>
+      <a class="ic" href="#ajustes" aria-label="Ajustes" id="gear"></a>
+    </div>
+  </header>
+  <main id="view"></main>
+</div>
+<nav class="tabs" id="tabs"></nav>
+<button class="fab" id="fab"><span id="fabIc"></span>Asistente</button>
+<dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
+<div id="toast" class="toast"></div>
+<script src="app.js?v=15"></script>
+</body>
+</html>
