@@ -27,7 +27,7 @@ const Store = {
     } catch (e) {}
     return DEFAULTS();
   },
-  save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('No se pudo guardar'); } },
+  save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('No se pudo guardar'); } if (window.Nube) Nube.push(); },
 };
 let S = Store.load();
 // Meta Ads: solo se aceptan datos de esta cuenta publicitaria
@@ -482,6 +482,7 @@ function vProy(el) {
 function vAjustes(el) {
   const c = S.config;
   el.innerHTML = `${secH('ajustes', 'Ajustes', 'Impuestos, moneda y respaldo')}
+  ${window.Nube ? Nube.cardHtml() : ''}
   <div class="card"><h3>General</h3><p class="sub">Personaliza tu panel</p>
     <div class="field"><label>Tu nombre (para el saludo)</label><input id="aNom" value="${esc(c.nombre)}" placeholder="Ej. Yosca"></div>
     <div class="field"><label>Tipo de cambio (S/ por US$ 1)</label><input id="aTc" type="number" step="any" inputmode="decimal" value="${c.tc}"></div></div>
@@ -489,9 +490,10 @@ function vAjustes(el) {
     <label class="chk" style="margin-bottom:12px"><input type="checkbox" id="aIgv" ${c.igv ? 'checked' : ''}> Mis precios incluyen IGV (18%)</label>
     <div class="field"><label>Impuesto a la renta (% sobre ventas netas)</label><input id="aRenta" type="number" step="any" inputmode="decimal" value="${c.renta}"><div class="note">RUS = 0 (cuota fija) · Régimen MYPE ≈ 1%. Confírmalo con tu contador.</div></div>
     <div class="field"><label>Costo por devolución (× flete)</label><input id="aFac" type="number" step="any" inputmode="decimal" value="${c.factorDevolucion}"><div class="note">2 = pierdes el flete de ida y de vuelta.</div></div></div>
-  <div class="card"><h3>Datos</h3><p class="sub">Viven en este navegador. Respáldalos seguido.</p>
+  <div class="card"><h3>Datos</h3><p class="sub">${window.Nube && Nube.activo ? 'Se guardan en tu cuenta y en este dispositivo.' : 'Viven en este navegador. Respáldalos seguido.'}</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="bk">Descargar respaldo</button><button class="btn" id="rs">Restaurar</button><button class="btn" id="csv">Exportar pedidos (CSV)</button><input type="file" id="rsf" accept=".json" hidden></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" id="demo">Cargar ejemplo</button><button class="btn btn-del" id="wipe">Borrar todo</button></div></div>`;
+  if (window.Nube) Nube.bind(el);
   const sv = () => { Object.assign(S.config, { nombre: $('#aNom').value.trim(), tc: num($('#aTc').value) || 3.75, igv: $('#aIgv').checked, renta: num($('#aRenta').value), factorDevolucion: num($('#aFac').value) }); Store.save(); toast('Guardado'); };
   ['aNom', 'aTc', 'aIgv', 'aRenta', 'aFac'].forEach(i => $('#' + i).onchange = sv);
   $('#bk').onclick = () => descargar('dropox-respaldo-' + hoy() + '.json', JSON.stringify(S, null, 2), 'application/json');

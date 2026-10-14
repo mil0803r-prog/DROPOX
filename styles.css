@@ -249,3 +249,16 @@ dialog h2{margin:0 0 14px;font-size:19px}
 @media (max-width:699px){.tabs .lg{display:none}.tabs .sh{display:inline}}
 
 @media (max-width:699px){.tabs{padding-left:2px;padding-right:2px;gap:0}.tabs a{font-size:10px;padding:8px 0}.tabs a svg{width:21px;height:21px}}
+
+/* cuenta (login con Google) */
+.nube-ov{position:fixed;inset:0;z-index:200;background:var(--bg);display:grid;place-items:center;padding:calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom))}
+.nube-box{width:100%;max-width:360px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px}
+.nube-box h1{margin:0;font-size:22px;letter-spacing:2px;font-weight:800}
+.nube-box p{margin:0;color:var(--mut);font-size:14px}
+.nube-logo{width:72px;height:72px;border-radius:20px;box-shadow:0 10px 24px #7c3aed40}
+.nube-g{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 16px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:700;font-size:15px;cursor:pointer}
+.nube-g:disabled{opacity:.6;cursor:default}
+.nube-btn{width:100%;padding:13px 16px}
+.nube-msg{font-size:12.5px;color:var(--mut);min-height:1em}
+.nube-fila{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.nube-fila b{word-break:break-all}
