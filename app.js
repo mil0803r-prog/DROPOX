@@ -73,7 +73,9 @@ const mesActual = () => hoy().slice(0, 7);
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); }
 
 const FREQ = { diario: 30, semanal: 52 / 12, mensual: 1, trimestral: 1 / 3, anual: 1 / 12 };
-const mensualDe = f => num(f.monto) * (FREQ[f.frecuencia] ?? 1);
+const mensualDe = f => f.frecuencia === 'unico' ? 0 : num(f.monto) * (FREQ[f.frecuencia] ?? 1);
+// gasto único: cuenta solo en el mes (o rango) de su fecha
+const unicosEn = (a, b) => S.fijos.filter(f => f.activo && f.frecuencia === 'unico' && (f.fecha || hoy()) >= a && (f.fecha || hoy()) <= b).reduce((s, f) => s + num(f.monto), 0);
 const ESTADOS = { pendiente: 'Pendiente', enruta: 'En ruta', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
 const SIG = { pendiente: ['enruta', 'Despachar'], enruta: ['entregado', 'Entregado'] };
 const TIPOS = { suscripcion: 'Suscripción mensual (S/)', porcentaje: 'Comisión % sobre venta', porPedido: 'Costo por pedido (S/)', gasto: 'Gasto variable mensual (S/)' };
@@ -125,7 +127,8 @@ function totalesPlataformas() {
   const a = S.plataformas.filter(p => p.activo), sum = t => a.filter(p => p.tipo === t).reduce((s, p) => s + num(p.valor), 0);
   return { pctVenta: sum('porcentaje'), porPedido: sum('porPedido'), suscripcion: sum('suscripcion'), gasto: sum('gasto'), mensual: sum('suscripcion') + sum('gasto') };
 }
-const fijosMensual = () => S.fijos.filter(f => f.activo).reduce((s, f) => s + mensualDe(f), 0);
+const fijosRecurrente = () => S.fijos.filter(f => f.activo).reduce((s, f) => s + mensualDe(f), 0);
+const fijosMensual = () => fijosRecurrente() + unicosEn(mesActual() + '-01', mesActual() + '-31');
 const divIgv = () => (S.config.igv ? 1.18 : 1);
 
 function desglose(p) {
@@ -156,7 +159,7 @@ function analizar(pk) {
   const adsReal = k => (S.ads || []).filter(a => a.plataforma === k && metaOk(a) && (k !== 'meta' || !S.metaAuto || a.src === 'meta-api') && a.fecha >= from && a.fecha <= to).reduce((s, a) => s + num(a.gasto), 0);
   const pubReal = k => (S.pub || []).filter(a => a.plataforma === k && a.fecha >= from && a.fecha <= to).reduce((s, a) => s + num(a.gasto), 0);
   const tienePlat = k => S.plataformas.some(p => p.activo && p.tipo === 'gasto' && PAUTA_PAT[k].test(p.nombre));
-  const fijos = (fijosMensual() + T.suscripcion) * f;
+  const fijos = (fijosRecurrente() + T.suscripcion) * f + unicosEn(from, to);
   const vars = S.plataformas.filter(p => p.activo && p.tipo === 'gasto').reduce((s, p) => {
     const k = Object.keys(PAUTA_PAT).find(x => PAUTA_PAT[x].test(p.nombre)) || '', real = k ? (k === 'google' ? pubReal('google') : adsReal(k)) : 0;
     return s + (real > 0 ? real : num(p.valor) * f);
@@ -363,14 +366,14 @@ function vGastos(el) {
   let body = '';
   if (gTab === 'fijos') {
     body = `<div class="tiles"><div class="t"><small>Total mensual</small><b>${fmt(totFijo)}</b><em>${fmt(totFijo * 12)} al año</em></div><div class="t"><small>Por día</small><b>${fmt(totFijo / 30)}</b><em>${S.fijos.filter(f => f.activo).length} conceptos</em></div></div>` +
-      (S.fijos.length ? `<div class="list">${S.fijos.map(f => `<div class="it" style="${f.activo ? '' : 'opacity:.55'}"><div class="it-h"><b>${esc(f.nombre)}</b><b>${fmt(mensualDe(f))}<span class="mut" style="font-weight:500;font-size:11px"> /mes</span></b></div><div class="it-s">${esc(f.categoria)} · ${fmt(f.monto)} ${esc(f.frecuencia)}${f.activo ? '' : ' · pausado'}</div><div class="it-a" style="margin:0"><button class="btn btn-sm" data-ef="${f.id}">Editar</button><button class="btn btn-sm btn-del" data-df="${f.id}">✕</button></div></div>`).join('')}</div>` : '<div class="card empty">Registra alquiler, sueldos, contador, internet, software…</div>');
+      (S.fijos.length ? `<div class="list">${S.fijos.map(f => `<div class="it" style="${f.activo ? '' : 'opacity:.55'}"><div class="it-h"><b>${esc(f.nombre)}</b><b>${f.frecuencia === 'unico' ? fmt(f.monto) : fmt(mensualDe(f))}<span class="mut" style="font-weight:500;font-size:11px">${f.frecuencia === 'unico' ? ' único' : ' /mes'}</span></b></div><div class="it-s">${esc(f.categoria)} · ${f.frecuencia === 'unico' ? 'Único · ' + esc(f.fecha || 'sin fecha') : fmt(f.monto) + ' ' + esc(f.frecuencia)}${f.activo ? '' : ' · pausado'}</div><div class="it-a" style="margin:0"><button class="btn btn-sm" data-ef="${f.id}">Editar</button><button class="btn btn-sm btn-del" data-df="${f.id}">✕</button></div></div>`).join('')}</div>` : '<div class="card empty">Registra alquiler, sueldos, contador, internet, software…</div>');
   } else {
     body = `<div class="tiles"><div class="t"><small>Suscripciones</small><b>${fmt(T.suscripcion)}</b><em>por mes</em></div><div class="t"><small>Pauta / variables</small><b>${fmt(T.gasto)}</b><em>por mes</em></div><div class="t"><small>Comisión sobre venta</small><b>${pct(T.pctVenta)}</b></div><div class="t"><small>Costo por pedido</small><b>${fmt(T.porPedido)}</b></div></div>` +
       `<div class="list">${S.plataformas.map(p => `<div class="it" style="${p.activo ? '' : 'opacity:.55'}"><div class="it-h"><b>${esc(p.nombre)}</b><b>${p.tipo === 'porcentaje' ? pct(p.valor) : fmt(p.valor)}</b></div><div class="it-s">${TIPOS[p.tipo]}${p.nota ? ' · ' + esc(p.nota) : ''}${p.activo ? '' : ' · pausado'}</div><div class="it-a" style="margin:0"><button class="btn btn-sm" data-ep="${p.id}">Editar</button><button class="btn btn-sm btn-del" data-dp="${p.id}">✕</button></div></div>`).join('')}</div>
       <p class="note">Suscripciones cuentan como gasto fijo; la pauta, como gasto variable. Los % y costos por pedido se aplican a cada pedido y a la Calculadora.</p>`;
   }
   el.innerHTML = head + seg + body;
-  const cF = [{ k: 'nombre', l: 'Concepto', req: 1, full: 1 }, { k: 'categoria', l: 'Categoría', t: 'select', opts: Object.fromEntries(CATS.map(c => [c, c])) }, { k: 'monto', l: 'Monto (S/)', t: 'number', req: 1 }, { k: 'frecuencia', l: 'Frecuencia', t: 'select', opts: { diario: 'Diario', semanal: 'Semanal', mensual: 'Mensual', trimestral: 'Trimestral', anual: 'Anual' }, def: 'mensual' }, { k: 'activo', l: 'Activo (cuenta en el cálculo)', t: 'check', def: true }];
+  const cF = [{ k: 'nombre', l: 'Concepto', req: 1, full: 1 }, { k: 'categoria', l: 'Categoría', t: 'select', opts: Object.fromEntries(CATS.map(c => [c, c])) }, { k: 'monto', l: 'Monto (S/)', t: 'number', req: 1 }, { k: 'frecuencia', l: 'Frecuencia', t: 'select', opts: { diario: 'Diario', semanal: 'Semanal', mensual: 'Mensual', trimestral: 'Trimestral', anual: 'Anual', unico: 'Único (una sola vez)' }, def: 'mensual' }, { k: 'fecha', l: 'Fecha (solo si es Único)', t: 'date', def: hoy() }, { k: 'activo', l: 'Activo (cuenta en el cálculo)', t: 'check', def: true }];
   const cP = [{ k: 'nombre', l: 'Plataforma o gasto', req: 1, full: 1 }, { k: 'tipo', l: 'Tipo de cobro', t: 'select', opts: TIPOS, full: 1 }, { k: 'valor', l: 'Valor (S/ o %)', t: 'number', req: 1 }, { k: 'nota', l: 'Nota' }, { k: 'activo', l: 'Activo', t: 'check', def: true }];
   $('#nuevo').onclick = () => gTab === 'fijos' ? openForm('Nuevo gasto fijo', cF, {}, v => S.fijos.push({ id: uid(), ...v })) : openForm('Nueva plataforma', cP, { tipo: 'suscripcion' }, v => S.plataformas.push({ id: uid(), ...v }));
   el.querySelectorAll('#gseg button').forEach(b => b.onclick = () => { gTab = b.dataset.k; render(); });
@@ -388,7 +391,7 @@ const guardarCalc = () => { try { localStorage.setItem('dropox.calc2', JSON.stri
 function calcular(c, devolOverride) {
   const r = (devolOverride ?? c.devol) / 100, T = totalesPlataformas(), d = divIgv(), renta = num(S.config.renta) / 100, fd = num(S.config.factorDevolucion);
   const com = (num(c.comCod) + num(c.comExtra) + (c.usarPlat ? T.pctVenta : 0)) / 100, porPed = c.usarPlat ? T.porPedido : 0;
-  const admM = c.admModo === 'manual', admAuto = c.ventas > 0 ? ((c.usarFijos ? fijosMensual() : 0) + (c.usarPlat ? T.suscripcion : 0)) / c.ventas : 0, pautaAuto = c.ventas > 0 && c.usarPlat ? T.gasto / c.ventas : 0;
+  const admM = c.admModo === 'manual', admAuto = c.ventas > 0 ? ((c.usarFijos ? fijosRecurrente() : 0) + (c.usarPlat ? T.suscripcion : 0)) / c.ventas : 0, pautaAuto = c.ventas > 0 && c.usarPlat ? T.gasto / c.ventas : 0;
   const prorr = (admM ? num(c.admManual) : admAuto) + pautaAuto;
   const k = (1 - r) * ((1 - renta) / d - com);
   const flete = num(c.flete) * (1 + r * (fd - 1));
@@ -445,7 +448,7 @@ function vCalc(el) {
     <div class="card"><h3>Escala y objetivo</h3><p class="sub">Para repartir costos fijos y fijar tu meta</p>
       <div class="row">${n('margen', 'Margen objetivo (%)')}</div>
       <label class="chk" style="margin:4px 0 10px"><input type="checkbox" data-c="usarPlat" ${C.usarPlat ? 'checked' : ''}> Incluir plataformas (${pct(T.pctVenta)} + ${fmt(T.porPedido)}/pedido + ${fmt(T.mensual)}/mes)</label>
-      <label class="chk"><input type="checkbox" data-c="usarFijos" ${C.usarFijos ? 'checked' : ''}> Repartir gastos fijos (${fmt(fijosMensual())}/mes)</label>
+      <label class="chk"><input type="checkbox" data-c="usarFijos" ${C.usarFijos ? 'checked' : ''}> Repartir gastos fijos (${fmt(fijosRecurrente())}/mes)</label>
       <p class="note">IGV ${S.config.igv ? '18% incluido' : 'no aplicado'} · Renta ${S.config.renta}% · cámbialo en Ajustes.</p></div>
   </div><div id="res2"></div></div>
   ${guardadosHtml()}`;
@@ -464,7 +467,7 @@ function pintarCalc() {
   const m = v => isFinite(v) && v > 0 ? fmt(v) : '<span class="neg">No alcanza</span>';
   $('#mini').innerHTML = `<span>Utilidad / pedido <b class="${cls(R.util)}">${fmt(R.util)}</b></span><span>Margen <b class="${cls(R.margen)}">${pct(R.margen)}</b></span><span>M. bruto <b class="${cls(R.margenBruto)}">${pct(R.margenBruto)}</b></span><span>Mes <b class="${cls(R.mensual)}">${fmt(R.mensual)}</b></span>`;
   $('#res').innerHTML = `<div class="hero ${hero}"><small>UTILIDAD POR PEDIDO DESPACHADO</small><div class="n">${fmt(R.util)}</div><span>${fmt(R.utilEnt)} por pedido entregado · margen ${pct(R.margen)}</span><div class="verdict">${vtxt}</div></div>`;
-  const T3 = totalesPlataformas(), gTot = (C.usarFijos ? fijosMensual() : 0) + (C.usarPlat ? T3.mensual : 0), nPed = num(C.ventas);
+  const T3 = totalesPlataformas(), gTot = (C.usarFijos ? fijosRecurrente() : 0) + (C.usarPlat ? T3.mensual : 0), nPed = num(C.ventas);
   $('#gTot').textContent = fmt(gTot); $('#gPed').textContent = nPed > 0 ? fmt(gTot / nPed) : '—';
   $('#res2').innerHTML = `
   <div class="card"><h3>Margen</h3>${gauge(R.margen, vc)}</div>
@@ -574,7 +577,7 @@ function vPublicidad(el) {
 // ── Proyección ──
 let PRY = { pd: null, u: null };
 function vProy(el) {
-  const A = analizar('30d'), G = fijosMensual() + totalesPlataformas().mensual;
+  const A = analizar('30d'), G = fijosRecurrente() + totalesPlataformas().mensual;
   const uAuto = A.ent.length ? A.ent.reduce((s, p) => s + utilPedido(p), 0) / A.ent.length : calcular(C).utilEnt;
   const pdAuto = A.ent.length ? Math.round(A.ent.length / 30 * 10) / 10 : 0;
   const u = PRY.u ?? Math.round(uAuto * 100) / 100, pd = PRY.pd ?? pdAuto;
