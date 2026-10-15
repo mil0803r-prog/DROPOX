@@ -6,7 +6,7 @@ const Nube = (() => {
   const listo = !!(cfg.url && cfg.key && window.supabase);
   const N = { listo, activo: false, email: '', estado: '' };
   const LK = 'dropox.nube.uid', DK = 'dropox.nube.sucio';
-  let sb, user, timer, remotoVer = null, subiendo = false, pendiente = false, sincronizado = false;
+  let sb, user, recuperando = false, timer, remotoVer = null, subiendo = false, pendiente = false, sincronizado = false;
 
   const ls = {
     get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -23,14 +23,82 @@ const Nube = (() => {
   }
   function cerrarPantalla() { const o = document.getElementById('nubeOv'); if (o) o.remove(); }
 
+  const ERR = [
+    ['Invalid login credentials', 'Correo o contraseña incorrectos.'],
+    ['Email not confirmed', 'Falta confirmar tu correo. Revisa tu bandeja y abre el enlace que te enviamos.'],
+    ['already registered', 'Ese correo ya tiene cuenta. Pulsa Entrar.'],
+    ['rate limit', 'Demasiados intentos. Espera unos minutos e intenta de nuevo.'],
+    ['at least', 'La contraseña debe tener al menos 8 caracteres.'],
+    ['weak', 'La contraseña es muy débil. Usa letras y números.'],
+  ];
+  const traducir = e => { const m = (e && e.message) || ''; const f = ERR.find(x => m.toLowerCase().includes(x[0].toLowerCase())); return f ? f[1] : 'No se pudo completar. Intenta de nuevo.'; };
+  const volver = () => location.origin + location.pathname;
+
   function pantallaLogin(msg) {
-    pantalla(`<p>Entra con tu cuenta de Google para guardar tus pedidos y gastos y verlos en tu PC y en tu celular.</p>
+    pantalla(`<p>Entra para guardar tus pedidos y gastos y verlos en tu PC y en tu celular.</p>
+      <form class="nube-form" id="nubeF" novalidate>
+        <input id="nubeEmail" type="email" autocomplete="email" placeholder="Correo" required>
+        <input id="nubePass" type="password" autocomplete="current-password" placeholder="Contraseña (mínimo 8 caracteres)" minlength="8" required>
+        <button class="btn btn-pri nube-btn" id="nubeIn" type="submit">Entrar</button>
+        <button class="btn nube-btn" id="nubeReg" type="button">Crear cuenta</button>
+        <button class="nube-link" id="nubeOlv" type="button">Olvidé mi contraseña</button>
+      </form>
+      <div class="nube-sep"><span>o</span></div>
       <button class="nube-g" id="nubeG" type="button">${G}<span>Continuar con Google</span></button>
-      <div class="nube-msg" id="nubeMsg">${msg ? esc(msg) : ''}</div>`);
+      <div class="nube-msg" id="nubeMsg" role="status">${msg ? esc(msg) : ''}</div>`);
+    const $m = t => { document.getElementById('nubeMsg').textContent = t; };
+    const val = () => {
+      const email = document.getElementById('nubeEmail').value.trim(), pass = document.getElementById('nubePass').value;
+      return { email, pass };
+    };
+    const ocupado = on => document.querySelectorAll('#nubeF button, #nubeG').forEach(b => { b.disabled = on; });
+    document.getElementById('nubeF').onsubmit = async e => {
+      e.preventDefault();
+      const { email, pass } = val();
+      if (!email || !pass) return $m('Escribe tu correo y tu contraseña.');
+      ocupado(true); $m('Entrando…');
+      const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+      if (error) { ocupado(false); $m(traducir(error)); }
+    };
+    document.getElementById('nubeReg').onclick = async () => {
+      const { email, pass } = val();
+      if (!email || !email.includes('@')) return $m('Escribe un correo válido.');
+      if (pass.length < 8) return $m('La contraseña debe tener al menos 8 caracteres.');
+      ocupado(true); $m('Creando tu cuenta…');
+      const { data, error } = await sb.auth.signUp({ email, password: pass, options: { emailRedirectTo: volver() } });
+      if (error) { ocupado(false); return $m(traducir(error)); }
+      if (!data.session) { ocupado(false); $m('Te enviamos un correo. Ábrelo, confirma tu cuenta y vuelve aquí para entrar.'); }
+    };
+    document.getElementById('nubeOlv').onclick = async () => {
+      const { email } = val();
+      if (!email || !email.includes('@')) return $m('Escribe tu correo arriba y vuelve a pulsar.');
+      ocupado(true);
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: volver() });
+      ocupado(false);
+      $m(error ? traducir(error) : 'Si ese correo tiene cuenta, te enviamos un enlace para crear una contraseña nueva.');
+    };
     document.getElementById('nubeG').onclick = async () => {
-      const b = document.getElementById('nubeG'); b.disabled = true;
-      const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
-      if (error) { b.disabled = false; document.getElementById('nubeMsg').textContent = 'No se pudo abrir Google. Intenta de nuevo.'; }
+      ocupado(true);
+      const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: volver() } });
+      if (error) { ocupado(false); $m('No se pudo abrir Google. Intenta de nuevo.'); }
+    };
+  }
+
+  function pantallaNuevaClave() {
+    pantalla(`<p>Escribe tu nueva contraseña.</p>
+      <form class="nube-form" id="nubeNF" novalidate>
+        <input id="nubeNueva" type="password" autocomplete="new-password" placeholder="Nueva contraseña (mínimo 8 caracteres)" minlength="8" required>
+        <button class="btn btn-pri nube-btn" type="submit">Guardar contraseña</button>
+      </form>
+      <div class="nube-msg" id="nubeMsg" role="status"></div>`);
+    document.getElementById('nubeNF').onsubmit = async e => {
+      e.preventDefault();
+      const p = document.getElementById('nubeNueva').value, m = document.getElementById('nubeMsg');
+      if (p.length < 8) { m.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
+      const { data, error } = await sb.auth.updateUser({ password: p });
+      if (error) { m.textContent = traducir(error); return; }
+      recuperando = false;
+      entrar(data.user);
     };
   }
 
@@ -133,12 +201,17 @@ const Nube = (() => {
     if (!listo) return;
     sb = supabase.createClient(cfg.url, cfg.key, { auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
     pantalla('<p class="nube-msg">Cargando…</p>');
-    const { data, error } = await sb.auth.getSession();
-    if (error || !data.session) { pantallaLogin(error ? 'No se pudo iniciar sesión. Intenta de nuevo.' : ''); }
-    else await entrar(data.session.user);
     sb.auth.onAuthStateChange((ev, ses) => {
-      if (ev === 'SIGNED_IN' && ses && !N.activo && (!user || user.id !== ses.user.id)) entrar(ses.user);
+      if (ev === 'PASSWORD_RECOVERY') { recuperando = true; pantallaNuevaClave(); return; }
+      if (ev === 'SIGNED_IN' && ses) {
+        setTimeout(() => { if (!recuperando && !N.activo && (!user || user.id !== ses.user.id)) entrar(ses.user); }, 150);
+      }
     });
+    const { data, error } = await sb.auth.getSession();
+    if (!recuperando) {
+      if (error || !data.session) pantallaLogin(error ? 'No se pudo iniciar sesión. Intenta de nuevo.' : '');
+      else await entrar(data.session.user);
+    }
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refrescar(); });
     addEventListener('online', refrescar);
   }
