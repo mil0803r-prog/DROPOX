@@ -202,9 +202,9 @@ function donut(rows) {
   return `<div class="donut"><svg viewBox="0 0 140 140"><circle r="${R}" cx="70" cy="70" fill="none" stroke="var(--tile)" stroke-width="18"/>${arcs}<text x="70" y="68" text-anchor="middle" class="d1">${fmt(tot)}</text><text x="70" y="82" text-anchor="middle" class="d2">al mes</text></svg>
   <div class="legend col">${rows.map((r, i) => `<span><u style="background:${PAL[i % PAL.length]}"></u>${esc(r[0])} <b>${fmt(r[1])}</b></span>`).join('')}</div></div>`;
 }
-function gauge(m, color) {
+function gauge(m, color, etiqueta = 'margen por entregado') {
   const f = Math.max(0, Math.min(1, (m + 20) / 70)), L = Math.PI * 70;
-  return `<svg viewBox="0 0 180 110" class="gauge"><path d="M20 90 A70 70 0 0 1 160 90" fill="none" stroke="var(--tile)" stroke-width="14" stroke-linecap="round"/><path d="M20 90 A70 70 0 0 1 160 90" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${f * L} ${L}"/><text x="90" y="82" text-anchor="middle" class="g1" fill="${color}">${m.toFixed(0)}%</text><text x="90" y="102" text-anchor="middle" style="font:600 10px 'Plus Jakarta Sans';fill:var(--mut)">margen por entregado</text></svg>`;
+  return `<svg viewBox="0 0 180 110" class="gauge"><path d="M20 90 A70 70 0 0 1 160 90" fill="none" stroke="var(--tile)" stroke-width="14" stroke-linecap="round"/><path d="M20 90 A70 70 0 0 1 160 90" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${f * L} ${L}"/><text x="90" y="82" text-anchor="middle" class="g1" fill="${color}">${m.toFixed(0)}%</text><text x="90" y="102" text-anchor="middle" style="font:600 10px 'Plus Jakarta Sans';fill:var(--mut)">${etiqueta}</text></svg>`;
 }
 function countUp(root) {
   const red = matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -396,6 +396,8 @@ function calcular(c, devolOverride) {
   const util = k * c.precio - F, utilEnt = r < 1 ? util / (1 - r) : 0, den = k - (c.margen / 100) * (1 - r), cpaBE = k * c.precio - (F - num(c.cpa));
   return {
     util, utilEnt, margen: c.precio ? utilEnt / c.precio * 100 : 0, prorr, mensual: util * c.ventas,
+    // margen bruto: (precio sin IGV - costo del producto) / precio sin IGV; no descuenta flete, pauta ni gastos
+    precioNeto: num(c.precio) / d, utilBruta: num(c.precio) / d - num(c.costo), margenBruto: num(c.precio) > 0 ? (num(c.precio) / d - num(c.costo)) / (num(c.precio) / d) * 100 : 0,
     pBE: k > 0 ? F / k : NaN, pObj: den > 0 ? F / den : NaN, cpaBE, cpaObj: cpaBE - (c.margen / 100) * (1 - r) * c.precio, roasBE: cpaBE > 0 ? (1 - r) * c.precio / cpaBE : NaN,
     g: { ingreso: (1 - r) * c.precio, igv: (1 - r) * (c.precio - c.precio / d), costo: (1 - r) * num(c.costo), flete, empaque: num(c.empaque), comis: (1 - r) * c.precio * com + porPed, renta: (1 - r) * c.precio / d * renta, cpa: num(c.cpa), prorr },
   };
@@ -406,7 +408,7 @@ const CAMPOS_CALC = ['nombre', 'precio', 'costo', 'flete', 'empaque', 'comCod', 
 function guardadosHtml() {
   const L = (S.calcs || []).slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   const filas = L.map(it => { const R = calcular({ ...CALC_DEF, ...it.c }), f = it.fecha ? it.fecha.slice(8) + '/' + it.fecha.slice(5, 7) : '';
-    return `<div class="it"><div class="it-h"><b>${esc(it.nombre)}${calcActual === it.id ? ' <span class="tag">Cargado</span>' : ''}</b><b class="${cls(R.utilEnt)}">${fmt(R.utilEnt)}</b></div><div class="it-s">Precio ${fmt(it.c.precio)} · costo ${fmt(it.c.costo)} · margen ${pct(R.margen)} · utilidad por pedido entregado · guardado ${f}</div><div class="it-a" style="margin:0"><button class="btn btn-sm" data-gl="${it.id}">Cargar</button><button class="btn btn-sm btn-del" data-gd="${it.id}">✕</button></div></div>`; }).join('');
+    return `<div class="it"><div class="it-h"><b>${esc(it.nombre)}${calcActual === it.id ? ' <span class="tag">Cargado</span>' : ''}</b><b class="${cls(R.utilEnt)}">${fmt(R.utilEnt)}</b></div><div class="it-s">Precio ${fmt(it.c.precio)} · costo ${fmt(it.c.costo)} · margen bruto ${pct(R.margenBruto)} · margen ${pct(R.margen)} · utilidad por pedido entregado · guardado ${f}</div><div class="it-a" style="margin:0"><button class="btn btn-sm" data-gl="${it.id}">Cargar</button><button class="btn btn-sm btn-del" data-gd="${it.id}">✕</button></div></div>`; }).join('');
   return `<div class="card" id="guardados"><h3>Productos guardados</h3><p class="sub">${L.length ? 'Toca Cargar para volver a calcular con esos números' : 'Pulsa Guardar para dejar aquí un producto y no escribirlo otra vez'}</p>${L.length ? `<div class="list">${filas}</div>` : '<div class="empty">Aún no guardas ningún producto.</div>'}</div>`;
 }
 function bindGuardados(el) {
@@ -458,12 +460,15 @@ function pintarCalc() {
   const vc = !pos ? '#dc2626' : ok ? '#10b981' : '#f59e0b';
   const L = (l, v, c = '') => `<div class="line"><span>${l}</span><span class="${c}">${v}</span></div>`;
   const m = v => isFinite(v) && v > 0 ? fmt(v) : '<span class="neg">No alcanza</span>';
-  $('#mini').innerHTML = `<span>Utilidad / pedido <b class="${cls(R.util)}">${fmt(R.util)}</b></span><span>Margen <b class="${cls(R.margen)}">${pct(R.margen)}</b></span><span>Mes <b class="${cls(R.mensual)}">${fmt(R.mensual)}</b></span>`;
+  $('#mini').innerHTML = `<span>Utilidad / pedido <b class="${cls(R.util)}">${fmt(R.util)}</b></span><span>Margen <b class="${cls(R.margen)}">${pct(R.margen)}</b></span><span>M. bruto <b class="${cls(R.margenBruto)}">${pct(R.margenBruto)}</b></span><span>Mes <b class="${cls(R.mensual)}">${fmt(R.mensual)}</b></span>`;
   $('#res').innerHTML = `<div class="hero ${hero}"><small>UTILIDAD POR PEDIDO DESPACHADO</small><div class="n">${fmt(R.util)}</div><span>${fmt(R.utilEnt)} por pedido entregado · margen ${pct(R.margen)}</span><div class="verdict">${vtxt}</div></div>`;
   const T3 = totalesPlataformas(), gTot = (C.usarFijos ? fijosMensual() : 0) + (C.usarPlat ? T3.mensual : 0), nPed = num(C.ventas);
   $('#gTot').textContent = fmt(gTot); $('#gPed').textContent = nPed > 0 ? fmt(gTot / nPed) : '—';
   $('#res2').innerHTML = `
   <div class="card"><h3>Margen</h3>${gauge(R.margen, vc)}</div>
+  <div class="card"><h3>Margen bruto</h3><p class="sub">Lo que deja el producto antes de flete, pauta y gastos</p>${gauge(R.margenBruto, '#7c3aed', 'margen bruto')}
+    ${L(S.config.igv ? 'Precio sin IGV' : 'Precio de venta', fmt(R.precioNeto))}${L('Costo del producto', '- ' + fmt(num(C.costo)))}${L('Utilidad bruta por unidad', fmt(R.utilBruta), 'hl ' + cls(R.utilBruta))}${L('Margen bruto', pct(R.margenBruto), 'hl ' + cls(R.margenBruto))}
+    <p class="note">Margen bruto = (precio sin IGV − costo del producto) ÷ precio sin IGV.</p></div>
   <div class="card"><h3>Cifras clave</h3><p class="sub">Para decidir precio y pauta</p>
     ${L('Precio mínimo (utilidad 0)', m(R.pBE))}${L(`Precio para ${C.margen}% de margen`, m(R.pObj), 'hl')}${L('CPA máximo sin perder', m(R.cpaBE))}${L(`CPA máx. para ${C.margen}% de margen`, m(R.cpaObj), 'hl')}${L('ROAS de equilibrio', isFinite(R.roasBE) ? R.roasBE.toFixed(2) + 'x' : '—')}${L(`Utilidad con ${C.ventas} pedidos/mes`, fmt(R.mensual), 'hl ' + cls(R.mensual))}</div>
   <div class="card"><h3>¿Y si cambia la devolución?</h3><div class="tw"><table><thead><tr><th>Devol.</th>${[0, 10, 20, 30, 40, 50].map(x => `<th class="num">${x}%</th>`).join('')}</tr></thead><tbody><tr><td>Por pedido</td>${[0, 10, 20, 30, 40, 50].map(x => { const u = calcular(C, x).util; return `<td class="num ${cls(u)}">${fmt(u)}</td>`; }).join('')}</tr><tr><td>Al mes</td>${[0, 10, 20, 30, 40, 50].map(x => { const u = calcular(C, x).mensual; return `<td class="num ${cls(u)}">${fmt(u)}</td>`; }).join('')}</tr></tbody></table></div></div>`;
