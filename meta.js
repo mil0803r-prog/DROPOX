@@ -11,7 +11,7 @@ const Meta = (() => {
   const ESTADOS = { ACTIVE: ['Activa', 'ok'], PAUSED: ['Pausada', 'off'], CAMPAIGN_PAUSED: ['Campaña pausada', 'off'], ADSET_PAUSED: ['Conjunto pausado', 'off'], ARCHIVED: ['Archivada', 'off'], DELETED: ['Eliminada', 'off'], WITH_ISSUES: ['Con problemas', 'bad'], IN_PROCESS: ['En revisión', 'warn'], PENDING_REVIEW: ['En revisión', 'warn'], DISAPPROVED: ['Rechazada', 'bad'] };
   const OBJ = { OUTCOME_SALES: 'Ventas', OUTCOME_LEADS: 'Clientes potenciales', OUTCOME_ENGAGEMENT: 'Interacción', OUTCOME_TRAFFIC: 'Tráfico', OUTCOME_AWARENESS: 'Reconocimiento', OUTCOME_APP_PROMOTION: 'Promoción de app' };
 
-  let datos = null, clave = '', hora = null, cargando = false, error = '', falta = false, filtro = 'activas', abierto = new Set();
+  let datos = null, clave = '', hora = null, cargando = false, error = '', falta = false, filtro = 'activas', vistaM = 'arbol', nivelT = 'campaign', abierto = new Set();
 
   const claveActual = () => { const [d, h] = rangoActual(); return d + '|' + h; };
   const rangoActual = () => { const pk = S.config.periodo; let [d, h] = rango(pk); if (pk === 'todo') { const x = new Date(); x.setDate(x.getDate() - 89); d = iso(x); } const hoyS = hoy(); return [d, h > hoyS ? hoyS : h]; };
@@ -115,6 +115,27 @@ const Meta = (() => {
   const nodo = (nivel, e, hijos) => { const k = nivel + e.id;
     return `<details class="mt-n mt-${nivel}" data-k="${k}" ${abierto.has(k) ? 'open' : ''}><summary><span class="mt-nom">${esc(e.nombre)}</span>${tag(e.estado)}<span class="mt-g">${money(e.m.gasto)}</span></summary><div class="mt-cuerpo">${cuerpo(nivel, e)}${hijos}</div></details>`; };
 
+  // ───────── tablas ─────────
+  const HEAD = ['Gasto', 'Impresiones', 'Alcance', 'Frecuencia', 'Clics enlace', 'CTR enlace', 'CPC enlace', 'CPM', 'Compras', 'Costo/compra', 'ROAS', 'Mensajes', 'Costo/mensaje'];
+  const celdas = m => [money(m.gasto), n0(m.impresiones), n0(m.alcance), n2(m.frecuencia), n0(m.clics_enlace), n2(m.ctr_enlace) + '%', m.cpc_enlace ? money(m.cpc_enlace) : '—', money(m.cpm), n0(m.compras), money(m.costo_compra), m.roas ? n2(m.roas) + 'x' : '—', n0(m.mensajes), money(m.costo_mensaje)];
+  const totales = rows => { const t = { gasto: 0, impresiones: 0, clics_enlace: 0, compras: 0, valor_compras: 0, mensajes: 0 }; rows.forEach(r => Object.keys(t).forEach(k => { t[k] += N(r.m[k]); })); const g = t.gasto;
+    return [money(g), n0(t.impresiones), '—', '—', n0(t.clics_enlace), t.impresiones ? n2(t.clics_enlace / t.impresiones * 100) + '%' : '—', t.clics_enlace ? money(g / t.clics_enlace) : '—', t.impresiones ? money(g / t.impresiones * 1000) : '—', n0(t.compras), t.compras ? money(g / t.compras) : '—', g > 0 && t.valor_compras > 0 ? n2(t.valor_compras / g) + 'x' : '—', n0(t.mensajes), t.mensajes ? money(g / t.mensajes) : '—']; };
+  function tablaNivel(A) {
+    let rows = [];
+    A.campanas.forEach(c => { if (nivelT === 'campaign') rows.push({ ...c, padre: '' }); c.conjuntos.forEach(s => { if (nivelT === 'adset') rows.push({ ...s, padre: c.nombre }); s.anuncios.forEach(a => { if (nivelT === 'ad') rows.push({ ...a, padre: s.nombre }); }); }); });
+    rows = rows.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto);
+    const nombre = { campaign: 'Campaña', adset: 'Conjunto de anuncios', ad: 'Anuncio' }[nivelT];
+    const nivs = [['campaign', 'Campañas'], ['adset', 'Conjuntos'], ['ad', 'Anuncios']];
+    const sel = `<div class="chips" style="margin-top:10px">${nivs.map(([k, l]) => `<button class="chip ${nivelT === k ? 'on' : ''}" data-nt="${k}">${l}</button>`).join('')}</div>`;
+    if (!rows.length) return sel + '<div class="empty">No hay filas con este filtro en el periodo.</div>';
+    return sel + `<div class="tw"><table class="mt-tabla"><thead><tr><th>${nombre}</th><th>Estado</th><th class="num">Presup. diario</th>${HEAD.map(h => `<th class="num">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr><td><b>${esc(r.nombre)}</b>${r.padre ? `<small class="mt-padre">${esc(r.padre)}</small>` : ''}</td><td>${tag(r.estado)}</td><td class="num">${r.presupuesto_diario ? money(r.presupuesto_diario) : '—'}</td>${celdas(r.m).map(v => `<td class="num">${v}</td>`).join('')}</tr>`).join('')}</tbody><tfoot><tr><td><b>Total (${rows.length})</b></td><td></td><td></td>${totales(rows).map(v => `<td class="num"><b>${v}</b></td>`).join('')}</tr></tfoot></table></div>`;
+  }
+  function tablaDias(A) {
+    const dias = A.dias.slice().sort((a, b) => b.fecha.localeCompare(a.fecha));
+    if (!dias.length) return '<div class="empty">Sin datos por día.</div>';
+    return `<div class="tw"><table class="mt-tabla"><thead><tr><th>Fecha</th>${HEAD.map(h => `<th class="num">${h}</th>`).join('')}</tr></thead><tbody>${dias.map(d => `<tr><td><b>${f1(d.fecha)}</b></td>${celdas(d).map(v => `<td class="num">${v}</td>`).join('')}</tr>`).join('')}</tbody><tfoot><tr><td><b>Total</b></td>${totales(dias.map(d => ({ m: d }))).map(v => `<td class="num"><b>${v}</b></td>`).join('')}</tr></tfoot></table></div>`;
+  }
+
   function html() {
     const A = datos, dias = A.dias, [d0, h0] = rangoActual(), otro = clave !== d0 + '|' + h0 && !A.ejemplo && !A.importado;
     const g = dias.reduce((s, d) => s + d.gasto, 0), c = dias.reduce((s, d) => s + d.compras, 0), v = dias.reduce((s, d) => s + d.valor_compras, 0), im = dias.reduce((s, d) => s + d.impresiones, 0), cl = dias.reduce((s, d) => s + d.clics_enlace, 0);
@@ -134,7 +155,9 @@ const Meta = (() => {
     <div class="card"><h3>Gasto por día</h3><p class="sub">Cuenta completa en el periodo</p>${chart}</div>
     <div class="card"><h3>Campañas, conjuntos y anuncios</h3><p class="sub">Toca una campaña para ver sus conjuntos y anuncios. Las métricas son las de Meta.</p>
       <div class="chips" style="margin-top:6px">${[['activas', 'Activas'], ['conGasto', 'Con gasto'], ['todas', 'Todas']].map(([k, l]) => `<button class="chip ${filtro === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
-      <div class="mt-arbol">${arbol}</div></div>`;
+      <div class="mt-vista"><button class="chip ${vistaM === 'arbol' ? 'on' : ''}" data-vm="arbol">Árbol</button><button class="chip ${vistaM === 'tabla' ? 'on' : ''}" data-vm="tabla">Tabla</button></div>
+      ${vistaM === 'tabla' ? tablaNivel(A) : `<div class="mt-arbol">${arbol}</div>`}</div>
+    <div class="card"><h3>Detalle por día</h3><p class="sub">Toda la cuenta, una fila por fecha</p>${tablaDias(A)}</div>`;
   }
 
   function dialogoDias(nivel, id) {
@@ -180,6 +203,8 @@ const Meta = (() => {
     const bt = $('#mact'); if (bt) bt.onclick = () => { cargar(true); sync(); render(); };
     const per = $('#per'); if (per) per.onchange = e => { S.config.periodo = e.target.value; Store.save(); render(); };
     el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; render(); });
+    el.querySelectorAll('[data-vm]').forEach(b => b.onclick = () => { vistaM = b.dataset.vm; render(); });
+    el.querySelectorAll('[data-nt]').forEach(b => b.onclick = () => { nivelT = b.dataset.nt; render(); });
     el.querySelectorAll('details.mt-n').forEach(x => x.addEventListener('toggle', () => { x.open ? abierto.add(x.dataset.k) : abierto.delete(x.dataset.k); }));
     el.querySelectorAll('[data-dia]').forEach(b => b.onclick = ev => { ev.stopPropagation(); const [nv, id] = b.dataset.dia.split(':'); dialogoDias(nv, id); });
     return true;
