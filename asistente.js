@@ -16,7 +16,8 @@ const Asistente = (() => {
       tasa_entrega_pct: A.tasa == null ? null : r(A.tasa), por_cobrar: r(A.porCobrar),
       ventas: r(A.D.ventas), igv: r(A.D.igv), costo_producto: r(A.D.producto), fletes: r(A.D.flete), comisiones: r(A.D.comis), renta: r(A.D.renta), otros: r(A.D.otros),
       utilidad_por_pedidos: r(A.utilPed), gastos_fijos_y_suscripciones: r(A.fijos), pauta: r(A.vars), utilidad_neta: r(A.neta),
-      pauta_por_plataforma: Object.fromEntries(Object.entries((S.ads || []).filter(x => x.fecha >= rango(k)[0] && x.fecha <= rango(k)[1]).reduce((m, x) => { m[x.plataforma] = (m[x.plataforma] || 0) + num(x.gasto); return m; }, {})).map(([n, v]) => [n, r(v)])),
+      pauta_meta_tiktok: Object.fromEntries(Object.entries((S.ads || []).filter(x => x.fecha >= rango(k)[0] && x.fecha <= rango(k)[1]).reduce((m, x) => { m[x.plataforma] = (m[x.plataforma] || 0) + num(x.gasto); return m; }, {})).map(([n, v]) => [n, r(v)])),
+      publicidad_manual_por_plataforma: Object.fromEntries(Object.entries((S.pub || []).filter(x => x.fecha >= rango(k)[0] && x.fecha <= rango(k)[1]).reduce((m, x) => { m[x.plataforma] = (m[x.plataforma] || 0) + num(x.gasto); return m; }, {})).map(([n, v]) => [n, r(v)])),
       productos_mas_pedidos: Object.entries(prod).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n, c]) => ({ producto: n, pedidos: c })),
     };
   }
@@ -80,7 +81,7 @@ const Asistente = (() => {
     ['Cómo se calcula tu utilidad neta', 'A tus ventas se les restan el IGV, el costo del producto, los fletes, las comisiones, el impuesto a la renta y otros costos. Eso da la utilidad de los pedidos. Luego se restan tus gastos fijos, tus suscripciones y la pauta. El resultado es la utilidad neta del periodo.', 'Explícame con mis números cómo se calcula mi utilidad neta.'],
     ['Fijar el precio con la Calculadora', 'En **Calculadora** pones el costo del producto, el flete y tu pauta, y te dice la utilidad, el margen, el CPA y el ROAS. El semáforo te avisa si el margen es sano o si estás en riesgo de perder plata.', '¿A qué precio debería vender mi producto para tener buen margen?'],
     ['Seguir tu pauta en Meta y TikTok', 'En **Meta Ads** y **TikTok Ads** registras el gasto diario, las compras y las ventas. Si cargas el gasto real, el Dashboard usa ese monto en lugar del mensual de Gastos. Vigila que la pauta no se coma más del 35% de tus ventas.', '¿Mi pauta está muy cara para lo que vendo?'],
-    ['Publicidad manual', 'En **Publicidad** registras a mano lo que gastas en anuncios de cualquier plataforma: Meta, TikTok, Google, influencers u otras. Anota fecha, gasto, pedidos y ventas generadas. Todo lo que registres se descuenta de tu utilidad neta, y verás el reparto por plataforma y el ROAS.', '¿En qué plataforma de publicidad me conviene invertir más según mis números?'],
+    ['Publicidad manual', 'En **Publicidad** registras a mano lo que gastas en Google, YouTube, influencers u otras plataformas. Es independiente de Meta Ads y TikTok Ads, que tienen su propia sección. Anota fecha, gasto, pedidos y ventas generadas. Todo lo que registres se descuenta de tu utilidad neta, y verás el reparto por plataforma y el ROAS.', '¿En qué plataforma de publicidad me conviene invertir más según mis números?'],
     ['Proyectar los próximos meses', 'En **Proyección** mueves el deslizador para probar escenarios a 12 meses: qué pasa si vendes más, o si bajan las devoluciones. Sirve para decidir cuánto invertir antes de gastar.', '¿Qué pasaría si subo mis ventas un 20%?'],
     ['Respaldos y tu cuenta', 'Con tu cuenta, tus datos se guardan solos y se ven en tu PC y en tu celular. Igual puedes bajar un respaldo desde **Ajustes**, restaurarlo o exportar tus pedidos a CSV. Cerrar sesión se hace en la tarjeta Cuenta.', ''],
   ];
