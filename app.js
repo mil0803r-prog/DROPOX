@@ -459,6 +459,7 @@ function pintarCalc() {
   const hero = !pos ? 'h-neg' : 'h-pos', vtxt = !num(C.precio) ? 'Escribe tu precio y costos para calcular' : !pos ? 'Con estos números pierdes dinero' : ok ? 'Producto escalable: cumples tu margen objetivo' : 'Rentable pero por debajo de tu margen objetivo';
   const vc = !pos ? '#dc2626' : ok ? '#10b981' : '#f59e0b';
   const L = (l, v, c = '') => `<div class="line"><span>${l}</span><span class="${c}">${v}</span></div>`;
+  const totProd = g.costo + g.flete + g.empaque, totCompleto = g.igv + g.costo + g.flete + g.empaque + g.comis + g.renta + g.cpa + g.prorr;
   const m = v => isFinite(v) && v > 0 ? fmt(v) : '<span class="neg">No alcanza</span>';
   $('#mini').innerHTML = `<span>Utilidad / pedido <b class="${cls(R.util)}">${fmt(R.util)}</b></span><span>Margen <b class="${cls(R.margen)}">${pct(R.margen)}</b></span><span>M. bruto <b class="${cls(R.margenBruto)}">${pct(R.margenBruto)}</b></span><span>Mes <b class="${cls(R.mensual)}">${fmt(R.mensual)}</b></span>`;
   $('#res').innerHTML = `<div class="hero ${hero}"><small>UTILIDAD POR PEDIDO DESPACHADO</small><div class="n">${fmt(R.util)}</div><span>${fmt(R.utilEnt)} por pedido entregado · margen ${pct(R.margen)}</span><div class="verdict">${vtxt}</div></div>`;
@@ -469,6 +470,13 @@ function pintarCalc() {
   <div class="card"><h3>Margen bruto</h3><p class="sub">Lo que deja el producto antes de flete, pauta y gastos</p>${gauge(R.margenBruto, '#7c3aed', 'margen bruto')}
     ${L(S.config.igv ? 'Precio sin IGV' : 'Precio de venta', fmt(R.precioNeto))}${L('Costo del producto', '- ' + fmt(num(C.costo)))}${L('Utilidad bruta por unidad', fmt(R.utilBruta), 'hl ' + cls(R.utilBruta))}${L('Margen bruto', pct(R.margenBruto), 'hl ' + cls(R.margenBruto))}
     <p class="note">Margen bruto = (precio sin IGV − costo del producto) ÷ precio sin IGV.</p></div>
+  <div class="card"><h3>Totales por pedido</h3><p class="sub">Por pedido despachado, ya contando las devoluciones</p>
+    <p class="sub tot-t">Solo gastos del producto</p>
+    ${L('Costo del producto', fmt(g.costo))}${L('Flete', fmt(g.flete))}${L('Empaque / otros', fmt(g.empaque))}${L('Total gastos del producto', fmt(totProd), 'hl')}${L('% de lo que cobras', g.ingreso > 0 ? pct(totProd / g.ingreso * 100) : '—')}
+    <p class="sub tot-t">Total completo, con todo</p>
+    ${L('Gastos del producto', fmt(totProd))}${L('Comisiones', fmt(g.comis))}${L('Pauta (CPA)', fmt(g.cpa))}${L('Gastos fijos y plataformas', fmt(g.prorr))}${L('IGV', fmt(g.igv))}${L('Impuesto a la renta', fmt(g.renta))}${L('Total con todo', fmt(totCompleto), 'hl')}${L('% de lo que cobras', g.ingreso > 0 ? pct(totCompleto / g.ingreso * 100) : '—')}
+    <p class="sub tot-t">Cómo cuadra</p>
+    ${L('Cobras por pedido despachado', fmt(g.ingreso))}${L('− Total con todo', '- ' + fmt(totCompleto))}${L('Te queda (utilidad)', fmt(R.util), 'hl ' + cls(R.util))}</div>
   <div class="card"><h3>Cifras clave</h3><p class="sub">Para decidir precio y pauta</p>
     ${L('Precio mínimo (utilidad 0)', m(R.pBE))}${L(`Precio para ${C.margen}% de margen`, m(R.pObj), 'hl')}${L('CPA máximo sin perder', m(R.cpaBE))}${L(`CPA máx. para ${C.margen}% de margen`, m(R.cpaObj), 'hl')}${L('ROAS de equilibrio', isFinite(R.roasBE) ? R.roasBE.toFixed(2) + 'x' : '—')}${L(`Utilidad con ${C.ventas} pedidos/mes`, fmt(R.mensual), 'hl ' + cls(R.mensual))}</div>
   <div class="card"><h3>¿Y si cambia la devolución?</h3><div class="tw"><table><thead><tr><th>Devol.</th>${[0, 10, 20, 30, 40, 50].map(x => `<th class="num">${x}%</th>`).join('')}</tr></thead><tbody><tr><td>Por pedido</td>${[0, 10, 20, 30, 40, 50].map(x => { const u = calcular(C, x).util; return `<td class="num ${cls(u)}">${fmt(u)}</td>`; }).join('')}</tr><tr><td>Al mes</td>${[0, 10, 20, 30, 40, 50].map(x => { const u = calcular(C, x).mensual; return `<td class="num ${cls(u)}">${fmt(u)}</td>`; }).join('')}</tr></tbody></table></div></div>`;

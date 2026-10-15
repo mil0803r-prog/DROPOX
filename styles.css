@@ -382,3 +382,4 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .mt-tabla tfoot td{background:var(--tile);border-bottom:0}
 .mt-tabla tfoot td:first-child{background:var(--tile)}
 .mt-padre{display:block;color:var(--mut);font-weight:500;font-size:11px;margin-top:2px}
+.tot-t{margin:14px 0 2px;font-weight:700;color:var(--ink);font-size:13px}
