@@ -13,7 +13,32 @@ const Meta = (() => {
 
   let datos = null, clave = '', hora = null, cargando = false, error = '', falta = false, filtro = 'activas', abierto = new Set();
 
+  const claveActual = () => { const [d, h] = rangoActual(); return d + '|' + h; };
   const rangoActual = () => { const pk = S.config.periodo; let [d, h] = rango(pk); if (pk === 'todo') { const x = new Date(); x.setDate(x.getDate() - 89); d = iso(x); } const hoyS = hoy(); return [d, h > hoyS ? hoyS : h]; };
+
+  // ───────── datos importados (los trae Claude desde el conector de Facebook) ─────────
+  function normalizarImport(txt) {
+    let j; try { j = JSON.parse(txt); } catch (e) { throw new Error('El texto no es válido. Pega exactamente lo que te dio Claude.'); }
+    if (!j || !Array.isArray(j.campanas) || !j.campanas.length) throw new Error('No encontré campañas en ese texto.');
+    const fecha = x => (/^\d{4}-\d{2}-\d{2}$/.test(String(x)) ? String(x) : '');
+    const iso8 = x => (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}/.test(x) ? x.slice(0, 25) : null);
+    const txtc = (x, n) => String(x == null ? '' : x).slice(0, n);
+    const MK = ['gasto', 'impresiones', 'alcance', 'frecuencia', 'clics', 'clics_enlace', 'ctr_enlace', 'cpc_enlace', 'ctr', 'cpc', 'cpm', 'compras', 'valor_compras', 'roas', 'mensajes'];
+    const nm = x => { x = x || {}; const o = {}; MK.forEach(k => { o[k] = N(x[k]); }); o.costo_compra = x.costo_compra == null ? null : N(x.costo_compra); o.costo_mensaje = x.costo_mensaje == null ? null : N(x.costo_mensaje); if (!o.roas) o.roas = null; return o; };
+    const ne = e => ({ id: txtc(e.id, 40), nombre: txtc(e.nombre || 'Sin nombre', 200), estado: txtc(e.estado, 30).toUpperCase(), objetivo: e.objetivo ? txtc(e.objetivo, 40) : null, optimizacion: e.optimizacion ? txtc(e.optimizacion, 40) : null, presupuesto_diario: e.presupuesto_diario == null ? null : N(e.presupuesto_diario), inicio: iso8(e.inicio), creado: iso8(e.creado), m: nm(e.m) });
+    const campanas = j.campanas.slice(0, 200).map(c => ({ ...ne(c), conjuntos: (c.conjuntos || []).slice(0, 200).map(s => ({ ...ne(s), anuncios: (s.anuncios || []).slice(0, 300).map(ne) })) }));
+    const cu = j.cuenta || {};
+    return { importado: true, fuente: txtc(j.fuente, 60), cuenta: { id: txtc(cu.id, 30), nombre: txtc(cu.nombre, 80), moneda: txtc(cu.moneda, 5) }, desde: fecha(j.desde), hasta: fecha(j.hasta), campanas, dias: (j.dias || []).slice(0, 400).map(d => ({ fecha: fecha(d.fecha), ...nm(d) })).filter(d => d.fecha), importado_en: new Date().toISOString() };
+  }
+  // los días importados de la cuenta correcta alimentan el Dashboard, sin borrar los de otras fechas
+  function alimentarDashboard(snap) {
+    if (String(snap.cuenta.id) !== META_CUENTA.id || !snap.dias.length) return;
+    const por = {};
+    (S.ads || []).filter(a => a.src === 'meta-api').forEach(a => { por[a.fecha] = { fecha: a.fecha, gasto: a.gasto, compras: a.pedidos, ventas: a.ventas }; });
+    snap.dias.filter(z => z.gasto > 0).forEach(z => { por[z.fecha] = { fecha: z.fecha, gasto: z.gasto, compras: z.compras, ventas: z.valor_compras }; });
+    window.DROPOX_META = { cuenta: { id: META_CUENTA.id }, dias: Object.values(por) };
+    syncMeta();
+  }
 
   // ───────── datos de ejemplo ─────────
   function ejemplo(desde, hasta) {
@@ -80,7 +105,7 @@ const Meta = (() => {
     return `<details class="mt-n mt-${nivel}" data-k="${k}" ${abierto.has(k) ? 'open' : ''}><summary><span class="mt-nom">${esc(e.nombre)}</span>${tag(e.estado)}<span class="mt-g">${money(e.m.gasto)}</span></summary><div class="mt-cuerpo">${cuerpo(nivel, e)}${hijos}</div></details>`; };
 
   function html() {
-    const A = datos, dias = A.dias, [d0, h0] = rangoActual(), otro = clave !== d0 + '|' + h0 && !A.ejemplo;
+    const A = datos, dias = A.dias, [d0, h0] = rangoActual(), otro = clave !== d0 + '|' + h0 && !A.ejemplo && !A.importado;
     const g = dias.reduce((s, d) => s + d.gasto, 0), c = dias.reduce((s, d) => s + d.compras, 0), v = dias.reduce((s, d) => s + d.valor_compras, 0), im = dias.reduce((s, d) => s + d.impresiones, 0), cl = dias.reduce((s, d) => s + d.clics_enlace, 0);
     const tile = (l, val, s = '') => `<div class="t"><small>${l}</small><b>${val}</b>${s ? `<em>${s}</em>` : ''}</div>`;
     const mx = Math.max(...dias.map(d => d.gasto), 0);
@@ -90,9 +115,10 @@ const Meta = (() => {
     const arbol = camps.length ? camps.map(ca => nodo('campaign', ca, ca.conjuntos.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto).map(se => nodo('adset', se, se.anuncios.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto).map(ad => nodo('ad', ad, '')).join(''))).join(''))).join('') : '<div class="empty">No hay campañas con este filtro en el periodo.</div>';
     const pk = S.config.periodo;
     return `${A.ejemplo ? '<div class="demo-bar"><span><b>Datos de ejemplo.</b> Así se verá tu cuenta cuando Meta esté conectado.</span></div>' : ''}
-    <div class="acct"><i></i><span>Automático desde Meta</span><b>${esc(A.cuenta.nombre || META_CUENTA.nombre)}</b><code>${esc(A.cuenta.id)}</code>${A.cuenta.moneda ? `<code>${esc(A.cuenta.moneda)}</code>` : ''}</div>
+    ${A.importado ? `<div class="nota-pub">Datos traídos de Meta ${A.fuente ? '(' + esc(A.fuente) + ') ' : ''}el ${esc(new Date(A.importado_en).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }))}. Es una foto de ese momento: para ponerla al día pídele a Claude <b>actualiza</b> y pega lo nuevo abajo.</div>` : ''}
+    <div class="acct"><i></i><span>${A.importado ? 'Importado desde Meta' : 'Automático desde Meta'}</span><b>${esc(A.cuenta.nombre || META_CUENTA.nombre)}</b><code>${esc(A.cuenta.id)}</code>${A.cuenta.moneda ? `<code>${esc(A.cuenta.moneda)}</code>` : ''}</div>
     ${otro ? `<div class="nota-pub">Estás viendo ${f1(A.desde)} al ${f1(A.hasta)}. Toca <b>Actualizar</b> para traer el periodo que elegiste.</div>` : ''}
-    <div class="card card-row per"><div><small class="cap">Periodo${hora && !A.ejemplo ? ' · actualizado ' + hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : ''}</small><b>${f1(A.desde)} al ${f1(A.hasta)}</b></div><select id="per">${Object.entries(PERIODOS).map(([k, l]) => `<option value="${k}" ${k === pk ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    <div class="card card-row per"><div><small class="cap">Periodo${hora && !A.ejemplo && !A.importado ? ' · actualizado ' + hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : ''}</small><b>${f1(A.desde)} al ${f1(A.hasta)}</b></div><select id="per">${Object.entries(PERIODOS).map(([k, l]) => `<option value="${k}" ${k === pk ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
     <div class="tiles">${tile('Importe gastado', money(g), `${dias.length} días`)}${tile('Compras', n0(c), 'según el píxel')}${tile('Costo por compra', c > 0 ? money(g / c) : '—')}${tile('ROAS de compras', g > 0 && v > 0 ? n2(v / g) + 'x' : '—', 'valor ÷ gasto')}${tile('CTR (enlace)', im > 0 ? n2(cl / im * 100) + '%' : '—')}${tile('CPM', im > 0 ? money(g / im * 1000) : '—')}</div>
     <div class="card"><h3>Gasto por día</h3><p class="sub">Cuenta completa en el periodo</p>${chart}</div>
     <div class="card"><h3>Campañas, conjuntos y anuncios</h3><p class="sub">Toca una campaña para ver sus conjuntos y anuncios. Las métricas son las de Meta.</p>
@@ -118,6 +144,7 @@ const Meta = (() => {
     if (!demo() && !(window.Nube && Nube.listo)) return false;
     const [d, h] = rangoActual();
     if (demo() && (!datos || clave !== d + '|' + h)) cargar();
+    if (!datos && !cargando && S.metaSnap && !demo()) { datos = S.metaSnap; clave = d + '|' + h; }
     const cab = secH('meta', 'Meta Ads', 'Campañas, conjuntos y anuncios', '<button class="btn btn-pri" id="mact" style="white-space:nowrap">Actualizar</button>');
     let cuerpoH;
     if (datos) cuerpoH = html();
@@ -126,7 +153,13 @@ const Meta = (() => {
     else if (error) cuerpoH = `<div class="card"><p class="mt-aviso">${esc(error)}</p></div>`;
     else if (window.Nube && Nube.activo) cuerpoH = `<div class="card"><p class="mt-aviso">Toca <b>Actualizar</b> para traer tus campañas, conjuntos y anuncios de Meta. No se actualiza solo.</p></div>`;
     else cuerpoH = `<div class="card"><p class="mt-aviso">Inicia sesión para ver las campañas de Meta.</p></div>`;
-    el.innerHTML = cab + cuerpoH;
+    const avisoErr = datos && datos.importado && error ? `<div class="card"><p class="mt-aviso">${esc(error)}</p></div>` : '';
+    const importador = demo() ? '' : `<details class="card mt-imp" ${!datos ? 'open' : ''}><summary><b>Importar datos de Meta</b></summary><p class="sub">Pídele a Claude que traiga tus campañas, copia el texto que te da y pégalo aquí.</p><textarea id="mimp" rows="5" placeholder="Pega aquí el texto"></textarea><div class="mt-impb"><button class="btn btn-pri btn-sm" id="mimpok" type="button">Importar</button>${S.metaSnap ? '<button class="btn btn-sm btn-del" id="mimpdel" type="button">Borrar lo importado</button>' : ''}</div><div class="nube-msg" id="mimpmsg"></div></details>`;
+    el.innerHTML = cab + avisoErr + cuerpoH + importador;
+    const ok = $('#mimpok');
+    if (ok) ok.onclick = () => { const msg = $('#mimpmsg'); const t = ($('#mimp').value || '').trim(); if (!t) { msg.textContent = 'Pega primero el texto.'; return; }
+      try { const snap = normalizarImport(t); S.metaSnap = snap; datos = snap; clave = claveActual(); error = ''; falta = false; alimentarDashboard(snap); Store.save(); toast('Datos importados'); render(); } catch (e) { msg.textContent = e.message; } };
+    const del = $('#mimpdel'); if (del) del.onclick = () => ask('¿Borrar los datos importados de Meta?', () => { delete S.metaSnap; if (datos && datos.importado) datos = null; Store.save(); render(); }, 'Borrar');
     const bt = $('#mact'); if (bt) bt.onclick = () => { cargar(true); sync(); render(); };
     const per = $('#per'); if (per) per.onchange = e => { S.config.periodo = e.target.value; Store.save(); render(); };
     el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; render(); });
