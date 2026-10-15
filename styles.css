@@ -270,8 +270,7 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .nube-sep::before,.nube-sep::after{content:'';flex:1;height:1px;background:var(--line)}
 
 /* asistente IA */
-.as-chat{margin-top:18px;border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:10px}
-.as-chat h3{margin:0;font-size:15px}
+.as-chat{display:flex;flex-direction:column;gap:10px}
 .as-chips{display:flex;gap:6px;flex-wrap:wrap}
 .as-chip{border:1px solid var(--line);background:var(--tile);color:var(--ink);border-radius:999px;padding:7px 12px;font:inherit;font-size:12.5px;cursor:pointer}
 .as-msgs{display:flex;flex-direction:column;gap:8px;max-height:38vh;overflow-y:auto}
@@ -282,3 +281,12 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .as-fila{display:flex;gap:8px}
 .as-fila input{flex:1;min-width:0;padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:14px}
 .as-nota{font-size:12px;color:var(--mut)}
+.as-tabs{display:flex;gap:4px;background:var(--tile);padding:4px;border-radius:12px;margin:2px 0 14px}
+.as-tabs button{flex:1;border:0;background:none;color:var(--mut);font:inherit;font-weight:700;font-size:13.5px;padding:9px 10px;border-radius:9px;cursor:pointer}
+.as-tabs button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 4px #00000026}
+.as-pie{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.as-guia h3{margin:16px 0 6px;font-size:15px}
+.as-guia h3:first-child{margin-top:0}
+.as-guia details{border-bottom:1px solid var(--line);padding:11px 0}
+.as-guia summary{font-weight:700;font-size:14px;cursor:pointer}
+.as-guia details p{margin:8px 0 10px;color:var(--mut);font-size:13.5px;line-height:1.5}
