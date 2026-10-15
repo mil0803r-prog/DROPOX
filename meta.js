@@ -1,6 +1,6 @@
 'use strict';
 /* DROPOX — sección Meta Ads automática: campañas, conjuntos y anuncios con las métricas de Meta, por fecha.
-   Los datos llegan de /api/meta (la clave de Meta vive en Vercel). Con DROPOX_DEMO se muestran datos de ejemplo. */
+   Los datos llegan de /api/meta (la clave de Meta vive en Vercel) y solo se traen al pulsar Actualizar. Con DROPOX_DEMO se muestran datos de ejemplo. */
 const Meta = (() => {
   const demo = () => !!window.DROPOX_DEMO && !(window.Nube && Nube.listo);
   const N = x => (isFinite(+x) ? +x : 0);
@@ -11,7 +11,7 @@ const Meta = (() => {
   const ESTADOS = { ACTIVE: ['Activa', 'ok'], PAUSED: ['Pausada', 'off'], CAMPAIGN_PAUSED: ['Campaña pausada', 'off'], ADSET_PAUSED: ['Conjunto pausado', 'off'], ARCHIVED: ['Archivada', 'off'], DELETED: ['Eliminada', 'off'], WITH_ISSUES: ['Con problemas', 'bad'], IN_PROCESS: ['En revisión', 'warn'], PENDING_REVIEW: ['En revisión', 'warn'], DISAPPROVED: ['Rechazada', 'bad'] };
   const OBJ = { OUTCOME_SALES: 'Ventas', OUTCOME_LEADS: 'Clientes potenciales', OUTCOME_ENGAGEMENT: 'Interacción', OUTCOME_TRAFFIC: 'Tráfico', OUTCOME_AWARENESS: 'Reconocimiento', OUTCOME_APP_PROMOTION: 'Promoción de app' };
 
-  let datos = null, clave = '', cargando = false, error = '', falta = false, filtro = 'activas', abierto = new Set();
+  let datos = null, clave = '', hora = null, cargando = false, error = '', falta = false, filtro = 'activas', abierto = new Set();
 
   const rangoActual = () => { const pk = S.config.periodo; let [d, h] = rango(pk); if (pk === 'todo') { const x = new Date(); x.setDate(x.getDate() - 89); d = iso(x); } const hoyS = hoy(); return [d, h > hoyS ? hoyS : h]; };
 
@@ -63,7 +63,7 @@ const Meta = (() => {
     cargando = true; error = ''; falta = false;
     try {
       datos = demo() ? ejemplo(d, h) : await traer({ desde: d, hasta: h });
-      clave = k;
+      clave = k; hora = new Date();
       if (!datos.ejemplo && String(datos.cuenta.id) !== META_CUENTA.id) { error = `La cuenta conectada (${datos.cuenta.nombre || datos.cuenta.id}) no es ${META_CUENTA.nombre}.`; datos = null; }
     } catch (e) { datos = null; error = e.message; falta = !!e.falta; if (e.sinCuenta) error = ''; }
     cargando = false;
@@ -80,7 +80,7 @@ const Meta = (() => {
     return `<details class="mt-n mt-${nivel}" data-k="${k}" ${abierto.has(k) ? 'open' : ''}><summary><span class="mt-nom">${esc(e.nombre)}</span>${tag(e.estado)}<span class="mt-g">${money(e.m.gasto)}</span></summary><div class="mt-cuerpo">${cuerpo(nivel, e)}${hijos}</div></details>`; };
 
   function html() {
-    const A = datos, tl = ['activas', 'conGasto', 'todas'], dias = A.dias;
+    const A = datos, dias = A.dias, [d0, h0] = rangoActual(), otro = clave !== d0 + '|' + h0 && !A.ejemplo;
     const g = dias.reduce((s, d) => s + d.gasto, 0), c = dias.reduce((s, d) => s + d.compras, 0), v = dias.reduce((s, d) => s + d.valor_compras, 0), im = dias.reduce((s, d) => s + d.impresiones, 0), cl = dias.reduce((s, d) => s + d.clics_enlace, 0);
     const tile = (l, val, s = '') => `<div class="t"><small>${l}</small><b>${val}</b>${s ? `<em>${s}</em>` : ''}</div>`;
     const mx = Math.max(...dias.map(d => d.gasto), 0);
@@ -91,7 +91,8 @@ const Meta = (() => {
     const pk = S.config.periodo;
     return `${A.ejemplo ? '<div class="demo-bar"><span><b>Datos de ejemplo.</b> Así se verá tu cuenta cuando Meta esté conectado.</span></div>' : ''}
     <div class="acct"><i></i><span>Automático desde Meta</span><b>${esc(A.cuenta.nombre || META_CUENTA.nombre)}</b><code>${esc(A.cuenta.id)}</code>${A.cuenta.moneda ? `<code>${esc(A.cuenta.moneda)}</code>` : ''}</div>
-    <div class="card card-row per"><div><small class="cap">Periodo</small><b>${f1(A.desde)} al ${f1(A.hasta)}</b></div><select id="per">${Object.entries(PERIODOS).map(([k, l]) => `<option value="${k}" ${k === pk ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    ${otro ? `<div class="nota-pub">Estás viendo ${f1(A.desde)} al ${f1(A.hasta)}. Toca <b>Actualizar</b> para traer el periodo que elegiste.</div>` : ''}
+    <div class="card card-row per"><div><small class="cap">Periodo${hora && !A.ejemplo ? ' · actualizado ' + hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : ''}</small><b>${f1(A.desde)} al ${f1(A.hasta)}</b></div><select id="per">${Object.entries(PERIODOS).map(([k, l]) => `<option value="${k}" ${k === pk ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
     <div class="tiles">${tile('Importe gastado', money(g), `${dias.length} días`)}${tile('Compras', n0(c), 'según el píxel')}${tile('Costo por compra', c > 0 ? money(g / c) : '—')}${tile('ROAS de compras', g > 0 && v > 0 ? n2(v / g) + 'x' : '—', 'valor ÷ gasto')}${tile('CTR (enlace)', im > 0 ? n2(cl / im * 100) + '%' : '—')}${tile('CPM', im > 0 ? money(g / im * 1000) : '—')}</div>
     <div class="card"><h3>Gasto por día</h3><p class="sub">Cuenta completa en el periodo</p>${chart}</div>
     <div class="card"><h3>Campañas, conjuntos y anuncios</h3><p class="sub">Toca una campaña para ver sus conjuntos y anuncios. Las métricas son las de Meta.</p>
@@ -116,29 +117,27 @@ const Meta = (() => {
   function mostrar(el) {
     if (!demo() && !(window.Nube && Nube.listo)) return false;
     const [d, h] = rangoActual();
-    if (!datos || clave !== d + '|' + h) cargar();
+    if (demo() && (!datos || clave !== d + '|' + h)) cargar();
     const cab = secH('meta', 'Meta Ads', 'Campañas, conjuntos y anuncios', '<button class="btn btn-pri" id="mact" style="white-space:nowrap">Actualizar</button>');
     let cuerpoH;
-    if (datos && clave === d + '|' + h) cuerpoH = html();
-    else if (cargando || (!error && !falta && (demo() || (window.Nube && Nube.activo)))) cuerpoH = '<div class="card"><div class="mt-carga"><i></i> Cargando desde Meta…</div></div>';
+    if (datos) cuerpoH = html();
+    else if (cargando) cuerpoH = '<div class="card"><div class="mt-carga"><i></i> Cargando desde Meta…</div></div>';
     else if (falta) cuerpoH = `<div class="card"><p class="mt-aviso">${esc(error)}</p></div>${pasos}`;
     else if (error) cuerpoH = `<div class="card"><p class="mt-aviso">${esc(error)}</p></div>`;
+    else if (window.Nube && Nube.activo) cuerpoH = `<div class="card"><p class="mt-aviso">Toca <b>Actualizar</b> para traer tus campañas, conjuntos y anuncios de Meta. No se actualiza solo.</p></div>`;
     else cuerpoH = `<div class="card"><p class="mt-aviso">Inicia sesión para ver las campañas de Meta.</p></div>`;
     el.innerHTML = cab + cuerpoH;
-    const bt = $('#mact'); if (bt) bt.onclick = () => { datos = null; cargar(true); render(); };
-    const per = $('#per'); if (per) per.onchange = e => { S.config.periodo = e.target.value; Store.save(); datos = null; render(); };
+    const bt = $('#mact'); if (bt) bt.onclick = () => { cargar(true); sync(); render(); };
+    const per = $('#per'); if (per) per.onchange = e => { S.config.periodo = e.target.value; Store.save(); render(); };
     el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; render(); });
     el.querySelectorAll('details.mt-n').forEach(x => x.addEventListener('toggle', () => { x.open ? abierto.add(x.dataset.k) : abierto.delete(x.dataset.k); }));
     el.querySelectorAll('[data-dia]').forEach(b => b.onclick = ev => { ev.stopPropagation(); const [nv, id] = b.dataset.dia.split(':'); dialogoDias(nv, id); });
     return true;
   }
 
-  addEventListener('dropox:listo', () => sync());
   return { vista: mostrar, sync };
 })();
 window.Meta = Meta;
 
 // si la página abrió directo en Meta Ads, volver a dibujarla ahora que este módulo ya cargó
 if (vista === "meta") render();
-// si la sesión ya estaba lista antes de cargar este módulo, sincronizar ahora
-if (window.Nube && Nube.activo) Meta.sync();
