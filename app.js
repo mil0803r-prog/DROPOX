@@ -359,6 +359,7 @@ function exportCSV() {
 function descargar(nombre, txt, tipo) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: tipo })); a.download = nombre; a.click(); URL.revokeObjectURL(a.href); }
 
 // ── Gastos ──
+const cF = [{ k: 'nombre', l: 'Concepto', req: 1, full: 1 }, { k: 'categoria', l: 'Categoría', t: 'select', opts: Object.fromEntries(CATS.map(c => [c, c])) }, { k: 'monto', l: 'Monto (S/)', t: 'number', req: 1 }, { k: 'frecuencia', l: 'Frecuencia', t: 'select', opts: { diario: 'Diario', semanal: 'Semanal', mensual: 'Mensual', trimestral: 'Trimestral', anual: 'Anual', unico: 'Único (una sola vez)' }, def: 'mensual' }, { k: 'fecha', l: 'Fecha (solo si es Único)', t: 'date', def: hoy() }, { k: 'activo', l: 'Activo (cuenta en el cálculo)', t: 'check', def: true }];
 let gTab = 'fijos';
 function vGastos(el) {
   const T = totalesPlataformas(), totFijo = fijosMensual();
@@ -374,7 +375,6 @@ function vGastos(el) {
       <p class="note">Suscripciones cuentan como gasto fijo; la pauta, como gasto variable. Los % y costos por pedido se aplican a cada pedido y a la Calculadora.</p>`;
   }
   el.innerHTML = head + seg + body;
-  const cF = [{ k: 'nombre', l: 'Concepto', req: 1, full: 1 }, { k: 'categoria', l: 'Categoría', t: 'select', opts: Object.fromEntries(CATS.map(c => [c, c])) }, { k: 'monto', l: 'Monto (S/)', t: 'number', req: 1 }, { k: 'frecuencia', l: 'Frecuencia', t: 'select', opts: { diario: 'Diario', semanal: 'Semanal', mensual: 'Mensual', trimestral: 'Trimestral', anual: 'Anual', unico: 'Único (una sola vez)' }, def: 'mensual' }, { k: 'fecha', l: 'Fecha (solo si es Único)', t: 'date', def: hoy() }, { k: 'activo', l: 'Activo (cuenta en el cálculo)', t: 'check', def: true }];
   const cP = [{ k: 'nombre', l: 'Plataforma o gasto', req: 1, full: 1 }, { k: 'tipo', l: 'Tipo de cobro', t: 'select', opts: TIPOS, full: 1 }, { k: 'valor', l: 'Valor (S/ o %)', t: 'number', req: 1 }, { k: 'nota', l: 'Nota' }, { k: 'activo', l: 'Activo', t: 'check', def: true }];
   $('#nuevo').onclick = () => gTab === 'fijos' ? openForm('Nuevo gasto fijo', cF, {}, v => S.fijos.push({ id: uid(), ...v })) : openForm('Nueva plataforma', cP, { tipo: 'suscripcion' }, v => S.plataformas.push({ id: uid(), ...v }));
   el.querySelectorAll('#gseg button').forEach(b => b.onclick = () => { gTab = b.dataset.k; render(); });
@@ -451,11 +451,14 @@ function vCalc(el) {
       <label class="chk" style="margin:4px 0 10px"><input type="checkbox" data-c="usarPlat" ${C.usarPlat ? 'checked' : ''}> Incluir plataformas (${pct(T.pctVenta)} + ${fmt(T.porPedido)}/pedido + ${fmt(T.mensual)}/mes)</label>
       <label class="chk"><input type="checkbox" data-c="usarFijos" ${C.usarFijos ? 'checked' : ''}> Repartir gastos fijos (${fmt(fijosRecurrente())}/mes)</label>
       <label class="chk"><input type="checkbox" data-c="usarUnicos" ${C.usarUnicos ? 'checked' : ''}> Incluir gastos únicos de este mes (${fmt(unicosMes())})</label>
+      <div class="row" style="margin:8px 0"><button type="button" class="btn btn-sm" id="addUnico">+ Gasto único</button><button type="button" class="btn btn-sm" id="addFijo">+ Gasto fijo</button></div>
       <p class="note">IGV ${S.config.igv ? '18% incluido' : 'no aplicado'} · Renta ${S.config.renta}% · cámbialo en Ajustes.</p></div>
   </div><div id="res2"></div></div>
   ${guardadosHtml()}`;
   bindGuardados(el);
   $('#rst').onclick = () => { C = { ...CALC_DEF }; calcActual = null; guardarCalc(); render(); };
+  $('#addUnico').onclick = () => openForm('Nuevo gasto único', cF, { frecuencia: 'unico' }, v => { S.fijos.push({ id: uid(), ...v }); C.usarUnicos = true; guardarCalc(); });
+  $('#addFijo').onclick = () => openForm('Nuevo gasto fijo', cF, {}, v => { S.fijos.push({ id: uid(), ...v }); C.usarFijos = true; guardarCalc(); });
   el.querySelectorAll('[data-c]').forEach(i => i.oninput = () => { C[i.dataset.c] = i.type === 'checkbox' ? i.checked : i.type === 'text' ? i.value : num(i.value); guardarCalc(); pintarCalc(); });
   pintarCalc();
 }
