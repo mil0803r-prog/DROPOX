@@ -216,7 +216,8 @@ const Nube = (() => {
     addEventListener('online', refrescar);
   }
 
-  Object.assign(N, { push, cardHtml, bind, init });
+  const token = async () => { const { data } = await sb.auth.getSession(); return data.session ? data.session.access_token : null; };
+  Object.assign(N, { push, cardHtml, bind, init, token });
   return N;
 })();
 window.Nube = Nube;

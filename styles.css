@@ -268,3 +268,17 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .nube-link{background:none;border:0;color:var(--acc2);font:inherit;font-weight:600;font-size:13px;cursor:pointer;padding:4px}
 .nube-sep{display:flex;align-items:center;gap:10px;width:100%;color:var(--mut);font-size:12px}
 .nube-sep::before,.nube-sep::after{content:'';flex:1;height:1px;background:var(--line)}
+
+/* asistente IA */
+.as-chat{margin-top:18px;border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.as-chat h3{margin:0;font-size:15px}
+.as-chips{display:flex;gap:6px;flex-wrap:wrap}
+.as-chip{border:1px solid var(--line);background:var(--tile);color:var(--ink);border-radius:999px;padding:7px 12px;font:inherit;font-size:12.5px;cursor:pointer}
+.as-msgs{display:flex;flex-direction:column;gap:8px;max-height:38vh;overflow-y:auto}
+.as-m{max-width:88%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.45;overflow-wrap:anywhere}
+.as-u{align-self:flex-end;background:var(--acc);color:#fff}
+.as-a{align-self:flex-start;background:var(--tile);color:var(--ink)}
+.as-esp{opacity:.6}
+.as-fila{display:flex;gap:8px}
+.as-fila input{flex:1;min-width:0;padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:14px}
+.as-nota{font-size:12px;color:var(--mut)}
