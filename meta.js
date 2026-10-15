@@ -30,6 +30,17 @@ const Meta = (() => {
     const cu = j.cuenta || {};
     return { importado: true, fuente: txtc(j.fuente, 60), cuenta: { id: txtc(cu.id, 30), nombre: txtc(cu.nombre, 80), moneda: txtc(cu.moneda, 5) }, desde: fecha(j.desde), hasta: fecha(j.hasta), campanas, dias: (j.dias || []).slice(0, 400).map(d => ({ fecha: fecha(d.fecha), ...nm(d) })).filter(d => d.fecha), importado_en: new Date().toISOString() };
   }
+  // archivo cifrado que deja Claude en datos/meta.enc.json: solo se abre con la clave que tú elegiste
+  async function descifrar(obj, clave) {
+    const b = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+    const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(clave), 'PBKDF2', false, ['deriveKey']);
+    const k = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b(obj.salt), iterations: obj.iter, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b(obj.iv) }, k, b(obj.ct)));
+  }
+  function aplicarImport(txt) {
+    const snap = normalizarImport(txt); S.metaSnap = snap; datos = snap; clave = claveActual(); error = ''; falta = false; alimentarDashboard(snap); Store.save(); toast('Datos importados'); render();
+  }
+
   // los días importados de la cuenta correcta alimentan el Dashboard, sin borrar los de otras fechas
   function alimentarDashboard(snap) {
     if (String(snap.cuenta.id) !== META_CUENTA.id || !snap.dias.length) return;
@@ -154,11 +165,17 @@ const Meta = (() => {
     else if (window.Nube && Nube.activo) cuerpoH = `<div class="card"><p class="mt-aviso">Toca <b>Actualizar</b> para traer tus campañas, conjuntos y anuncios de Meta. No se actualiza solo.</p></div>`;
     else cuerpoH = `<div class="card"><p class="mt-aviso">Inicia sesión para ver las campañas de Meta.</p></div>`;
     const avisoErr = datos && datos.importado && error ? `<div class="card"><p class="mt-aviso">${esc(error)}</p></div>` : '';
-    const importador = demo() ? '' : `<details class="card mt-imp" ${!datos ? 'open' : ''}><summary><b>Importar datos de Meta</b></summary><p class="sub">Pídele a Claude que traiga tus campañas, copia el texto que te da y pégalo aquí.</p><textarea id="mimp" rows="5" placeholder="Pega aquí el texto"></textarea><div class="mt-impb"><button class="btn btn-pri btn-sm" id="mimpok" type="button">Importar</button>${S.metaSnap ? '<button class="btn btn-sm btn-del" id="mimpdel" type="button">Borrar lo importado</button>' : ''}</div><div class="nube-msg" id="mimpmsg"></div></details>`;
+    const importador = demo() ? '' : `<details class="card mt-imp" ${!datos ? 'open' : ''}><summary><b>Importar datos de Meta</b></summary><p class="sub">Si Claude dejó datos guardados, escribe tu clave y pulsa Cargar. O pega aquí el texto que te dio.</p><div class="mt-clave"><input id="mclave" type="password" autocomplete="off" placeholder="Tu clave"><button class="btn btn-pri btn-sm" id="mcargar" type="button">Cargar datos de Claude</button></div><textarea id="mimp" rows="5" placeholder="Pega aquí el texto"></textarea><div class="mt-impb"><button class="btn btn-pri btn-sm" id="mimpok" type="button">Importar</button>${S.metaSnap ? '<button class="btn btn-sm btn-del" id="mimpdel" type="button">Borrar lo importado</button>' : ''}</div><div class="nube-msg" id="mimpmsg"></div></details>`;
     el.innerHTML = cab + avisoErr + cuerpoH + importador;
     const ok = $('#mimpok');
     if (ok) ok.onclick = () => { const msg = $('#mimpmsg'); const t = ($('#mimp').value || '').trim(); if (!t) { msg.textContent = 'Pega primero el texto.'; return; }
-      try { const snap = normalizarImport(t); S.metaSnap = snap; datos = snap; clave = claveActual(); error = ''; falta = false; alimentarDashboard(snap); Store.save(); toast('Datos importados'); render(); } catch (e) { msg.textContent = e.message; } };
+      try { aplicarImport(t); } catch (e) { msg.textContent = e.message; } };
+    const cg = $('#mcargar');
+    if (cg) cg.onclick = async () => { const msg = $('#mimpmsg'), cl = ($('#mclave').value || '').trim(); if (!cl) { msg.textContent = 'Escribe tu clave.'; return; }
+      msg.textContent = 'Abriendo…';
+      let obj; try { const r = await fetch('datos/meta.enc.json', { cache: 'no-store' }); if (!r.ok) throw 0; obj = await r.json(); } catch (e) { msg.textContent = 'Todavía no hay datos guardados por Claude.'; return; }
+      let txt; try { txt = await descifrar(obj, cl); } catch (e) { msg.textContent = 'La clave no es correcta.'; return; }
+      try { aplicarImport(txt); } catch (e) { msg.textContent = e.message; } };
     const del = $('#mimpdel'); if (del) del.onclick = () => ask('¿Borrar los datos importados de Meta?', () => { delete S.metaSnap; if (datos && datos.importado) datos = null; Store.save(); render(); }, 'Borrar');
     const bt = $('#mact'); if (bt) bt.onclick = () => { cargar(true); sync(); render(); };
     const per = $('#per'); if (per) per.onchange = e => { S.config.periodo = e.target.value; Store.save(); render(); };

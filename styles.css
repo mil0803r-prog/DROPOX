@@ -369,3 +369,5 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .mt-imp summary{cursor:pointer;list-style:none}.mt-imp summary::-webkit-details-marker{display:none}
 .mt-imp textarea{width:100%;margin-top:6px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:12.5px/1.4 ui-monospace,Menlo,monospace;resize:vertical}
 .mt-impb{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.mt-clave{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.mt-clave input{flex:1 1 140px;min-width:0;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit}
