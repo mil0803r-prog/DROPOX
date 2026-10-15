@@ -392,7 +392,7 @@ const guardarCalc = () => { try { localStorage.setItem('dropox.calc2', JSON.stri
 function calcular(c, devolOverride) {
   const r = (devolOverride ?? c.devol) / 100, T = totalesPlataformas(), d = divIgv(), renta = num(S.config.renta) / 100, fd = num(S.config.factorDevolucion);
   const com = (num(c.comCod) + num(c.comExtra) + (c.usarPlat ? T.pctVenta : 0)) / 100, porPed = c.usarPlat ? T.porPedido : 0;
-  const admM = c.admModo === 'manual', admAuto = c.ventas > 0 ? ((c.usarFijos ? fijosRecurrente() : 0) + (c.usarUnicos ? unicosMes() : 0) + (c.usarPlat ? T.suscripcion : 0)) / c.ventas : 0, pautaAuto = c.ventas > 0 && c.usarPlat ? T.gasto / c.ventas : 0;
+  const admM = c.admModo === 'manual', admAuto = c.ventas > 0 ? ((c.usarFijos ? fijosMensual() : 0) + (c.usarPlat ? T.suscripcion : 0)) / c.ventas : 0, pautaAuto = c.ventas > 0 && c.usarPlat ? T.gasto / c.ventas : 0;
   const prorr = (admM ? num(c.admManual) : admAuto) + pautaAuto;
   const k = (1 - r) * ((1 - renta) / d - com);
   const flete = num(c.flete) * (1 + r * (fd - 1));
@@ -449,15 +449,15 @@ function vCalc(el) {
     <div class="card"><h3>Escala y objetivo</h3><p class="sub">Para repartir costos fijos y fijar tu meta</p>
       <div class="row">${n('margen', 'Margen objetivo (%)')}</div>
       <label class="chk" style="margin:4px 0 10px"><input type="checkbox" data-c="usarPlat" ${C.usarPlat ? 'checked' : ''}> Incluir plataformas (${pct(T.pctVenta)} + ${fmt(T.porPedido)}/pedido + ${fmt(T.mensual)}/mes)</label>
-      <label class="chk"><input type="checkbox" data-c="usarFijos" ${C.usarFijos ? 'checked' : ''}> Repartir gastos fijos (${fmt(fijosRecurrente())}/mes)</label>
-      <label class="chk"><input type="checkbox" data-c="usarUnicos" ${C.usarUnicos ? 'checked' : ''}> Incluir gastos únicos de este mes (${fmt(unicosMes())})</label>
+      <label class="chk"><input type="checkbox" data-c="usarFijos" ${C.usarFijos ? 'checked' : ''}> Repartir gastos fijos y únicos (${fmt(fijosMensual())}/mes)</label>
+      <div class="line" style="margin-top:8px"><span>Total gastos fijos + plataformas</span><b>${fmt(fijosMensual() + T.mensual)}/mes</b></div>
       <div class="row" style="margin:8px 0"><button type="button" class="btn btn-sm" id="addUnico">+ Gasto único</button><button type="button" class="btn btn-sm" id="addFijo">+ Gasto fijo</button></div>
       <p class="note">IGV ${S.config.igv ? '18% incluido' : 'no aplicado'} · Renta ${S.config.renta}% · cámbialo en Ajustes.</p></div>
   </div><div id="res2"></div></div>
   ${guardadosHtml()}`;
   bindGuardados(el);
   $('#rst').onclick = () => { C = { ...CALC_DEF }; calcActual = null; guardarCalc(); render(); };
-  $('#addUnico').onclick = () => openForm('Nuevo gasto único', cF, { frecuencia: 'unico' }, v => { S.fijos.push({ id: uid(), ...v }); C.usarUnicos = true; guardarCalc(); });
+  $('#addUnico').onclick = () => openForm('Nuevo gasto único', cF, { frecuencia: 'unico' }, v => { S.fijos.push({ id: uid(), ...v }); C.usarFijos = true; guardarCalc(); });
   $('#addFijo').onclick = () => openForm('Nuevo gasto fijo', cF, {}, v => { S.fijos.push({ id: uid(), ...v }); C.usarFijos = true; guardarCalc(); });
   el.querySelectorAll('[data-c]').forEach(i => i.oninput = () => { C[i.dataset.c] = i.type === 'checkbox' ? i.checked : i.type === 'text' ? i.value : num(i.value); guardarCalc(); pintarCalc(); });
   pintarCalc();
@@ -472,7 +472,7 @@ function pintarCalc() {
   const m = v => isFinite(v) && v > 0 ? fmt(v) : '<span class="neg">No alcanza</span>';
   $('#mini').innerHTML = `<span>Utilidad / pedido <b class="${cls(R.util)}">${fmt(R.util)}</b></span><span>Margen <b class="${cls(R.margen)}">${pct(R.margen)}</b></span><span>M. bruto <b class="${cls(R.margenBruto)}">${pct(R.margenBruto)}</b></span><span>Mes <b class="${cls(R.mensual)}">${fmt(R.mensual)}</b></span>`;
   $('#res').innerHTML = `<div class="hero ${hero}"><small>UTILIDAD POR PEDIDO DESPACHADO</small><div class="n">${fmt(R.util)}</div><span>${fmt(R.utilEnt)} por pedido entregado · margen ${pct(R.margen)}</span><div class="verdict">${vtxt}</div></div>`;
-  const T3 = totalesPlataformas(), gTot = (C.usarFijos ? fijosRecurrente() : 0) + (C.usarUnicos ? unicosMes() : 0) + (C.usarPlat ? T3.mensual : 0), nPed = num(C.ventas);
+  const T3 = totalesPlataformas(), gTot = (C.usarFijos ? fijosMensual() : 0) + (C.usarPlat ? T3.mensual : 0), nPed = num(C.ventas);
   $('#gTot').textContent = fmt(gTot); $('#gPed').textContent = nPed > 0 ? fmt(gTot / nPed) : '—';
   $('#res2').innerHTML = `
   <div class="card"><h3>Margen</h3>${gauge(R.margen, vc)}</div>
