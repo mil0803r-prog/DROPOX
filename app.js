@@ -49,7 +49,7 @@ const META_CUENTA = { id: '1226449025709907', nombre: 'Daniel San CUENTA PERU' }
 const metaOk = a => a.plataforma !== 'meta' || !a.cuenta || a.cuenta === META_CUENTA.id;
 function syncMeta() {
   const d = window.DROPOX_META;
-  S.ads = (S.ads || []).filter(a => a.src !== 'meta-api' && metaOk(a));
+  S.ads = (S.ads || []).filter(a => metaOk(a) && (!d || a.src !== 'meta-api'));
   if (d && d.cuenta && String(d.cuenta.id) === META_CUENTA.id && Array.isArray(d.dias)) {
     d.dias.forEach(x => S.ads.push({ id: 'meta' + x.fecha, plataforma: 'meta', cuenta: META_CUENTA.id, src: 'meta-api', fecha: x.fecha, gasto: num(x.gasto), pedidos: num(x.compras), ventas: num(x.ventas), campana: '' }));
   }
@@ -151,7 +151,8 @@ function analizar(pk) {
   [...ent, ...dev].forEach(p => { const z = desglose(p); for (const k in D) D[k] += z[k]; });
   const utilPed = D.ventas - D.igv - D.producto - D.flete - D.otros - D.comis - D.renta;
   // pauta: si hay gasto real registrado en Ads para Meta o TikTok, se usa ese; si no, el monto mensual de Plataformas
-  const adsReal = k => (S.ads || []).filter(a => a.plataforma === k && metaOk(a) && a.fecha >= from && a.fecha <= to).reduce((s, a) => s + num(a.gasto), 0);
+  // con Meta conectado, para Meta solo cuentan los datos automáticos de la API
+  const adsReal = k => (S.ads || []).filter(a => a.plataforma === k && metaOk(a) && (k !== 'meta' || !S.metaAuto || a.src === 'meta-api') && a.fecha >= from && a.fecha <= to).reduce((s, a) => s + num(a.gasto), 0);
   const pubReal = k => (S.pub || []).filter(a => a.plataforma === k && a.fecha >= from && a.fecha <= to).reduce((s, a) => s + num(a.gasto), 0);
   const tienePlat = k => S.plataformas.some(p => p.activo && p.tipo === 'gasto' && PAUTA_PAT[k].test(p.nombre));
   const fijos = (fijosMensual() + T.suscripcion) * f;
@@ -270,7 +271,7 @@ function insights(A) {
 const alertasHtml = L => L.length ? L.map(a => `<div class="al"><i class="dot ${a.c}"></i><div><b>${esc(a.t)}</b><span>${esc(a.d)}</span></div></div>`).join('') : '<div class="empty">Todo en orden. Sin alertas.</div>';
 
 // ───────── Vistas ─────────
-const VIEWS = { dashboard: vDashboard, calculadora: vCalc, pedidos: vPedidos, gastos: vGastos, meta: el => vAdsPlat(el, 'meta'), tiktok: el => vAdsPlat(el, 'tiktok'), ads: el => vAdsPlat(el, 'meta'), publicidad: vPublicidad, proyeccion: vProy, ajustes: vAjustes };
+const VIEWS = { dashboard: vDashboard, calculadora: vCalc, pedidos: vPedidos, gastos: vGastos, meta: el => { if (!(window.Meta && Meta.vista(el))) vAdsPlat(el, 'meta'); }, tiktok: el => vAdsPlat(el, 'tiktok'), ads: el => vAdsPlat(el, 'meta'), publicidad: vPublicidad, proyeccion: vProy, ajustes: vAjustes };
 let metrica = 'ventas', tabla = { dia: false, sem: false };
 
 function vDashboard(el) {

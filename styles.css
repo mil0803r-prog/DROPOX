@@ -338,3 +338,30 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .pb-s{font-size:12.5px;color:var(--mut)}
 .nota-pub{font-size:13px;color:var(--mut);background:var(--tile);border-radius:14px;padding:11px 14px;margin-bottom:12px}
 .nota-pub b{color:var(--ink)}
+
+/* Meta Ads automático */
+.mtag{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;white-space:nowrap}
+.mtag-ok{background:#05966922;color:var(--ok)}.mtag-off{background:var(--tile);color:var(--mut)}.mtag-warn{background:#d9770622;color:var(--warn)}.mtag-bad{background:#dc262622;color:var(--bad)}
+.mt-arbol{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.mt-n{border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.mt-n .mt-n{margin-top:8px;background:var(--tile)}
+.mt-n summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 14px;flex-wrap:wrap}
+.mt-n summary::-webkit-details-marker{display:none}
+.mt-n summary::before{content:'›';font-size:18px;line-height:1;color:var(--mut);transition:transform .15s}
+.mt-n[open]>summary::before{transform:rotate(90deg)}
+.mt-nom{flex:1 1 160px;min-width:0;font-weight:700;font-size:14px;overflow-wrap:anywhere}
+.mt-g{font-weight:800;font-size:14px;margin-left:auto}
+.mt-ad>summary .mt-nom{font-weight:600}
+.mt-cuerpo{padding:0 14px 14px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.mt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;width:100%}
+.mt-grid small{display:block;font-size:11px;color:var(--mut);font-weight:600}
+.mt-grid b{font-size:13.5px;overflow-wrap:anywhere}
+.mt-cuerpo>.mt-n{width:100%}
+@media (min-width:700px){.mt-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.mt-carga{display:flex;align-items:center;gap:10px;color:var(--mut)}
+.mt-carga i{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--acc);animation:mtgira .8s linear infinite}
+@keyframes mtgira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.mt-carga i{animation:none}}
+.mt-aviso{margin:0;color:var(--ink)}
+.mt-pasos{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:var(--mut)}
+.mt-pasos b{color:var(--ink)}

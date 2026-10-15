@@ -1,3 +1,6 @@
 {
-  "functions": { "api/asistente.js": { "maxDuration": 30 } }
+  "functions": {
+    "api/asistente.js": { "maxDuration": 30 },
+    "api/meta.js": { "maxDuration": 30 }
+  }
 }

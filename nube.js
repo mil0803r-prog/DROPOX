@@ -144,6 +144,8 @@ const Nube = (() => {
     document.getElementById('nubeUsaLocal').onclick = fnLocal;
   }
 
+  const avisar = () => dispatchEvent(new Event('dropox:listo'));
+
   async function entrar(u) {
     user = u; N.email = u.email || '';
     pantalla('<p class="nube-msg">Cargando tus datos…</p>');
@@ -154,10 +156,10 @@ const Nube = (() => {
       return;
     }
     const vinculado = ls.get(LK) === u.id, sucio = ls.get(DK) === '1';
-    const finalizar = () => { ls.set(LK, u.id); N.activo = true; sincronizado = true; cerrarPantalla(); render(); };
+    const finalizar = () => { ls.set(LK, u.id); N.activo = true; sincronizado = true; cerrarPantalla(); render(); avisar(); };
     if (!data) {
       N.activo = true; sincronizado = true; ls.set(LK, u.id); cerrarPantalla();
-      await subir(); render(); return;
+      await subir(); render(); avisar(); return;
     }
     if (vinculado && sucio) {
       remotoVer = data.actualizado; finalizar(); await subir(); return;
