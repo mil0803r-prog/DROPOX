@@ -383,3 +383,7 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .mt-tabla tfoot td:first-child{background:var(--tile)}
 .mt-padre{display:block;color:var(--mut);font-weight:500;font-size:11px;margin-top:2px}
 .tot-t{margin:14px 0 2px;font-weight:700;color:var(--ink);font-size:13px}
+.line3{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
+.line3 span:nth-child(n+2){text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.line3 .hl{font-weight:800}
+.line3-h{font-size:11.5px;color:var(--mut);font-weight:700;border-bottom:1px solid var(--line)}
