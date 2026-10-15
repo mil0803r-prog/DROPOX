@@ -290,3 +290,16 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .as-guia details{border-bottom:1px solid var(--line);padding:11px 0}
 .as-guia summary{font-weight:700;font-size:14px;cursor:pointer}
 .as-guia details p{margin:8px 0 10px;color:var(--mut);font-size:13.5px;line-height:1.5}
+
+/* menú lateral también en tablet y ventanas medianas (700–1023px) */
+@media (min-width:700px) and (max-width:1023px){
+  .wrap{max-width:none;margin:0 0 0 210px;padding:0 24px 48px}
+  .head{justify-content:flex-end;padding:16px 0 12px;margin-bottom:18px}
+  .brand{position:fixed;left:16px;top:16px;z-index:41}
+  .tabs{top:0;right:auto;bottom:0;width:210px;flex-direction:column;justify-content:flex-start;gap:4px;border-top:0;border-right:1px solid var(--line);padding:88px 12px 20px;overflow-y:auto}
+  .tabs a{flex:none;max-width:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:12px 14px;font-size:14px;border-radius:14px}
+  .tabs a svg{width:21px;height:21px;flex-shrink:0}
+  .tabs a:hover:not(.on){background:var(--tile)}
+  .fab{bottom:24px;right:24px}
+  .toast{bottom:32px}
+}
