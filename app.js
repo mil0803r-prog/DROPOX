@@ -17,6 +17,7 @@ const DEFAULTS = () => ({
   ],
   pedidos: [],
   ads: [],
+  cuentas: [],
   config: { igv: true, renta: 1, factorDevolucion: 2, moneda: 'PEN', tc: 3.75, tema: 'auto', nombre: '', periodo: 'mes' },
 });
 const Store = {
@@ -30,6 +31,13 @@ const Store = {
   save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('No se pudo guardar'); } if (window.Nube) Nube.push(); },
 };
 let S = Store.load();
+// Cuentas publicitarias: se crea una vez la cuenta de Meta que ya usaba la app y queda por defecto
+function asegurarCuentas() {
+  if (!Array.isArray(S.cuentas)) S.cuentas = [];
+  if (S.cuentasInit) return;
+  S.cuentasInit = true;
+  if (!S.cuentas.some(c => c.ref === META_CUENTA.id)) S.cuentas.unshift({ id: 'cta-meta-' + META_CUENTA.id, nombre: META_CUENTA.nombre, plataforma: 'meta', ref: META_CUENTA.id, predeterminada: !S.cuentas.some(c => c.predeterminada) });
+}
 // Meta Ads: solo se aceptan datos de esta cuenta publicitaria
 const META_CUENTA = { id: '1226449025709907', nombre: 'Daniel San CUENTA PERU' };
 const metaOk = a => a.plataforma !== 'meta' || !a.cuenta || a.cuenta === META_CUENTA.id;
@@ -457,10 +465,15 @@ function vAdsPlat(el, key) {
 
 // ── Publicidad manual: el gasto en anuncios de cualquier plataforma ──
 const PUBP = { meta: { n: 'Meta Ads', c: '#3b82f6' }, tiktok: { n: 'TikTok Ads', c: '#14b8a6' }, google: { n: 'Google Ads', c: '#f59e0b' }, influencer: { n: 'Influencers', c: '#ec4899' }, otro: { n: 'Otro', c: '#8b5cf6' } };
-let fPub = '';
+let fPub = '', fCta = '';
+const pubNom = k => (PUBP[k] || PUBP.otro).n;
+const ctaDe = a => (S.cuentas || []).find(c => c.id === a.cuentaId) || (a.cuenta ? (S.cuentas || []).find(c => c.ref && c.ref === a.cuenta) : null) || null;
+const ctaDefault = () => (S.cuentas || []).find(c => c.predeterminada) || null;
 function vPublicidad(el) {
-  const pk = S.config.periodo, [from, to] = rango(pk), nom = k => (PUBP[k] || PUBP.otro).n;
-  const todas = (S.ads || []).filter(a => metaOk(a) && a.fecha >= from && a.fecha <= to);
+  const pk = S.config.periodo, [from, to] = rango(pk), cuentas = S.cuentas || [];
+  if (fCta && !cuentas.some(c => c.id === fCta)) fCta = '';
+  const delPeriodo = (S.ads || []).filter(a => metaOk(a) && a.fecha >= from && a.fecha <= to);
+  const todas = delPeriodo.filter(a => !fCta || (ctaDe(a) || {}).id === fCta);
   const L = todas.filter(a => !fPub || a.plataforma === fPub).sort((a, b) => b.fecha.localeCompare(a.fecha));
   const sum = (arr, k) => arr.reduce((s, a) => s + num(a[k]), 0);
   const g = sum(L, 'gasto'), p = sum(L, 'pedidos'), v = sum(L, 'ventas');
@@ -469,21 +482,41 @@ function vPublicidad(el) {
   const gt = por.reduce((s, x) => s + x.g, 0);
   const tile = (l, val, s = '') => `<div class="t"><small>${l}</small><b>${val}</b>${s ? `<em>${s}</em>` : ''}</div>`;
   const chips = `<div class="chips"><button class="chip ${fPub === '' ? 'on' : ''}" data-p="">Todas<i>${todas.length}</i></button>${Object.entries(PUBP).map(([k, o]) => `<button class="chip ${fPub === k ? 'on' : ''}" data-p="${k}">${o.n}<i>${todas.filter(a => a.plataforma === k).length}</i></button>`).join('')}</div>`;
-  const reparto = por.length ? por.map(x => { const r = x.g > 0 && x.v > 0 ? x.v / x.g : null; return `<div class="pb-row"><div class="pb-top"><span>${esc(nom(x.k))}</span><span>${fmt(x.g)}</span></div><div class="pb-bar"><i style="width:${gt > 0 ? Math.max(2, x.g / gt * 100).toFixed(1) : 0}%;background:${(PUBP[x.k] || PUBP.otro).c}"></i></div><div class="pb-s">${gt > 0 ? (x.g / gt * 100).toFixed(0) + '% del gasto' : ''} · ${x.p} pedidos${r !== null ? ' · ROAS ' + r.toFixed(2) + 'x' : ''}</div></div>`; }).join('') : '<div class="empty">Aún no hay gasto en este periodo.</div>';
+  const reparto = por.length ? por.map(x => { const r = x.g > 0 && x.v > 0 ? x.v / x.g : null; return `<div class="pb-row"><div class="pb-top"><span>${esc(pubNom(x.k))}</span><span>${fmt(x.g)}</span></div><div class="pb-bar"><i style="width:${gt > 0 ? Math.max(2, x.g / gt * 100).toFixed(1) : 0}%;background:${(PUBP[x.k] || PUBP.otro).c}"></i></div><div class="pb-s">${gt > 0 ? (x.g / gt * 100).toFixed(0) + '% del gasto' : ''} · ${x.p} pedidos${r !== null ? ' · ROAS ' + r.toFixed(2) + 'x' : ''}</div></div>`; }).join('') : '<div class="empty">Aún no hay gasto en este periodo.</div>';
+  const filtroCta = cuentas.length ? `<div class="card card-row"><div><small class="cap">Cuenta publicitaria</small><b>${fCta ? esc((cuentas.find(c => c.id === fCta) || {}).nombre || '') : 'Todas las cuentas'}</b></div><select id="fcta"><option value="">Todas las cuentas</option>${cuentas.map(c => `<option value="${esc(c.id)}" ${c.id === fCta ? 'selected' : ''}>${esc(c.nombre)} · ${esc(pubNom(c.plataforma))}</option>`).join('')}</select></div>` : '';
+  const listaCtas = cuentas.length ? `<div class="list">${cuentas.map(c => { const gc = delPeriodo.filter(a => (ctaDe(a) || {}).id === c.id).reduce((s, a) => s + num(a.gasto), 0);
+    return `<div class="it"><div class="it-h"><b>${esc(c.nombre)}${c.predeterminada ? ' <span class="tag">Por defecto</span>' : ''}</b><span>${esc(pubNom(c.plataforma))}</span></div><div class="it-s">${c.ref ? 'ID ' + esc(c.ref) : 'Sin ID'} · ${fmt(gc)} en este periodo</div><div class="it-a" style="margin:0">${c.predeterminada ? '' : `<button class="btn btn-sm" data-cdef="${esc(c.id)}">Usar por defecto</button>`}<button class="btn btn-sm" data-ce="${esc(c.id)}">Editar</button><button class="btn btn-sm btn-del" data-cd="${esc(c.id)}">✕</button></div></div>`; }).join('')}</div>` : '<div class="empty">Agrega tu cuenta publicitaria para que quede elegida al registrar.</div>';
   el.innerHTML = `${secH('publicidad', 'Publicidad', 'Registra a mano lo que gastas en anuncios', '<button class="btn btn-pri" id="nuevo" style="white-space:nowrap">+ Registrar</button>')}
   <div class="card card-row per"><div><small class="cap">Periodo</small><b>Gasto en publicidad</b></div><select id="per">${Object.entries(PERIODOS).map(([k, l]) => `<option value="${k}" ${k === pk ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-  ${chips}
+  ${filtroCta}${chips}
   <div class="tiles">${tile('Gasto', fmt(g), `${L.length} registros`)}${tile('Pedidos generados', p)}${tile('Costo por pedido', cpa === null ? '—' : fmt(cpa))}${tile('ROAS', roas === null ? '—' : roas.toFixed(2) + 'x', 'ventas ÷ gasto')}</div>
   <div class="card"><h3>Gasto por plataforma</h3><p class="sub">Todo lo que registras aquí se descuenta de tu utilidad neta</p>${reparto}</div>
-  <div class="card"><h3>Registros</h3><p class="sub">${L.length ? 'Lo más reciente primero' : 'Anota cuánto gastas en publicidad, en la plataforma que sea.'}</p>${L.length ? `<div class="list">${L.map(a => { const c = num(a.pedidos) > 0 ? num(a.gasto) / num(a.pedidos) : null, r = num(a.gasto) > 0 && num(a.ventas) > 0 ? num(a.ventas) / num(a.gasto) : null;
-    return `<div class="it"><div class="it-h"><b>${esc(a.fecha.slice(8) + '/' + a.fecha.slice(5, 7))} · ${esc(nom(a.plataforma))}</b><b>${fmt(a.gasto)}</b></div><div class="it-s">${a.campana ? esc(a.campana) + ' · ' : ''}${num(a.pedidos)} pedidos${c !== null ? ' · ' + fmt(c) + ' c/u' : ''}${r !== null ? ' · ROAS ' + r.toFixed(2) + 'x' : ''}</div><div class="it-a" style="margin:0">${a.src === 'meta-api' ? '<span class="tag">Meta API</span>' : `<button class="btn btn-sm" data-e="${a.id}">Editar</button><button class="btn btn-sm btn-del" data-d="${a.id}">✕</button>`}</div></div>`; }).join('')}</div>` : '<div class="empty">Sin registros en este periodo.</div>'}</div>`;
-  const campos = () => [{ k: 'fecha', l: 'Fecha', t: 'date', def: hoy(), req: 1 }, { k: 'plataforma', l: 'Plataforma', t: 'select', opts: Object.fromEntries(Object.entries(PUBP).map(([k, o]) => [k, o.n])), def: fPub || 'meta' }, { k: 'gasto', l: 'Gasto (S/)', t: 'number', req: 1 }, { k: 'pedidos', l: 'Pedidos generados', t: 'number' }, { k: 'ventas', l: 'Ventas generadas (S/)', t: 'number' }, { k: 'campana', l: 'Campaña o nota (opcional)', full: 1 }];
-  const fijaCuenta = a => { if (a.plataforma === 'meta') a.cuenta = META_CUENTA.id; else delete a.cuenta; return a; };
-  $('#nuevo').onclick = () => openForm('Registrar publicidad', campos(), {}, x => (S.ads = S.ads || []).push(fijaCuenta({ id: uid(), ...x })));
+  <div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><h3>Cuentas publicitarias</h3><p class="sub">La cuenta por defecto aparece ya elegida al registrar</p></div><button class="btn btn-sm" id="nuevaCta" style="white-space:nowrap">+ Agregar cuenta</button></div>${listaCtas}</div>
+  <div class="card"><h3>Registros</h3><p class="sub">${L.length ? 'Lo más reciente primero' : 'Anota cuánto gastas en publicidad, en la plataforma que sea.'}</p>${L.length ? `<div class="list">${L.map(a => { const c = num(a.pedidos) > 0 ? num(a.gasto) / num(a.pedidos) : null, r = num(a.gasto) > 0 && num(a.ventas) > 0 ? num(a.ventas) / num(a.gasto) : null, ct = ctaDe(a);
+    return `<div class="it"><div class="it-h"><b>${esc(a.fecha.slice(8) + '/' + a.fecha.slice(5, 7))} · ${esc(pubNom(a.plataforma))}</b><b>${fmt(a.gasto)}</b></div><div class="it-s">${ct ? esc(ct.nombre) + ' · ' : ''}${a.campana ? esc(a.campana) + ' · ' : ''}${num(a.pedidos)} pedidos${c !== null ? ' · ' + fmt(c) + ' c/u' : ''}${r !== null ? ' · ROAS ' + r.toFixed(2) + 'x' : ''}</div><div class="it-a" style="margin:0">${a.src === 'meta-api' ? '<span class="tag">Meta API</span>' : `<button class="btn btn-sm" data-e="${a.id}">Editar</button><button class="btn btn-sm btn-del" data-d="${a.id}">✕</button>`}</div></div>`; }).join('')}</div>` : '<div class="empty">Sin registros en este periodo.</div>'}</div>`;
+
+  // formulario del gasto: al elegir una cuenta, la plataforma se ajusta sola
+  const campos = () => [{ k: 'fecha', l: 'Fecha', t: 'date', def: hoy(), req: 1 },
+    { k: 'cuentaId', l: 'Cuenta publicitaria', t: 'select', opts: { '': 'Sin cuenta', ...Object.fromEntries(cuentas.map(c => [c.id, `${c.nombre} · ${pubNom(c.plataforma)}`])) } },
+    { k: 'plataforma', l: 'Plataforma', t: 'select', opts: Object.fromEntries(Object.entries(PUBP).map(([k, o]) => [k, o.n])) },
+    { k: 'gasto', l: 'Gasto (S/)', t: 'number', req: 1 }, { k: 'pedidos', l: 'Pedidos generados', t: 'number' }, { k: 'ventas', l: 'Ventas generadas (S/)', t: 'number' }, { k: 'campana', l: 'Campaña o nota (opcional)', full: 1 }];
+  const enlazar = () => { const sc = $('#dlgForm').elements.cuentaId, sp = $('#dlgForm').elements.plataforma; if (sc && sp) sc.onchange = () => { const c = cuentas.find(x => x.id === sc.value); if (c) sp.value = c.plataforma; }; };
+  const fijar = a => { if (!a.cuentaId) delete a.cuentaId; if (a.plataforma === 'meta') a.cuenta = META_CUENTA.id; else delete a.cuenta; return a; };
+  const nuevoVals = () => { const d = ctaDefault(), pf = fPub || (d ? d.plataforma : 'meta'); const c = d && d.plataforma === pf ? d : cuentas.find(x => x.plataforma === pf); return { cuentaId: c ? c.id : '', plataforma: pf }; };
+  $('#nuevo').onclick = () => { openForm('Registrar publicidad', campos(), nuevoVals(), x => (S.ads = S.ads || []).push(fijar({ id: uid(), ...x }))); enlazar(); };
   $('#per').onchange = e => { S.config.periodo = e.target.value; Store.save(); render(); };
+  const fc = $('#fcta'); if (fc) fc.onchange = e => { fCta = e.target.value; render(); };
   el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { fPub = b.dataset.p; render(); });
-  el.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { const a = S.ads.find(x => x.id === b.dataset.e); openForm('Editar publicidad', campos(), a, x => fijaCuenta(Object.assign(a, x))); });
+  el.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { const a = S.ads.find(x => x.id === b.dataset.e), c = ctaDe(a); openForm('Editar publicidad', campos(), { ...a, cuentaId: c ? c.id : '' }, x => fijar(Object.assign(a, x))); enlazar(); });
   el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => confirmDel('¿Eliminar este registro?', () => S.ads = S.ads.filter(x => x.id !== b.dataset.d)));
+
+  // cuentas publicitarias
+  const camposCta = [{ k: 'nombre', l: 'Nombre de la cuenta', req: 1, full: 1 }, { k: 'plataforma', l: 'Plataforma', t: 'select', opts: Object.fromEntries(Object.entries(PUBP).map(([k, o]) => [k, o.n])) }, { k: 'ref', l: 'ID de la cuenta (opcional)' }, { k: 'predeterminada', l: 'Usar esta cuenta por defecto', t: 'check', full: 1 }];
+  const guardarCta = (c, x) => { Object.assign(c, x); if (!x.ref) c.ref = ''; if (c.predeterminada) S.cuentas.forEach(o => { if (o !== c) o.predeterminada = false; }); if (!S.cuentas.some(o => o.predeterminada)) S.cuentas[0].predeterminada = true; };
+  $('#nuevaCta').onclick = () => openForm('Nueva cuenta publicitaria', camposCta, { plataforma: fPub || 'meta', predeterminada: !cuentas.length }, x => { const c = { id: uid() }; S.cuentas.push(c); guardarCta(c, x); });
+  el.querySelectorAll('[data-ce]').forEach(b => b.onclick = () => { const c = S.cuentas.find(x => x.id === b.dataset.ce); openForm('Editar cuenta publicitaria', camposCta, c, x => guardarCta(c, x)); });
+  el.querySelectorAll('[data-cdef]').forEach(b => b.onclick = () => { S.cuentas.forEach(c => { c.predeterminada = c.id === b.dataset.cdef; }); Store.save(); render(); });
+  el.querySelectorAll('[data-cd]').forEach(b => b.onclick = () => confirmDel('¿Eliminar esta cuenta? Los registros se conservan, solo quedan sin cuenta.', () => { const id = b.dataset.cd; S.cuentas = S.cuentas.filter(c => c.id !== id); S.ads.forEach(a => { if (a.cuentaId === id) delete a.cuentaId; }); if (S.cuentas.length && !S.cuentas.some(c => c.predeterminada)) S.cuentas[0].predeterminada = true; }));
 }
 
 // ── Proyección ──
@@ -549,6 +582,8 @@ function cargarDemo() {
   S.ads = S.ads || [];
   for (let i = 0; i < 14; i++) { const d = new Date(); d.setDate(d.getDate() - i); const f = iso(d); S.ads.push({ id: uid(), fecha: f, plataforma: 'meta', gasto: 40 + (i * 7) % 25, pedidos: 2 + i % 3, ventas: 180 + (i * 23) % 120, campana: 'Conversiones' }, { id: uid(), fecha: f, plataforma: 'tiktok', gasto: 15 + (i * 5) % 14, pedidos: 1 + i % 2, ventas: 80 + (i * 17) % 70, campana: 'Video viral' }); }
   for (let i = 0; i < 14; i += 3) { const d = new Date(); d.setDate(d.getDate() - i); S.ads.push({ id: uid(), fecha: iso(d), plataforma: 'google', gasto: 22 + i, pedidos: 1, ventas: 79, campana: 'Búsqueda' }); }
+  S.cuentas.push({ id: 'cta-demo-tiktok', nombre: 'TikTok principal', plataforma: 'tiktok', ref: '', predeterminada: false }, { id: 'cta-demo-google', nombre: 'Google Ads tienda', plataforma: 'google', ref: '', predeterminada: false });
+  S.ads.forEach(a => { if (!a.cuentaId && a.plataforma === 'meta') a.cuentaId = 'cta-meta-' + META_CUENTA.id; if (!a.cuentaId && a.plataforma === 'tiktok') a.cuentaId = 'cta-demo-tiktok'; if (!a.cuentaId && a.plataforma === 'google') a.cuentaId = 'cta-demo-google'; });
   S.ads.push({ id: uid(), fecha: hoy(), plataforma: 'influencer', gasto: 150, pedidos: 3, ventas: 267, campana: 'Reel con creadora' });
   const ciu = ['Lima', 'Arequipa', 'Trujillo', 'Piura', 'Cusco', 'Chiclayo'], est = ['entregado', 'entregado', 'entregado', 'entregado', 'devuelto', 'entregado', 'enruta', 'pendiente'];
   for (let i = 0; i < 40; i++) { const d = new Date(); d.setDate(d.getDate() - Math.floor(i * 0.9)); S.pedidos.push({ id: uid(), fecha: iso(d), estado: i < 4 ? ['pendiente', 'enruta', 'enruta', 'pendiente'][i] : est[i % 8], producto: i % 2 ? 'Masajeador cervical' : 'Faja moldeadora', cliente: 'Cliente ' + (i + 1), telefono: '9' + String(10000000 + i * 137), ciudad: ciu[i % 6], canal: 'Tienda', cantidad: i % 5 === 0 ? 2 : 1, precio: i % 2 ? 99 : 79, costo: i % 2 ? 28 : 22, flete: 12, otros: 2 }); }
@@ -571,6 +606,7 @@ function aplicarTema() {
   document.querySelectorAll('#monSeg button').forEach(b => b.classList.toggle('on', b.dataset.m === S.config.moneda));
 }
 function render() {
+  asegurarCuentas();
   const key = VIEWS[vista] ? vista : 'dashboard';
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.v === key));
   aplicarTema();
