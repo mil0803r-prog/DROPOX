@@ -381,7 +381,7 @@ function vGastos(el) {
 }
 
 // ── Calculadora ──
-const CALC_DEF = { precio: 0, costo: 0, flete: 0, empaque: 0, comCod: 0, comExtra: 0, cpa: 0, devol: 0, ventas: 0, usarPlat: true, usarFijos: true, margen: 0, admModo: 'auto', admManual: 0 };
+const CALC_DEF = { nombre: '', precio: 0, costo: 0, flete: 0, empaque: 0, comCod: 0, comExtra: 0, cpa: 0, devol: 0, ventas: 0, usarPlat: true, usarFijos: true, margen: 0, admModo: 'auto', admManual: 0 };
 let C = Object.assign({}, CALC_DEF, (() => { try { return JSON.parse(localStorage.getItem('dropox.calc2')) || {}; } catch (e) { return {}; } })());
 const guardarCalc = () => { try { localStorage.setItem('dropox.calc2', JSON.stringify(C)); } catch (e) {} };
 
@@ -402,7 +402,7 @@ function calcular(c, devolOverride) {
 }
 // ── Calculadora: productos guardados ──
 let calcActual = null;
-const CAMPOS_CALC = ['precio', 'costo', 'flete', 'empaque', 'comCod', 'comExtra', 'cpa', 'devol', 'ventas', 'margen', 'usarPlat', 'usarFijos'];
+const CAMPOS_CALC = ['nombre', 'precio', 'costo', 'flete', 'empaque', 'comCod', 'comExtra', 'cpa', 'devol', 'ventas', 'margen', 'usarPlat', 'usarFijos'];
 function guardadosHtml() {
   const L = (S.calcs || []).slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   const filas = L.map(it => { const R = calcular({ ...CALC_DEF, ...it.c }), f = it.fecha ? it.fecha.slice(8) + '/' + it.fecha.slice(5, 7) : '';
@@ -411,18 +411,16 @@ function guardadosHtml() {
 }
 function bindGuardados(el) {
   $('#gcalc').onclick = () => {
+    const nombre = String(C.nombre || '').trim();
+    if (!nombre) { toast('Escribe primero el nombre del producto'); $('[data-c=nombre]').focus(); return; }
     if (!num(C.precio)) { toast('Escribe primero el precio de venta'); return; }
-    const cur = (S.calcs || []).find(x => x.id === calcActual);
-    const campos = [{ k: 'nombre', l: 'Nombre del producto', req: 1, full: 1 }];
-    if (cur) campos.push({ k: 'actualizar', l: `Actualizar «${cur.nombre}» en vez de crear otro`, t: 'check', full: 1 });
-    openForm('Guardar producto', campos, { nombre: cur ? cur.nombre : '', actualizar: true }, x => {
-      const snap = {}; CAMPOS_CALC.forEach(k => { snap[k] = C[k]; });
-      if (cur && x.actualizar) Object.assign(cur, { nombre: x.nombre, c: snap, fecha: hoy() });
-      else { const it = { id: uid(), nombre: x.nombre, fecha: hoy(), c: snap }; (S.calcs = S.calcs || []).push(it); calcActual = it.id; }
-      toast('Producto guardado');
-    });
+    const snap = {}; CAMPOS_CALC.forEach(k => { snap[k] = C[k]; }); snap.nombre = nombre;
+    const lista = (S.calcs = S.calcs || []), ya = lista.find(x => String(x.nombre).trim().toLowerCase() === nombre.toLowerCase());
+    if (ya) { Object.assign(ya, { nombre, c: snap, fecha: hoy() }); calcActual = ya.id; toast('Producto actualizado'); }
+    else { const it = { id: uid(), nombre, fecha: hoy(), c: snap }; lista.push(it); calcActual = it.id; toast('Producto guardado'); }
+    Store.save(); render();
   };
-  el.querySelectorAll('[data-gl]').forEach(b => b.onclick = () => { const it = (S.calcs || []).find(x => x.id === b.dataset.gl); if (!it) return; C = { ...CALC_DEF, ...it.c }; calcActual = it.id; guardarCalc(); render(); scrollTo(0, 0); toast('Cargado: ' + it.nombre); });
+  el.querySelectorAll('[data-gl]').forEach(b => b.onclick = () => { const it = (S.calcs || []).find(x => x.id === b.dataset.gl); if (!it) return; C = { ...CALC_DEF, ...it.c, nombre: it.nombre }; calcActual = it.id; guardarCalc(); render(); scrollTo(0, 0); toast('Cargado: ' + it.nombre); });
   el.querySelectorAll('[data-gd]').forEach(b => b.onclick = () => confirmDel('¿Eliminar este producto guardado?', () => { S.calcs = (S.calcs || []).filter(x => x.id !== b.dataset.gd); if (calcActual === b.dataset.gd) calcActual = null; }));
 }
 function vCalc(el) {
@@ -434,7 +432,7 @@ function vCalc(el) {
   <div id="res"></div>
   <div class="two"><div>
     <div class="card"><h3>Producto</h3><p class="sub">${S.config.igv ? 'El precio incluye IGV 18%' : 'Precios sin IGV'}</p>
-      <div class="row">${n('precio', 'Precio de venta (S/)')}${n('costo', 'Costo del producto (S/)')}${n('flete', 'Flete de envío (S/)')}${n('empaque', 'Empaque / otros (S/)')}</div></div>
+      <div class="row"><div class="field" style="grid-column:1/-1"><label>Nombre del producto</label><input data-c="nombre" type="text" maxlength="80" autocomplete="off" placeholder="Ej. Masajeador cervical" value="${esc(C.nombre)}"></div>${n('precio', 'Precio de venta (S/)')}${n('costo', 'Costo del producto (S/)')}${n('flete', 'Flete de envío (S/)')}${n('empaque', 'Empaque / otros (S/)')}</div></div>
     <div class="card"><h3>Publicidad y devoluciones</h3><p class="sub">Lo que más mueve tu utilidad</p>
       <div class="row">${n('cpa', 'Pauta por pedido (S/)', 'CPA por pedido despachado')}${n('devol', '% de devolución', 'Pierdes el flete ida y vuelta')}${n('comCod', 'Comisión contraentrega (%)', 'Courier o agente')}${n('comExtra', 'Otra comisión (%)', 'Pasarela, marketplace')}</div>
     </div>
@@ -451,7 +449,7 @@ function vCalc(el) {
   ${guardadosHtml()}`;
   bindGuardados(el);
   $('#rst').onclick = () => { C = { ...CALC_DEF }; calcActual = null; guardarCalc(); render(); };
-  el.querySelectorAll('[data-c]').forEach(i => i.oninput = () => { C[i.dataset.c] = i.type === 'checkbox' ? i.checked : num(i.value); guardarCalc(); pintarCalc(); });
+  el.querySelectorAll('[data-c]').forEach(i => i.oninput = () => { C[i.dataset.c] = i.type === 'checkbox' ? i.checked : i.type === 'text' ? i.value : num(i.value); guardarCalc(); pintarCalc(); });
   pintarCalc();
 }
 function pintarCalc() {
