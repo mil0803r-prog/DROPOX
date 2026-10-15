@@ -3,7 +3,7 @@
 const URL_SB = process.env.SUPABASE_URL || 'https://ehlkytblkxupiepbtgja.supabase.co';
 const KEY_SB = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_fOT8lAd9F19z1piNdCWX9A_stA2MDjU';
 const MODELO = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-const MODELO_RESPALDO = 'gemini-flash-latest';
+const MODELOS = [...new Set([MODELO, 'gemini-2.5-flash-lite', 'gemini-flash-latest'])];
 
 const SISTEMA = `Eres el asistente de DROPOX, un panel de finanzas para vendedores de ecommerce con pago contra entrega en Perú. La moneda es el sol (S/) salvo que el contexto diga otra.
 Responde en español claro y breve (máximo 150 palabras, salvo que pidan más detalle). Usa solo las cifras del contexto. Si falta un dato, dilo y no lo inventes.
@@ -44,17 +44,22 @@ module.exports = async (req, res) => {
     generationConfig: { maxOutputTokens: 900, temperature: 0.5 },
   });
   const llamar = modelo => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelo)}:generateContent`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': clave }, body: cuerpo,
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': clave }, body: cuerpo, signal: AbortSignal.timeout(8000),
   });
 
   try {
-    let r = await llamar(MODELO);
-    if (r.status === 404 && MODELO !== MODELO_RESPALDO) r = await llamar(MODELO_RESPALDO);
+    let r;
+    for (const m of MODELOS) {
+      try { r = await llamar(m); } catch (e) { r = { ok: false, status: 504, json: async () => ({}) }; }
+      if (r.ok || ![404, 429, 500, 503, 504].includes(r.status)) break;
+      console.error('Gemini', m, 'falló con', r.status, 'probando el siguiente');
+    }
     if (!r.ok) {
       const det = await r.json().catch(() => ({}));
       const msg = String((det.error && det.error.message) || '');
       console.error('Gemini error', r.status, msg.slice(0, 300));
       if (r.status === 429) return res.status(429).json({ error: 'Se agotó el límite de la IA por ahora. Intenta en unos minutos.' });
+      if (r.status === 503 || r.status === 504) return res.status(502).json({ error: 'La IA de Google está saturada en este momento. Intenta de nuevo en un minuto.' });
       if (/api key not valid|API_KEY_INVALID|expired/i.test(msg)) return res.status(502).json({ error: 'La clave de Gemini no es válida. Crea una nueva en aistudio.google.com/apikey y guárdala en Vercel.' });
       if (r.status === 403) return res.status(502).json({ error: 'La clave de Gemini no tiene permiso. Crea una nueva clave en aistudio.google.com/apikey.' });
       if (r.status === 404) return res.status(502).json({ error: 'El modelo de IA ya no está disponible. Avisa para actualizarlo.' });
