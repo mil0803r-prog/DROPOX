@@ -81,6 +81,7 @@ const IC = {
   ajustes: '<circle cx="12" cy="12" r="3"/><path d="M19.400 15a1.700 1.700 0 0 0 .3 1.800l.1.100a2 2 0 1 1-2.800 2.800l-.1-.1a1.700 1.700 0 0 0-1.800-.3 1.700 1.700 0 0 0-1 1.500V21a2 2 0 1 1-4 0v-.1a1.700 1.700 0 0 0-1.100-1.500 1.700 1.700 0 0 0-1.800.3l-.1.1a2 2 0 1 1-2.800-2.800l.1-.1a1.700 1.700 0 0 0 .3-1.800 1.700 1.700 0 0 0-1.500-1H3a2 2 0 1 1 0-4h.1a1.700 1.700 0 0 0 1.500-1.100 1.700 1.700 0 0 0-.3-1.800l-.1-.1a2 2 0 1 1 2.800-2.800l.1.100a1.700 1.700 0 0 0 1.800.3H9a1.700 1.700 0 0 0 1-1.500V3a2 2 0 1 1 4 0v.1a1.700 1.700 0 0 0 1 1.500 1.700 1.700 0 0 0 1.800-.3l.1-.1a2 2 0 1 1 2.800 2.800l-.1.100a1.700 1.700 0 0 0-.3 1.800V9a1.700 1.700 0 0 0 1.500 1H21a2 2 0 1 1 0 4h-.1a1.700 1.700 0 0 0-1.500 1z"/>',
   chispa: '<path d="M12 3l1.900 5.100L19 10l-5.100 1.900L12 17l-1.900-5.100L5 10l5.100-1.900zM19 15l.8 2.200L22 18l-2.200.8L19 21l-.8-2.200L16 18l2.200-.8z"/>',
 };
+IC.publicidad = IC.ads;
 const svg = (k, w = 1.9) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`;
 
 // ───────── Periodos ─────────
@@ -127,6 +128,7 @@ const utilPedido = p => { const z = desglose(p); return z.ventas - z.igv - z.pro
 const enCurso = p => p.estado === 'pendiente' || p.estado === 'enruta';
 const cerrado = p => p.estado === 'entregado' || p.estado === 'devuelto';
 
+const PAUTA_PAT = { meta: /meta/i, tiktok: /tiktok/i, google: /google/i };
 function analizar(pk) {
   const [from, to] = rango(pk), f = factorPeriodo(pk), T = totalesPlataformas();
   const P = S.pedidos.filter(p => p.fecha >= from && p.fecha <= to);
@@ -138,9 +140,9 @@ function analizar(pk) {
   const adsReal = k => (S.ads || []).filter(a => a.plataforma === k && metaOk(a) && a.fecha >= from && a.fecha <= to).reduce((s, a) => s + num(a.gasto), 0);
   const fijos = (fijosMensual() + T.suscripcion) * f;
   const vars = S.plataformas.filter(p => p.activo && p.tipo === 'gasto').reduce((s, p) => {
-    const k = /meta/i.test(p.nombre) ? 'meta' : /tiktok/i.test(p.nombre) ? 'tiktok' : '', real = k ? adsReal(k) : 0;
+    const k = Object.keys(PAUTA_PAT).find(x => PAUTA_PAT[x].test(p.nombre)) || '', real = k ? adsReal(k) : 0;
     return s + (real > 0 ? real : num(p.valor) * f);
-  }, 0) + ['meta', 'tiktok'].filter(k => !S.plataformas.some(p => p.activo && p.tipo === 'gasto' && (k === 'meta' ? /meta/i : /tiktok/i).test(p.nombre))).reduce((s, k) => s + adsReal(k), 0);
+  }, 0) + ['meta', 'tiktok', 'google', 'influencer', 'otro'].filter(k => !PAUTA_PAT[k] || !S.plataformas.some(p => p.activo && p.tipo === 'gasto' && PAUTA_PAT[k].test(p.nombre))).reduce((s, k) => s + adsReal(k), 0);
   return {
     P, ent, dev, curso, D, utilPed, fijos, vars, neta: utilPed - fijos - vars, f,
     tasa: ent.length + dev.length ? ent.length / (ent.length + dev.length) * 100 : null,
@@ -251,7 +253,7 @@ function insights(A) {
 const alertasHtml = L => L.length ? L.map(a => `<div class="al"><i class="dot ${a.c}"></i><div><b>${esc(a.t)}</b><span>${esc(a.d)}</span></div></div>`).join('') : '<div class="empty">Todo en orden. Sin alertas.</div>';
 
 // ───────── Vistas ─────────
-const VIEWS = { dashboard: vDashboard, calculadora: vCalc, pedidos: vPedidos, gastos: vGastos, meta: el => vAdsPlat(el, 'meta'), tiktok: el => vAdsPlat(el, 'tiktok'), ads: el => vAdsPlat(el, 'meta'), proyeccion: vProy, ajustes: vAjustes };
+const VIEWS = { dashboard: vDashboard, calculadora: vCalc, pedidos: vPedidos, gastos: vGastos, meta: el => vAdsPlat(el, 'meta'), tiktok: el => vAdsPlat(el, 'tiktok'), ads: el => vAdsPlat(el, 'meta'), publicidad: vPublicidad, proyeccion: vProy, ajustes: vAjustes };
 let metrica = 'ventas', tabla = { dia: false, sem: false };
 
 function vDashboard(el) {
@@ -453,6 +455,37 @@ function vAdsPlat(el, key) {
   el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => confirmDel('¿Eliminar este registro?', () => S.ads = S.ads.filter(x => x.id !== b.dataset.d)));
 }
 
+// ── Publicidad manual: el gasto en anuncios de cualquier plataforma ──
+const PUBP = { meta: { n: 'Meta Ads', c: '#3b82f6' }, tiktok: { n: 'TikTok Ads', c: '#14b8a6' }, google: { n: 'Google Ads', c: '#f59e0b' }, influencer: { n: 'Influencers', c: '#ec4899' }, otro: { n: 'Otro', c: '#8b5cf6' } };
+let fPub = '';
+function vPublicidad(el) {
+  const pk = S.config.periodo, [from, to] = rango(pk), nom = k => (PUBP[k] || PUBP.otro).n;
+  const todas = (S.ads || []).filter(a => metaOk(a) && a.fecha >= from && a.fecha <= to);
+  const L = todas.filter(a => !fPub || a.plataforma === fPub).sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const sum = (arr, k) => arr.reduce((s, a) => s + num(a[k]), 0);
+  const g = sum(L, 'gasto'), p = sum(L, 'pedidos'), v = sum(L, 'ventas');
+  const cpa = p > 0 ? g / p : null, roas = g > 0 && v > 0 ? v / g : null;
+  const por = Object.keys(PUBP).map(k => { const x = todas.filter(a => a.plataforma === k); return { k, g: sum(x, 'gasto'), p: sum(x, 'pedidos'), v: sum(x, 'ventas'), n: x.length }; }).filter(x => x.n);
+  const gt = por.reduce((s, x) => s + x.g, 0);
+  const tile = (l, val, s = '') => `<div class="t"><small>${l}</small><b>${val}</b>${s ? `<em>${s}</em>` : ''}</div>`;
+  const chips = `<div class="chips"><button class="chip ${fPub === '' ? 'on' : ''}" data-p="">Todas<i>${todas.length}</i></button>${Object.entries(PUBP).map(([k, o]) => `<button class="chip ${fPub === k ? 'on' : ''}" data-p="${k}">${o.n}<i>${todas.filter(a => a.plataforma === k).length}</i></button>`).join('')}</div>`;
+  const reparto = por.length ? por.map(x => { const r = x.g > 0 && x.v > 0 ? x.v / x.g : null; return `<div class="pb-row"><div class="pb-top"><span>${esc(nom(x.k))}</span><span>${fmt(x.g)}</span></div><div class="pb-bar"><i style="width:${gt > 0 ? Math.max(2, x.g / gt * 100).toFixed(1) : 0}%;background:${(PUBP[x.k] || PUBP.otro).c}"></i></div><div class="pb-s">${gt > 0 ? (x.g / gt * 100).toFixed(0) + '% del gasto' : ''} · ${x.p} pedidos${r !== null ? ' · ROAS ' + r.toFixed(2) + 'x' : ''}</div></div>`; }).join('') : '<div class="empty">Aún no hay gasto en este periodo.</div>';
+  el.innerHTML = `${secH('publicidad', 'Publicidad', 'Registra a mano lo que gastas en anuncios', '<button class="btn btn-pri" id="nuevo" style="white-space:nowrap">+ Registrar</button>')}
+  <div class="card card-row per"><div><small class="cap">Periodo</small><b>Gasto en publicidad</b></div><select id="per">${Object.entries(PERIODOS).map(([k, l]) => `<option value="${k}" ${k === pk ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+  ${chips}
+  <div class="tiles">${tile('Gasto', fmt(g), `${L.length} registros`)}${tile('Pedidos generados', p)}${tile('Costo por pedido', cpa === null ? '—' : fmt(cpa))}${tile('ROAS', roas === null ? '—' : roas.toFixed(2) + 'x', 'ventas ÷ gasto')}</div>
+  <div class="card"><h3>Gasto por plataforma</h3><p class="sub">Todo lo que registras aquí se descuenta de tu utilidad neta</p>${reparto}</div>
+  <div class="card"><h3>Registros</h3><p class="sub">${L.length ? 'Lo más reciente primero' : 'Anota cuánto gastas en publicidad, en la plataforma que sea.'}</p>${L.length ? `<div class="list">${L.map(a => { const c = num(a.pedidos) > 0 ? num(a.gasto) / num(a.pedidos) : null, r = num(a.gasto) > 0 && num(a.ventas) > 0 ? num(a.ventas) / num(a.gasto) : null;
+    return `<div class="it"><div class="it-h"><b>${esc(a.fecha.slice(8) + '/' + a.fecha.slice(5, 7))} · ${esc(nom(a.plataforma))}</b><b>${fmt(a.gasto)}</b></div><div class="it-s">${a.campana ? esc(a.campana) + ' · ' : ''}${num(a.pedidos)} pedidos${c !== null ? ' · ' + fmt(c) + ' c/u' : ''}${r !== null ? ' · ROAS ' + r.toFixed(2) + 'x' : ''}</div><div class="it-a" style="margin:0">${a.src === 'meta-api' ? '<span class="tag">Meta API</span>' : `<button class="btn btn-sm" data-e="${a.id}">Editar</button><button class="btn btn-sm btn-del" data-d="${a.id}">✕</button>`}</div></div>`; }).join('')}</div>` : '<div class="empty">Sin registros en este periodo.</div>'}</div>`;
+  const campos = () => [{ k: 'fecha', l: 'Fecha', t: 'date', def: hoy(), req: 1 }, { k: 'plataforma', l: 'Plataforma', t: 'select', opts: Object.fromEntries(Object.entries(PUBP).map(([k, o]) => [k, o.n])), def: fPub || 'meta' }, { k: 'gasto', l: 'Gasto (S/)', t: 'number', req: 1 }, { k: 'pedidos', l: 'Pedidos generados', t: 'number' }, { k: 'ventas', l: 'Ventas generadas (S/)', t: 'number' }, { k: 'campana', l: 'Campaña o nota (opcional)', full: 1 }];
+  const fijaCuenta = a => { if (a.plataforma === 'meta') a.cuenta = META_CUENTA.id; else delete a.cuenta; return a; };
+  $('#nuevo').onclick = () => openForm('Registrar publicidad', campos(), {}, x => (S.ads = S.ads || []).push(fijaCuenta({ id: uid(), ...x })));
+  $('#per').onchange = e => { S.config.periodo = e.target.value; Store.save(); render(); };
+  el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { fPub = b.dataset.p; render(); });
+  el.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { const a = S.ads.find(x => x.id === b.dataset.e); openForm('Editar publicidad', campos(), a, x => fijaCuenta(Object.assign(a, x))); });
+  el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => confirmDel('¿Eliminar este registro?', () => S.ads = S.ads.filter(x => x.id !== b.dataset.d)));
+}
+
 // ── Proyección ──
 let PRY = { pd: null, u: null };
 function vProy(el) {
@@ -515,13 +548,15 @@ function cargarDemo() {
   set('Shopify', 130); set('Lumy', 99); set('Dropi', 1); set('Chatea Pro', 150); set('Meta Ads', 900); set('TikTok Ads', 300);
   S.ads = S.ads || [];
   for (let i = 0; i < 14; i++) { const d = new Date(); d.setDate(d.getDate() - i); const f = iso(d); S.ads.push({ id: uid(), fecha: f, plataforma: 'meta', gasto: 40 + (i * 7) % 25, pedidos: 2 + i % 3, ventas: 180 + (i * 23) % 120, campana: 'Conversiones' }, { id: uid(), fecha: f, plataforma: 'tiktok', gasto: 15 + (i * 5) % 14, pedidos: 1 + i % 2, ventas: 80 + (i * 17) % 70, campana: 'Video viral' }); }
+  for (let i = 0; i < 14; i += 3) { const d = new Date(); d.setDate(d.getDate() - i); S.ads.push({ id: uid(), fecha: iso(d), plataforma: 'google', gasto: 22 + i, pedidos: 1, ventas: 79, campana: 'Búsqueda' }); }
+  S.ads.push({ id: uid(), fecha: hoy(), plataforma: 'influencer', gasto: 150, pedidos: 3, ventas: 267, campana: 'Reel con creadora' });
   const ciu = ['Lima', 'Arequipa', 'Trujillo', 'Piura', 'Cusco', 'Chiclayo'], est = ['entregado', 'entregado', 'entregado', 'entregado', 'devuelto', 'entregado', 'enruta', 'pendiente'];
   for (let i = 0; i < 40; i++) { const d = new Date(); d.setDate(d.getDate() - Math.floor(i * 0.9)); S.pedidos.push({ id: uid(), fecha: iso(d), estado: i < 4 ? ['pendiente', 'enruta', 'enruta', 'pendiente'][i] : est[i % 8], producto: i % 2 ? 'Masajeador cervical' : 'Faja moldeadora', cliente: 'Cliente ' + (i + 1), telefono: '9' + String(10000000 + i * 137), ciudad: ciu[i % 6], canal: 'Tienda', cantidad: i % 5 === 0 ? 2 : 1, precio: i % 2 ? 99 : 79, costo: i % 2 ? 28 : 22, flete: 12, otros: 2 }); }
 }
 
 // ───────── Navegación ─────────
 // ───────── Navegación ─────────
-const TABS = [['dashboard', 'Dashboard'], ['calculadora', 'Calculadora'], ['pedidos', 'Pedidos'], ['gastos', 'Gastos'], ['meta', 'Meta Ads'], ['tiktok', 'TikTok Ads'], ['proyeccion', 'Proyección']];
+const TABS = [['dashboard', 'Dashboard'], ['calculadora', 'Calculadora'], ['pedidos', 'Pedidos'], ['gastos', 'Gastos'], ['meta', 'Meta Ads'], ['tiktok', 'TikTok Ads'], ['publicidad', 'Publicidad'], ['proyeccion', 'Proyección']];
 let vista = (location.hash || '').slice(1);
 function go(k) {
   vista = VIEWS[k] ? k : 'dashboard';
@@ -543,7 +578,7 @@ function render() {
   if (S.demo) { el.insertAdjacentHTML('afterbegin', '<div class="demo-bar"><span><b>Datos de ejemplo.</b> Así se ve tu panel con pedidos y gastos.</span><button class="btn btn-sm btn-pri" id="demoOut">Empezar con mis datos</button></div>'); $('#demoOut').onclick = () => ask('Se borrarán los datos de ejemplo para empezar en limpio.', empezarLimpio, 'Empezar limpio'); }
   countUp(el);
 }
-const CORTO = { dashboard: 'Panel', calculadora: 'Calcular', meta: 'Meta', tiktok: 'TikTok', proyeccion: 'Proyec.' };
+const CORTO = { dashboard: 'Panel', calculadora: 'Calcular', meta: 'Meta', tiktok: 'TikTok', publicidad: 'Publi.', proyeccion: 'Proyec.' };
 $('#tabs').innerHTML = TABS.map(([k, l]) => `<a href="#${k}" data-v="${k}">${svg(k)}<span class="lg">${l}</span><span class="sh">${CORTO[k] || l}</span></a>`).join('');
 $('#gear').innerHTML = svg('ajustes');
 $('#fabIc').innerHTML = svg('chispa');

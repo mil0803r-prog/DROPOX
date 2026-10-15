@@ -328,3 +328,11 @@ dialog h2{margin:0 0 14px;font-size:19px}
   .seg button{padding:7px 10px;white-space:nowrap}
 }
 @media (prefers-reduced-motion:reduce){.tabs,.menu-ov{transition:none}}
+
+/* publicidad manual */
+.pb-row{display:grid;gap:6px;padding:11px 0;border-bottom:1px solid var(--line)}
+.pb-row:last-child{border-bottom:0}
+.pb-top{display:flex;justify-content:space-between;gap:8px;font-weight:700;font-size:14px}
+.pb-bar{height:8px;border-radius:99px;background:var(--tile);overflow:hidden}
+.pb-bar i{display:block;height:100%;border-radius:99px}
+.pb-s{font-size:12.5px;color:var(--mut)}
