@@ -19,6 +19,7 @@ const DEFAULTS = () => ({
   ads: [],
   pub: [],
   cuentas: [],
+  calcs: [],
   config: { igv: true, renta: 1, factorDevolucion: 2, moneda: 'PEN', tc: 3.75, tema: 'auto', nombre: '', periodo: 'mes' },
 });
 const Store = {
@@ -399,11 +400,36 @@ function calcular(c, devolOverride) {
     g: { ingreso: (1 - r) * c.precio, igv: (1 - r) * (c.precio - c.precio / d), costo: (1 - r) * num(c.costo), flete, empaque: num(c.empaque), comis: (1 - r) * c.precio * com + porPed, renta: (1 - r) * c.precio / d * renta, cpa: num(c.cpa), prorr },
   };
 }
+// ── Calculadora: productos guardados ──
+let calcActual = null;
+const CAMPOS_CALC = ['precio', 'costo', 'flete', 'empaque', 'comCod', 'comExtra', 'cpa', 'devol', 'ventas', 'margen', 'usarPlat', 'usarFijos'];
+function guardadosHtml() {
+  const L = (S.calcs || []).slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const filas = L.map(it => { const R = calcular({ ...CALC_DEF, ...it.c }), f = it.fecha ? it.fecha.slice(8) + '/' + it.fecha.slice(5, 7) : '';
+    return `<div class="it"><div class="it-h"><b>${esc(it.nombre)}${calcActual === it.id ? ' <span class="tag">Cargado</span>' : ''}</b><b class="${cls(R.utilEnt)}">${fmt(R.utilEnt)}</b></div><div class="it-s">Precio ${fmt(it.c.precio)} · costo ${fmt(it.c.costo)} · margen ${pct(R.margen)} · utilidad por pedido entregado · guardado ${f}</div><div class="it-a" style="margin:0"><button class="btn btn-sm" data-gl="${it.id}">Cargar</button><button class="btn btn-sm btn-del" data-gd="${it.id}">✕</button></div></div>`; }).join('');
+  return `<div class="card" id="guardados"><h3>Productos guardados</h3><p class="sub">${L.length ? 'Toca Cargar para volver a calcular con esos números' : 'Pulsa Guardar para dejar aquí un producto y no escribirlo otra vez'}</p>${L.length ? `<div class="list">${filas}</div>` : '<div class="empty">Aún no guardas ningún producto.</div>'}</div>`;
+}
+function bindGuardados(el) {
+  $('#gcalc').onclick = () => {
+    if (!num(C.precio)) { toast('Escribe primero el precio de venta'); return; }
+    const cur = (S.calcs || []).find(x => x.id === calcActual);
+    const campos = [{ k: 'nombre', l: 'Nombre del producto', req: 1, full: 1 }];
+    if (cur) campos.push({ k: 'actualizar', l: `Actualizar «${cur.nombre}» en vez de crear otro`, t: 'check', full: 1 });
+    openForm('Guardar producto', campos, { nombre: cur ? cur.nombre : '', actualizar: true }, x => {
+      const snap = {}; CAMPOS_CALC.forEach(k => { snap[k] = C[k]; });
+      if (cur && x.actualizar) Object.assign(cur, { nombre: x.nombre, c: snap, fecha: hoy() });
+      else { const it = { id: uid(), nombre: x.nombre, fecha: hoy(), c: snap }; (S.calcs = S.calcs || []).push(it); calcActual = it.id; }
+      toast('Producto guardado');
+    });
+  };
+  el.querySelectorAll('[data-gl]').forEach(b => b.onclick = () => { const it = (S.calcs || []).find(x => x.id === b.dataset.gl); if (!it) return; C = { ...CALC_DEF, ...it.c }; calcActual = it.id; guardarCalc(); render(); scrollTo(0, 0); toast('Cargado: ' + it.nombre); });
+  el.querySelectorAll('[data-gd]').forEach(b => b.onclick = () => confirmDel('¿Eliminar este producto guardado?', () => { S.calcs = (S.calcs || []).filter(x => x.id !== b.dataset.gd); if (calcActual === b.dataset.gd) calcActual = null; }));
+}
 function vCalc(el) {
   C.admModo = 'auto';
   const n = (k, l, ex = '') => `<div class="field"><label>${l}</label><input data-c="${k}" type="number" step="any" min="0" inputmode="decimal" value="${C[k]}">${ex ? `<div class="note" style="margin-top:4px">${ex}</div>` : ''}</div>`;
   const T = totalesPlataformas();
-  el.innerHTML = `${secH('calculadora', 'Calculadora', 'Cuánto te deja cada venta en Perú', `<button class="btn" id="rst">Restablecer</button>`)}
+  el.innerHTML = `${secH('calculadora', 'Calculadora', 'Cuánto te deja cada venta en Perú', `<button class="btn btn-pri" id="gcalc">Guardar</button><button class="btn" id="rst">Restablecer</button>`)}
   <div class="mini" id="mini"></div>
   <div id="res"></div>
   <div class="two"><div>
@@ -421,8 +447,10 @@ function vCalc(el) {
       <label class="chk" style="margin:4px 0 10px"><input type="checkbox" data-c="usarPlat" ${C.usarPlat ? 'checked' : ''}> Incluir plataformas (${pct(T.pctVenta)} + ${fmt(T.porPedido)}/pedido + ${fmt(T.mensual)}/mes)</label>
       <label class="chk"><input type="checkbox" data-c="usarFijos" ${C.usarFijos ? 'checked' : ''}> Repartir gastos fijos (${fmt(fijosMensual())}/mes)</label>
       <p class="note">IGV ${S.config.igv ? '18% incluido' : 'no aplicado'} · Renta ${S.config.renta}% · cámbialo en Ajustes.</p></div>
-  </div><div id="res2"></div></div>`;
-  $('#rst').onclick = () => { C = { ...CALC_DEF }; guardarCalc(); render(); };
+  </div><div id="res2"></div></div>
+  ${guardadosHtml()}`;
+  bindGuardados(el);
+  $('#rst').onclick = () => { C = { ...CALC_DEF }; calcActual = null; guardarCalc(); render(); };
   el.querySelectorAll('[data-c]').forEach(i => i.oninput = () => { C[i.dataset.c] = i.type === 'checkbox' ? i.checked : num(i.value); guardarCalc(); pintarCalc(); });
   pintarCalc();
 }
