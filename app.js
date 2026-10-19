@@ -18,6 +18,8 @@ const DEFAULTS = () => ({
   pedidos: [],
   ads: [],
   pub: [],
+  caza: [],
+  invest: [],
   cuentas: [],
   calcs: [],
   config: { igv: true, renta: 1, factorDevolucion: 2, moneda: 'PEN', tc: 3.75, tema: 'auto', nombre: '', periodo: 'mes' },
@@ -99,6 +101,10 @@ const IC = {
   chispa: '<path d="M12 3l1.900 5.100L19 10l-5.100 1.900L12 17l-1.900-5.100L5 10l5.100-1.900zM19 15l.8 2.200L22 18l-2.200.8L19 21l-.8-2.200L16 18l2.200-.8z"/>',
 };
 IC.publicidad = IC.ads;
+IC.investigacion = '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.300-4.300"/>';
+IC.dropi = '<path d="M12 2l9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10"/>';
+IC.aliclick = '<path d="M9 3l7 7-4 1 3 6-2 1-3-6-3 3z"/>';
+IC.caza = IC.dropi;
 const svg = (k, w = 1.9) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`;
 
 // ───────── Periodos ─────────
@@ -276,7 +282,7 @@ function insights(A) {
 const alertasHtml = L => L.length ? L.map(a => `<div class="al"><i class="dot ${a.c}"></i><div><b>${esc(a.t)}</b><span>${esc(a.d)}</span></div></div>`).join('') : '<div class="empty">Todo en orden. Sin alertas.</div>';
 
 // ───────── Vistas ─────────
-const VIEWS = { dashboard: vDashboard, calculadora: vCalc, pedidos: vPedidos, gastos: vGastos, meta: el => { if (!(window.Meta && Meta.vista(el))) vAdsPlat(el, 'meta'); }, tiktok: el => vAdsPlat(el, 'tiktok'), ads: el => vAdsPlat(el, 'meta'), publicidad: vPublicidad, proyeccion: vProy, ajustes: vAjustes };
+const VIEWS = { dashboard: vDashboard, calculadora: vCalc, pedidos: vPedidos, gastos: vGastos, meta: el => { if (!(window.Meta && Meta.vista(el))) vAdsPlat(el, 'meta'); }, tiktok: el => vAdsPlat(el, 'tiktok'), ads: el => vAdsPlat(el, 'meta'), publicidad: vPublicidad, investigacion: el => window.Caza && Caza.vista(el, 'invest'), dropi: el => window.Caza && Caza.vista(el, 'dropi'), aliclick: el => window.Caza && Caza.vista(el, 'aliclick'), proyeccion: vProy, ajustes: vAjustes };
 let metrica = 'ventas', tabla = { dia: false, sem: false };
 
 function vDashboard(el) {
@@ -651,7 +657,7 @@ function cargarDemo() {
 
 // ───────── Navegación ─────────
 // ───────── Navegación ─────────
-const TABS = [['dashboard', 'Dashboard'], ['calculadora', 'Calculadora'], ['pedidos', 'Pedidos'], ['gastos', 'Gastos'], ['meta', 'Meta Ads'], ['tiktok', 'TikTok Ads'], ['publicidad', 'Publicidad'], ['proyeccion', 'Proyección']];
+const TABS = [['dashboard', 'Dashboard'], ['calculadora', 'Calculadora'], ['pedidos', 'Pedidos'], ['gastos', 'Gastos'], ['meta', 'Meta Ads'], ['tiktok', 'TikTok Ads'], ['publicidad', 'Publicidad'], ['investigacion', 'Investigación de mercado'], ['dropi', 'Caza diaria Dropi'], ['aliclick', 'Caza diaria AliClick'], ['proyeccion', 'Proyección']];
 let vista = (location.hash || '').slice(1);
 function go(k) {
   vista = VIEWS[k] ? k : 'dashboard';
@@ -674,7 +680,7 @@ function render() {
   if (S.demo) { el.insertAdjacentHTML('afterbegin', '<div class="demo-bar"><span><b>Datos de ejemplo.</b> Así se ve tu panel con pedidos y gastos.</span><button class="btn btn-sm btn-pri" id="demoOut">Empezar con mis datos</button></div>'); $('#demoOut').onclick = () => ask('Se borrarán los datos de ejemplo para empezar en limpio.', empezarLimpio, 'Empezar limpio'); }
   countUp(el);
 }
-const CORTO = { dashboard: 'Panel', calculadora: 'Calcular', meta: 'Meta', tiktok: 'TikTok', publicidad: 'Publi.', proyeccion: 'Proyec.' };
+const CORTO = { dashboard: 'Panel', calculadora: 'Calcular', meta: 'Meta', tiktok: 'TikTok', publicidad: 'Publi.', investigacion: 'Invest.', dropi: 'Dropi', aliclick: 'AliClick', proyeccion: 'Proyec.' };
 $('#tabs').innerHTML = TABS.map(([k, l]) => `<a href="#${k}" data-v="${k}">${svg(k)}<span class="lg">${l}</span><span class="sh">${CORTO[k] || l}</span></a>`).join('');
 $('#gear').innerHTML = svg('ajustes');
 $('#fabIc').innerHTML = svg('chispa');
