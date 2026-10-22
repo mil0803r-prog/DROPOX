@@ -402,3 +402,20 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .rt{width:100%;border-collapse:collapse;font-size:12.5px;min-width:560px}.rt th,.rt td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}.rt th{font-size:11px;color:var(--mut);text-transform:uppercase}
 .prompt{white-space:pre-wrap;word-break:break-word;background:var(--tile);border:1px solid var(--line);border-radius:14px;padding:14px;font:12.5px/1.5 ui-monospace,Menlo,monospace;max-height:420px;overflow:auto}
 .promptbar{display:flex;justify-content:flex-end;margin:12px 0 6px}
+
+/* Fichas del radar (Caza diaria) */
+.fk{padding:18px 16px}.fk-h{display:flex;align-items:flex-start;gap:12px}.fk-r{font-size:26px;font-weight:800;color:var(--acc)}
+.fk-t{flex:1;min-width:0}.fk-t b{display:block;font-size:16px}.fk-t small{color:var(--mut);font-size:12.5px}
+.fk-ring{--p:0;--c:#16a34a;flex:none;width:52px;height:52px;border-radius:50%;background:conic-gradient(var(--c) calc(var(--p)*1%),var(--tile) 0);display:grid;place-items:center;position:relative}
+.fk-ring:before{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--card)}.fk-ring span{position:relative;font-weight:800;font-size:15px}
+.fk-tl{margin:12px 0}.fk-tl .t b{font-size:18px}.fk-p{margin:8px 0;font-size:13.5px;line-height:1.55;color:var(--ink)}
+.fk-bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px 14px;margin:12px 0}
+.fk-bars div{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:11.5px;font-weight:600}
+.fk-bars i{grid-column:1/-1;height:5px;border-radius:99px;background:var(--tile);overflow:hidden}.fk-bars u{display:block;height:100%;background:var(--acc);border-radius:99px}
+.fk-of{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;border:1px dashed var(--line);border-radius:14px;padding:12px;margin:12px 0}
+.fk-of small{display:block;color:var(--mut);font-size:11.5px}.fk-of b{font-size:19px}.fk-of .neg{color:#dc2626}
+.fk-flag{color:#d97706;font-size:12.5px;font-weight:700;margin:6px 0}
+.fk-s{margin:12px 0}.fk-s small{display:block;font-size:10.5px;font-weight:800;letter-spacing:.08em;color:var(--mut);margin-bottom:3px}.fk-s p{margin:0;font-size:13.5px;line-height:1.55}
+.fk details{margin:10px 0}.fk summary{cursor:pointer;font-weight:700;font-size:14.5px}.fk-l{margin:6px 0 0 18px;padding:0;font-size:13px;line-height:1.6}
+.fk-n{font-size:12px;color:var(--mut);margin:4px 0}.fk-ph{display:flex;align-items:center;gap:12px;margin:12px 0}.fk-ph img{width:74px;height:74px;object-fit:cover;border-radius:10px;background:var(--tile)}
+.fk-lk{font-size:13px;margin:8px 0 0}

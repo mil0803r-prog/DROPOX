@@ -29,8 +29,49 @@
     S.sembrado[k] = true; Store.save();
   }
 
+
+  // ficha completa de un producto del radar (estructura del informe: tiles, barras, oferta, textos y enlaces)
+  function ficha(f, i) {
+    const E = window.RadarEcon, g = E.cfg(), ev = E.evaluar(f.costo, f.pvp);
+    const mar = Math.max(0, Math.min(10, Math.round(ev.u / 3)));
+    const b = { Demanda: f.bars.dem, 'Tracción': f.bars.tra, Margen: mar, Competencia: f.bars.com, Riesgo: f.bars.rie };
+    const score = Math.round((f.bars.dem * 3.5 + mar * 2.5 + f.bars.tra * 1.5 + f.bars.com * 1.5 + f.bars.rie) );
+    const P2 = Math.round(ev.pvp * 1.6 / 5) * 5, u2 = (g.entrega / 100) * (P2 * (1 - g.comision / 100) - 2 * f.costo - g.flete) - (1 - g.entrega / 100) * g.devolucion - g.cpa;
+    const obj = 15, pmin = ((obj + g.cpa + (1 - g.entrega / 100) * g.devolucion) / (g.entrega / 100) + f.costo + g.flete) / (1 - g.comision / 100);
+    const q = encodeURIComponent(f.n.split(/[·(]/)[0].trim());
+    const col = score >= 70 ? '#16a34a' : score >= 50 ? '#d97706' : '#dc2626';
+    const tile = (l, v) => `<div class="t"><small>${l}</small><b>${v}</b></div>`;
+    const sec = (t, h) => `<div class="fk-s"><small>${t}</small><p>${h}</p></div>`;
+    const lk = (a, u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(a)}</a>`;
+    const cls = ev.v === 'VIABLE' ? 'rv-ok' : ev.v === 'REPRECIABLE' ? 'rv-mid' : 'rv-no';
+    return `<div class="card fk">
+      <div class="fk-h"><div class="fk-r">#${i + 1}</div><div class="fk-t"><b>${esc(f.n)}</b><small>${esc(f.sub)}</small></div><div class="fk-ring" style="--p:${score};--c:${col}"><span>${score}</span></div></div>
+      <div class="tiles fk-tl">${tile('Costo', fmt(f.costo))}${tile('Precio venta', fmt(f.pvp))}${tile('Vend. 7 d', f.v7)}${tile('Vend. 30 d', f.v30)}${tile('Stock', f.st)}${tile('Venta total', f.tot)}${f.visto ? tile('Visto desde', esc(f.visto)) : ''}</div>
+      <div class="tiles fk-tl">${tile('Tiendas activas en Perú', f.tAct)}${tile('Tiendas totales en Perú', f.tPE)}${tile('Anuncios revisados', f.nAds)}</div>
+      <p class="fk-p">${esc(f.resumen)}</p>
+      <div class="fk-bars">${Object.entries(b).map(([k, v]) => `<div><span>${k}</span><span>${v}/10</span><i><u style="width:${v * 10}%"></u></i></div>`).join('')}</div>
+      <div class="fk-of"><div><small>Oferta</small><b>2 por ${fmt(P2)}</b></div><div><small>Utilidad esperada por pedido</small><b class="${u2 >= 0 ? '' : 'neg'}">${fmt(u2)}</b></div><div><small>Precio mínimo para +${fmt(obj)}</small><b>${fmt(pmin)}</b></div><div><small>Veredicto de margen</small><b><span class="rv ${cls}">${ev.v}</span></b></div></div>
+      ${f.rk ? `<div class="fk-flag">● Bandera amarilla: ${esc(f.rkTxt)}</div>` : ''}
+      ${sec('POR QUÉ', esc(f.porque))}${sec('ÁNGULO DE VENTA', esc(f.angulo))}
+      <div class="fk-s"><small>ÁNGULOS NUEVOS (NADIE LOS USA)</small><ol class="rn">${f.nuevos.map(([a, h]) => `<li><b>${esc(a)}.</b> ${esc(h)}</li>`).join('')}</ol></div>
+      ${sec('COMPETENCIA', esc(f.comp))}${sec('RIESGOS', esc(f.riesgos))}
+      <details><summary>Tiendas que lo anuncian en Perú (${f.tiendas.length})</summary><ul class="fk-l">${f.tiendas.map(t => `<li>${lk(t.n, t.u)} · ${esc(t.e)} · ${esc(t.d)}</li>`).join('')}</ul></details>
+      <details><summary>Creativos de video (${f.videos.length})</summary><ul class="fk-l">${f.videos.map(v => `<li>${lk(v.t, v.u)}</li>`).join('')}</ul></details>
+      <p class="fk-n">Son enlaces: la página no puede incrustar videos externos.</p>
+      <div class="fk-ph"><img src="${esc(f.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">${lk('Ver producto en ' + (f.f === 'dropi' ? 'Dropi' : 'AliClick'), f.url)}</div>
+      <details open><summary>ID por proveedor (1)</summary><ul class="fk-l"><li><b>${esc(f.prov)}</b> · ID ${f.ext} · costo ${fmt(f.costo)} · stock ${f.st} · vend. 7 d ${f.v7} · 30 d ${f.v30}</li></ul></details>
+      <p class="fk-lk">${lk('Dropi / AliClick', f.url)} · ${lk('DropKiller', 'https://app.dropkiller.com/dashboard/products/' + f.dk)} · ${lk('Amazon', 'https://www.amazon.com/s?k=' + q)} · ${lk('AliExpress', 'https://www.aliexpress.com/wholesale?SearchText=' + q)}</p>
+      <div class="it-a" style="margin:8px 0 0"><button class="btn btn-sm" data-fc="${f.dk}">Calcular</button></div></div>`;
+  }
+  function fichasHtml(k) {
+    const R = window.CAZA_FICHAS;
+    if (!R || !window.RadarEcon) return '';
+    const L = R.items.filter(x => x.f === k).map((x, i) => ({ x, i })).sort((a, b) => 0);
+    if (!L.length) return '';
+    return `<h3 style="margin:18px 0 8px">Radar de hoy · ${esc(R.fecha)}</h3><p class="note" style="margin:0 0 10px">Ficha de cada producto con datos de DropKiller, la biblioteca de anuncios, el kit del radar y la skill de productos ganadores. Los números de margen salen de «Tus números de operación» en <a href="#radar">Radar diario</a>.</p>` + L.map(({ x }, i) => ficha(x, i)).join('');
+  }
+
   function vCaza(el, k) {
-    sembrar(k);
     const F = FUENTES[k], todos = lista('caza').filter(c => c.fuente === k);
     const meta = Math.max(1, num(S.config.metaCaza) || 5), hoyN = todos.filter(c => c.fecha === hoy()).length;
     const sem = (() => { const d = new Date(); d.setDate(d.getDate() - 6); const a = iso(d); return todos.filter(c => c.fecha >= a).length; })();
@@ -49,8 +90,11 @@
       <div class="pb-bar"><i style="width:${pct}%;background:var(--acc)"></i></div>
       <div class="row" style="margin-top:10px"><div class="field"><label>Meta diaria (productos)</label><input id="meta" type="number" min="1" inputmode="numeric" value="${meta}"></div></div></div>
     <div class="tiles">${tile('Hoy', hoyN, `meta ${meta}`)}${tile('Últimos 7 días', sem)}${tile('Racha', racha + (racha === 1 ? ' día' : ' días'))}${tile('Mejor margen', mejor ? pct1(mejor.m) : '—', mejor ? esc(mejor.c.nombre) : '')}</div>
+    ${fichasHtml(k)}
+    <h3 style="margin:18px 0 8px">Mis productos cazados</h3>
     ${chips(act, EST, cuenta(todos, 'estado'))}
     <div class="card"><h3>Productos</h3><p class="sub">${L.length ? 'Lo más reciente primero' : 'Anota cada producto que caces. Cuando uno te guste, mándalo a la Calculadora.'}</p>${L.length ? `<div class="list">${L.map(c => { const m = margen(c), u = enlace(c.link); return `<div class="it"><div class="it-h"><b>${esc(dia(c.fecha))} · ${esc(c.nombre)}</b><b>${fmt(c.pvp)}</b></div><div class="it-s">${esc(EST[c.estado] || '')} · costo ${fmt(c.costo)}${m === null ? '' : ' · margen bruto ' + pct1(m)}${c.categoria ? ' · ' + esc(c.categoria) : ''}${num(c.ventas) ? ' · ' + num(c.ventas) + ' ventas' : ''}${c.nota ? ' · ' + esc(c.nota) : ''}</div><div class="it-a" style="margin:0">${u ? `<a class="btn btn-sm" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Abrir</a>` : ''}<button class="btn btn-sm" data-calc="${c.id}">Calcular</button><button class="btn btn-sm" data-e="${c.id}">Editar</button><button class="btn btn-sm btn-del" data-d="${c.id}">✕</button></div></div>`; }).join('')}</div>` : ''}</div>`;
+    el.querySelectorAll('[data-fc]').forEach(bn => bn.onclick = () => { const x = window.CAZA_FICHAS.items.find(y => y.dk === bn.dataset.fc); Object.assign(C, { nombre: x.n.split(/[·(]/)[0].trim(), precio: num(x.pvp), costo: num(x.costo) }); guardarCalc(); toast('Producto enviado a la Calculadora'); go('calculadora'); });
     $('#nuevo').onclick = () => openForm('Nuevo producto · ' + F.corto, campos(), { fuente: k }, v => lista('caza').push({ id: uid(), fuente: k, ...v }));
     $('#meta').onchange = e => { S.config.metaCaza = Math.max(1, num(e.target.value) || 5); Store.save(); render(); };
     el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { fCaza[k] = b.dataset.f; render(); });

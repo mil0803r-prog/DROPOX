@@ -76,7 +76,7 @@
       },
     ],
     notas: [
-      'El producto con más ventas es «Gld unisex 2 und» (344 en 7 días, 973 en 30). Tiene 3 reabastecimientos y su proveedor aparece sin nombre, así que primero hay que ver qué producto es antes de puntuarlo.',
+      'El producto con más ventas es «Gld unisex 2 und» (344 en 7 días, 973 en 30). Por sus anuncios son unas gafas antirreflectantes o lentes inteligentes; tiene 3 reabastecimientos y su proveedor aparece sin nombre.',
       'No pasé por anuncios los demás productos de la tabla: solo los tres finalistas con margen holgado y señal de demanda. Los de salud y suplementos quedan en amarillo (registro sanitario) y Schubert en rojo (posible marca).',
     ],
   };
@@ -133,7 +133,7 @@
     ${tab === 'hoy' ? `
     <div class="card"><h3>Veredicto de hoy · ${esc(HOY.fecha)}</h3>
       <p class="rk-p">En Perú ningún proveedor llega al rango «validado» (81 a 200 ventas en 7 días) y solo 3 productos entran en «emergente» (20 a 80), así que con los filtros del kit casi no sale nada; amplié el rango y miré 18 productos más.
-      Mira primero el <b>kit de grabación con trípode</b> (6 tiendas activas, zona dulce) y el <b>sellador Jaysuing</b> (margen alto, 14 ventas en 7 días); el que más vende, «Gld unisex 2 und» (344 en 7 días), primero hay que identificarlo.</p></div>
+      Mira primero el <b>kit de grabación con trípode</b> (6 tiendas activas, zona dulce) y el <b>sellador Jaysuing</b> (margen alto, 14 ventas en 7 días); el que más vende, «Gld unisex 2 und» (344 en 7 días), resultó ser unas gafas antirreflectantes: mira su ficha completa en <a href="#dropi">Caza diaria Dropi</a>; las de AliClick están en <a href="#aliclick">Caza diaria AliClick</a>.</p></div>
     <div class="tiles"><div class="t"><small>Validado (81–200 en 7d)</small><b>${HOY.embudo.A}</b></div><div class="t"><small>Emergente (20–80 en 7d)</small><b>${HOY.embudo.B}</b></div><div class="t"><small>Ampliado (5–19 en 7d)</small><b>${HOY.embudo.ampliado}</b></div><div class="t"><small>Más de 200 en 7d</small><b>${HOY.embudo.sobre200}</b></div></div>
     <div class="card"><h3>Tus números de operación</h3><p class="sub">Valores de referencia míos, <b>no medidos</b>: cámbialos por los tuyos y todo se recalcula.</p>
       <div class="row">${camp('entrega', 'Tasa de entrega (%)')}${camp('flete', 'Flete por entrega (S/)')}${camp('devolucion', 'Flete de devolución (S/)')}${camp('comision', 'Comisión de recaudo (%)')}${camp('cpa', 'CPA por pedido generado (S/)')}${camp('umbral', 'Utilidad mínima (S/)')}</div>
@@ -154,6 +154,7 @@
   }
   let tab = 'hoy';
   window.Radar = { vista };
-  if (vista_actual() === 'radar') render();
+  window.RadarEcon = { cfg, util, evaluar: (c, sug) => evaluar(['', c, sug, 0, 0, 0, '', 0, '', ''], cfg()) };
+  if (['radar', 'dropi', 'aliclick'].includes(vista_actual())) render();
   function vista_actual() { return (location.hash || '').slice(1); }
 })();
