@@ -20,7 +20,17 @@
   const cuenta = (arr, key) => arr.reduce((m, x) => { m[x[key]] = (m[x[key]] || 0) + 1; m.todos++; return m; }, { todos: 0 });
   const enlace = u => { try { const x = new URL(/^https?:/i.test(u) ? u : 'https://' + u); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch (e) { return ''; } };
 
+  // primera vez que se abre la sección: carga la caza de hoy (se puede borrar o editar)
+  function sembrar(k) {
+    S.sembrado = S.sembrado || {};
+    if (S.sembrado[k] || !Array.isArray(window.CAZA_SEMILLA)) return;
+    const ya = new Set(lista('caza').map(c => c.ext).filter(Boolean));
+    window.CAZA_SEMILLA.filter(x => x.fuente === k && !ya.has(x.ext)).forEach(x => S.caza.push({ id: uid(), ...x }));
+    S.sembrado[k] = true; Store.save();
+  }
+
   function vCaza(el, k) {
+    sembrar(k);
     const F = FUENTES[k], todos = lista('caza').filter(c => c.fuente === k);
     const meta = Math.max(1, num(S.config.metaCaza) || 5), hoyN = todos.filter(c => c.fecha === hoy()).length;
     const sem = (() => { const d = new Date(); d.setDate(d.getDate() - 6); const a = iso(d); return todos.filter(c => c.fecha >= a).length; })();
