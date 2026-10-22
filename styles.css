@@ -390,3 +390,15 @@ dialog h2{margin:0 0 14px;font-size:19px}
 
 /* sidebar con más secciones: el texto largo cabe */
 @media (min-width:700px){.tabs a{white-space:normal;line-height:1.2;padding:11px 14px;font-size:14px}}
+
+/* Radar diario */
+.rv{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700}
+.rv-ok{background:#dcfce7;color:#166534}.rv-mid{background:#fef3c7;color:#92400e}.rv-no{background:#fee2e2;color:#991b1b}
+:root[data-theme="dark"] .rv-ok{background:#14532d;color:#bbf7d0}:root[data-theme="dark"] .rv-mid{background:#78350f;color:#fde68a}:root[data-theme="dark"] .rv-no{background:#7f1d1d;color:#fecaca}
+.rk-rojo{color:#dc2626;font-size:11px;font-weight:700}.rk-amarillo{color:#d97706;font-size:11px;font-weight:700}
+.rk-p{margin:8px 0;line-height:1.55;color:var(--ink)}.rk-h{margin:26px 0 8px;font-size:17px}.rk-n{font-size:30px;font-weight:800;margin-top:10px}
+.rn{margin:6px 0 4px 18px;padding:0;font-size:13.5px;line-height:1.5}.rn li{margin:4px 0}
+.rf .it-s{margin:6px 0}.tw{overflow-x:auto;margin:0 -4px}
+.rt{width:100%;border-collapse:collapse;font-size:12.5px;min-width:560px}.rt th,.rt td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}.rt th{font-size:11px;color:var(--mut);text-transform:uppercase}
+.prompt{white-space:pre-wrap;word-break:break-word;background:var(--tile);border:1px solid var(--line);border-radius:14px;padding:14px;font:12.5px/1.5 ui-monospace,Menlo,monospace;max-height:420px;overflow:auto}
+.promptbar{display:flex;justify-content:flex-end;margin:12px 0 6px}
