@@ -19,6 +19,7 @@ const DEFAULTS = () => ({
   ads: [],
   pub: [],
   caza: [],
+  gdia: [],
   invest: [],
   cuentas: [],
   calcs: [],
@@ -105,6 +106,7 @@ IC.investigacion = '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.300-4.300"
 IC.dropi = '<path d="M12 2l9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10"/>';
 IC.aliclick = '<path d="M9 3l7 7-4 1 3 6-2 1-3-6-3 3z"/>';
 IC.caza = IC.dropi;
+IC.gdia = '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4M9 15h6"/>';
 IC.prodtiktok = '<path d="M14 3v11.500a3.500 3.500 0 1 1-3.500-3.500M14 3c.300 2.600 2 4.200 5 4.500"/>';
 IC.radar = '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12l6-6"/>';
 const svg = (k, w = 1.9) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`;
@@ -168,7 +170,8 @@ function analizar(pk) {
   const adsReal = k => (S.ads || []).filter(a => a.plataforma === k && metaOk(a) && (k !== 'meta' || !S.metaAuto || a.src === 'meta-api') && a.fecha >= from && a.fecha <= to).reduce((s, a) => s + num(a.gasto), 0);
   const pubReal = k => (S.pub || []).filter(a => a.plataforma === k && a.fecha >= from && a.fecha <= to).reduce((s, a) => s + num(a.gasto), 0);
   const tienePlat = k => S.plataformas.some(p => p.activo && p.tipo === 'gasto' && PAUTA_PAT[k].test(p.nombre));
-  const fijos = (fijosRecurrente() + T.suscripcion) * f + unicosEn(from, to);
+  const diarios = S.config.gdiaSuma === false ? 0 : (S.gdia || []).filter(g => g.fecha >= from && g.fecha <= to).reduce((s, g) => s + num(g.monto), 0);
+  const fijos = (fijosRecurrente() + T.suscripcion) * f + unicosEn(from, to) + diarios;
   const vars = S.plataformas.filter(p => p.activo && p.tipo === 'gasto').reduce((s, p) => {
     const k = Object.keys(PAUTA_PAT).find(x => PAUTA_PAT[x].test(p.nombre)) || '', real = k ? (k === 'google' ? pubReal('google') : adsReal(k)) : 0;
     return s + (real > 0 ? real : num(p.valor) * f);
@@ -284,7 +287,7 @@ function insights(A) {
 const alertasHtml = L => L.length ? L.map(a => `<div class="al"><i class="dot ${a.c}"></i><div><b>${esc(a.t)}</b><span>${esc(a.d)}</span></div></div>`).join('') : '<div class="empty">Todo en orden. Sin alertas.</div>';
 
 // ───────── Vistas ─────────
-const VIEWS = { dashboard: vDashboard, calculadora: vCalc, pedidos: vPedidos, gastos: vGastos, meta: el => { if (!(window.Meta && Meta.vista(el))) vAdsPlat(el, 'meta'); }, tiktok: el => vAdsPlat(el, 'tiktok'), ads: el => vAdsPlat(el, 'meta'), publicidad: vPublicidad, prodtiktok: el => window.Caza && Caza.vista(el, 'tiktok'), radar: el => window.Radar && Radar.vista(el), investigacion: el => window.Caza && Caza.vista(el, 'invest'), dropi: el => window.Caza && Caza.vista(el, 'dropi'), aliclick: el => window.Caza && Caza.vista(el, 'aliclick'), proyeccion: vProy, ajustes: vAjustes };
+const VIEWS = { dashboard: vDashboard, calculadora: vCalc, pedidos: vPedidos, gastos: vGastos, meta: el => { if (!(window.Meta && Meta.vista(el))) vAdsPlat(el, 'meta'); }, tiktok: el => vAdsPlat(el, 'tiktok'), ads: el => vAdsPlat(el, 'meta'), publicidad: vPublicidad, gdia: el => window.Gdia && Gdia.vista(el), prodtiktok: el => window.Caza && Caza.vista(el, 'tiktok'), radar: el => window.Radar && Radar.vista(el), investigacion: el => window.Caza && Caza.vista(el, 'invest'), dropi: el => window.Caza && Caza.vista(el, 'dropi'), aliclick: el => window.Caza && Caza.vista(el, 'aliclick'), proyeccion: vProy, ajustes: vAjustes };
 let metrica = 'ventas', tabla = { dia: false, sem: false };
 
 function vDashboard(el) {
@@ -306,7 +309,7 @@ function vDashboard(el) {
     ${tile('Ventas entregadas', fmt(A.D.ventas), `${A.ent.length} entregados`)}
     ${tile('Utilidad de pedidos', fmt(A.utilPed), 'antes de gastos', cls(A.utilPed))}
     ${tile('Gastos variables', fmt(A.vars), 'pauta y otros')}
-    ${tile('Gastos fijos', fmt(A.fijos), 'fijos + suscripciones')}
+    ${tile('Gastos fijos', fmt(A.fijos), 'fijos, suscripciones y diarios')}
     ${tile('Pedidos', A.P.length, `${A.curso.length} en curso`)}
     ${tile('Tasa de entrega', A.tasa === null ? '—' : pct(A.tasa), `${A.dev.length} devueltos`, A.tasa !== null && A.tasa < 70 ? 'warn' : '')}
     ${tile('Por cobrar', fmt(A.porCobrar), 'en proceso')}
@@ -659,7 +662,7 @@ function cargarDemo() {
 
 // ───────── Navegación ─────────
 // ───────── Navegación ─────────
-const TABS = [['dashboard', 'Dashboard'], ['calculadora', 'Calculadora'], ['pedidos', 'Pedidos'], ['gastos', 'Gastos'], ['meta', 'Meta Ads'], ['tiktok', 'TikTok Ads'], ['publicidad', 'Publicidad'], ['radar', 'Radar diario'], ['investigacion', 'Investigación de mercado'], ['dropi', 'Caza diaria Dropi'], ['aliclick', 'Caza diaria AliClick'], ['prodtiktok', 'Productos TikTok'], ['proyeccion', 'Proyección']];
+const TABS = [['dashboard', 'Dashboard'], ['calculadora', 'Calculadora'], ['pedidos', 'Pedidos'], ['gastos', 'Gastos'], ['gdia', 'Gastos diarios'], ['meta', 'Meta Ads'], ['tiktok', 'TikTok Ads'], ['publicidad', 'Publicidad'], ['radar', 'Radar diario'], ['investigacion', 'Investigación de mercado'], ['dropi', 'Caza diaria Dropi'], ['aliclick', 'Caza diaria AliClick'], ['prodtiktok', 'Productos TikTok'], ['proyeccion', 'Proyección']];
 let vista = (location.hash || '').slice(1);
 function go(k) {
   vista = VIEWS[k] ? k : 'dashboard';
@@ -682,7 +685,7 @@ function render() {
   if (S.demo) { el.insertAdjacentHTML('afterbegin', '<div class="demo-bar"><span><b>Datos de ejemplo.</b> Así se ve tu panel con pedidos y gastos.</span><button class="btn btn-sm btn-pri" id="demoOut">Empezar con mis datos</button></div>'); $('#demoOut').onclick = () => ask('Se borrarán los datos de ejemplo para empezar en limpio.', empezarLimpio, 'Empezar limpio'); }
   countUp(el);
 }
-const CORTO = { dashboard: 'Panel', calculadora: 'Calcular', meta: 'Meta', tiktok: 'TikTok', publicidad: 'Publi.', radar: 'Radar', prodtiktok: 'Prod. TT', investigacion: 'Invest.', dropi: 'Dropi', aliclick: 'AliClick', proyeccion: 'Proyec.' };
+const CORTO = { dashboard: 'Panel', calculadora: 'Calcular', meta: 'Meta', tiktok: 'TikTok', publicidad: 'Publi.', radar: 'Radar', prodtiktok: 'Prod. TT', gdia: 'Diarios', investigacion: 'Invest.', dropi: 'Dropi', aliclick: 'AliClick', proyeccion: 'Proyec.' };
 $('#tabs').innerHTML = TABS.map(([k, l]) => `<a href="#${k}" data-v="${k}">${svg(k)}<span class="lg">${l}</span><span class="sh">${CORTO[k] || l}</span></a>`).join('');
 $('#gear').innerHTML = svg('ajustes');
 $('#fabIc').innerHTML = svg('chispa');

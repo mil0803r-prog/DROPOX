@@ -419,3 +419,9 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .fk details{margin:10px 0}.fk summary{cursor:pointer;font-weight:700;font-size:14.5px}.fk-l{margin:6px 0 0 18px;padding:0;font-size:13px;line-height:1.6}
 .fk-n{font-size:12px;color:var(--mut);margin:4px 0}.fk-ph{display:flex;align-items:center;gap:12px;margin:12px 0}.fk-ph img{width:74px;height:74px;object-fit:cover;border-radius:10px;background:var(--tile)}
 .fk-lk{font-size:13px;margin:8px 0 0}
+
+/* Gastos diarios */
+.gd-bars{display:flex;align-items:flex-end;gap:5px;height:110px;margin-top:10px}
+.gd-b{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px}
+.gd-b i{display:block;width:100%;min-height:2px;background:var(--acc);border-radius:5px 5px 2px 2px}.gd-b span{font-size:10px;color:var(--mut)}
+.gd-d{margin:14px 0}.gd-d>.it-h{padding:6px 2px;border-bottom:1px solid var(--line);margin-bottom:6px}.gd-d>.it-h b:first-child::first-letter{text-transform:uppercase}
