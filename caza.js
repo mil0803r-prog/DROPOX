@@ -71,6 +71,39 @@
     return `<h3 style="margin:18px 0 8px">Radar de hoy · ${esc(R.fecha)}</h3><p class="note" style="margin:0 0 10px">Ficha de cada producto con datos de DropKiller, la biblioteca de anuncios, el kit del radar y la skill de productos ganadores. Los números de margen salen de «Tus números de operación» en <a href="#radar">Radar diario</a>.</p>` + L.map(({ x }, i) => ficha(x, i)).join('');
   }
 
+
+  // Productos TikTok: TikTok Shop EE. UU. (DropKiller) cruzado con Dropi y AliClick Perú
+  let fTT = 'todos';
+  const TC = 3.75; // tipo de cambio de referencia USD a soles, solo para comparar
+  const PERU = { no: ['No existe en Perú', 'rv-ok'], parcial: ['Parecido en Perú', 'rv-mid'], si: ['Ya existe en Perú', 'rv-no'] };
+  function vTikTok(el) {
+    const R = window.TIKTOK_PROD, items = R ? R.items : [];
+    const cnt = k => items.filter(x => x.peru[0] === k).length;
+    const L = items.filter(x => fTT === 'todos' || x.peru[0] === fTT);
+    const lk = (a, u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(a)}</a>`;
+    const tile = (l, v) => `<div class="t"><small>${l}</small><b>${v}</b></div>`;
+    const chip = (k, l, n) => `<button class="chip ${fTT === k ? 'on' : ''}" data-ft="${k}">${l}<i>${n}</i></button>`;
+    el.innerHTML = `${secH('caza', 'Productos TikTok', 'Lo que más vende en TikTok Shop, cruzado con Dropi y AliClick Perú')}
+    <div class="card"><h3>Corrida del ${esc(R ? R.fecha : '')}</h3>
+      <p class="rk-p">Productos de TikTok Shop de Estados Unidos con ventas registradas en DropKiller, de precio bajo y fáciles de explicar, sin marcas registradas ni suplementos. Para cada uno revisé si ya existe en Dropi o en AliClick de Perú: los que <b>no existen</b> son oportunidades para importar o buscar proveedor.</p>
+      <p class="note">Ojo: DropKiller solo tiene 2 días de historial de ventas de estos productos, así que las cifras de 7 y 30 días son iguales y deben leerse como una muestra, no como un mes completo. Los precios están en dólares; en soles son una referencia al cambio de S/ ${TC}.</p></div>
+    <div class="chips">${chip('todos', 'Todos', items.length)}${chip('no', 'No existe en Perú', cnt('no'))}${chip('parcial', 'Parecido en Perú', cnt('parcial'))}${chip('si', 'Ya existe en Perú', cnt('si'))}</div>
+    ${L.map((x, i) => `<div class="card fk">
+      <div class="fk-h"><div class="fk-r">#${i + 1}</div><div class="fk-t"><b>${esc(x.n)}</b><small>${esc(x.vend)} · ${esc(x.cat || 'TikTok Shop EE. UU.')}</small></div></div>
+      <div class="tiles fk-tl">${tile('Precio EE. UU.', 'US$ ' + x.usd.toFixed(2))}${tile('Equivale a', fmt(x.usd * TC))}${tile('Vendidas (muestra)', x.s30.toLocaleString('es-PE'))}${tile('Facturación (muestra)', 'US$ ' + x.fact30.toLocaleString('es-PE'))}${tile('Calificación', x.rating + ' ★')}${tile('Reseñas', x.rev.toLocaleString('es-PE'))}${tile('Visto desde', esc(x.visto))}${tile('Videos en TikTok', x.adsN)}</div>
+      <div class="fk-of"><div><small>En Perú (Dropi y AliClick)</small><b><span class="rv ${PERU[x.peru[0]][1]}">${PERU[x.peru[0]][0]}</span></b></div></div>
+      <p class="fk-p">${esc(x.peru[1])}</p>
+      <div class="fk-s"><small>POR QUÉ</small><p>${esc(x.porque)}</p></div>
+      <div class="fk-s"><small>ÁNGULOS NUEVOS PARA PERÚ</small><ol class="rn">${x.nuevos.map(([a, h]) => `<li><b>${esc(a)}.</b> ${esc(h)}</li>`).join('')}</ol></div>
+      <div class="fk-s"><small>RIESGOS</small><p>${esc(x.riesgos)}</p></div>
+      <div class="fk-ph"><img src="${esc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">${lk('Ver en TikTok Shop', x.url)}</div>
+      <p class="fk-lk">${lk('TikTok Shop', x.url)} · ${lk('DropKiller', x.dk)} · ${lk('AliExpress', 'https://www.aliexpress.com/wholesale?SearchText=' + encodeURIComponent(x.n.split(/[·]/)[0].trim()))} · ${lk('Amazon', 'https://www.amazon.com/s?k=' + encodeURIComponent(x.n.split(/[·]/)[0].trim()))}</p>
+      <p class="note">Falta el costo en origen: búscalo en AliExpress o con un proveedor, y ponlo en la Calculadora.</p>
+      <div class="it-a" style="margin:8px 0 0"><button class="btn btn-sm" data-tc="${x.id}">Calcular</button></div></div>`).join('')}`;
+    el.querySelectorAll('[data-ft]').forEach(b => b.onclick = () => { fTT = b.dataset.ft; render(); });
+    el.querySelectorAll('[data-tc]').forEach(b => b.onclick = () => { const x = items.find(y => y.id === b.dataset.tc); Object.assign(C, { nombre: x.n, precio: Math.round(x.usd * TC), costo: 0 }); guardarCalc(); toast('Producto enviado a la Calculadora'); go('calculadora'); });
+  }
+
   function vCaza(el, k) {
     const F = FUENTES[k], todos = lista('caza').filter(c => c.fuente === k);
     const meta = Math.max(1, num(S.config.metaCaza) || 5), hoyN = todos.filter(c => c.fecha === hoy()).length;
@@ -122,6 +155,6 @@
     el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => confirmDel('¿Eliminar esta investigación?', () => S.invest = S.invest.filter(y => y.id !== b.dataset.d)));
   }
 
-  window.Caza = { vista: (el, k) => (k === 'invest' ? vInvest(el) : vCaza(el, k)) };
-  if (['investigacion', 'dropi', 'aliclick'].includes(vista)) render();
+  window.Caza = { vista: (el, k) => (k === 'invest' ? vInvest(el) : k === 'tiktok' ? vTikTok(el) : vCaza(el, k)) };
+  if (['investigacion', 'dropi', 'aliclick', 'prodtiktok'].includes(vista)) render();
 })();
