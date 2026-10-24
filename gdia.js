@@ -2,6 +2,7 @@
 /* DROPOX — Registro de gastos por días. Se guarda en S.gdia y es independiente del resto de la app. */
 (() => {
   const CAT_D = ['Transporte / Movilidad', 'Alimentación', 'Herramientas / Software', 'Empaque / Materiales', 'Comisiones y retiros', 'Publicidad extra', 'Servicios', 'Otros'];
+  const MAPA = { 'Transporte / Movilidad': 'Logística / Almacén', 'Alimentación': 'Otros', 'Herramientas / Software': 'Software / Herramientas', 'Empaque / Materiales': 'Logística / Almacén', 'Comisiones y retiros': 'Otros', 'Publicidad extra': 'Marketing fijo', 'Servicios': 'Servicios (luz, agua, internet)', 'Otros': 'Otros' };
   const lista = () => (S.gdia = S.gdia || []);
   const fechaLarga = f => { const d = new Date(f + 'T12:00:00'); return d.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' }); };
   const campos = () => [{ k: 'fecha', l: 'Fecha', t: 'date', def: hoy(), req: 1 }, { k: 'concepto', l: 'Concepto', req: 1, full: 1 },
@@ -31,10 +32,15 @@
     ${cats.length ? `<div class="card"><h3>Por categoría</h3>${cats.map(([k, v]) => `<div class="pb-row"><div class="pb-top"><span>${esc(k)}</span><span>${fmt(v)}</span></div><div class="pb-bar"><i style="width:${Math.round(v / total * 100)}%;background:var(--acc)"></i></div></div>`).join('')}</div>` : ''}
     <p class="note">Esta sección es independiente: no se suma a la utilidad neta ni a los reportes del resto de la app.</p>
     <div class="card"><h3>Registro por día</h3><p class="sub">${dias.length ? 'Lo más reciente primero' : 'Todavía no hay gastos en este periodo.'}</p>
-      ${dias.map(d => `<div class="gd-d"><div class="it-h"><b>${esc(fechaLarga(d))}</b><b>${fmt(suma(porDia[d]))}</b></div><div class="list">${porDia[d].map(g => `<div class="it"><div class="it-h"><b>${esc(g.concepto)}</b><b>${fmt(g.monto)}</b></div><div class="it-s">${esc(g.categoria || 'Otros')}${g.nota ? ' · ' + esc(g.nota) : ''}</div><div class="it-a" style="margin:0"><button class="btn btn-sm" data-e="${g.id}">Editar</button><button class="btn btn-sm btn-del" data-d="${g.id}">✕</button></div></div>`).join('')}</div></div>`).join('')}</div>`;
+      ${dias.map(d => `<div class="gd-d"><div class="it-h"><b>${esc(fechaLarga(d))}</b><b>${fmt(suma(porDia[d]))}</b></div><div class="list">${porDia[d].map(g => `<div class="it"><div class="it-h"><b>${esc(g.concepto)}</b><b>${fmt(g.monto)}</b></div><div class="it-s">${esc(g.categoria || 'Otros')}${g.nota ? ' · ' + esc(g.nota) : ''}</div><div class="it-a" style="margin:0">${g.gastoId && (S.fijos || []).some(f => f.id === g.gastoId) ? '<span class="tag">Enviado a Gastos ✓</span>' : `<button class="btn btn-sm btn-pri" data-s="${g.id}">Enviar a Gastos</button>`}<button class="btn btn-sm" data-e="${g.id}">Editar</button><button class="btn btn-sm btn-del" data-d="${g.id}">✕</button></div></div>`).join('')}</div></div>`).join('')}</div>`;
     $('#per').onchange = e => { S.config.periodo = e.target.value; Store.save(); render(); };
     $('#nuevo').onclick = () => openForm('Nuevo gasto', campos(), {}, v => lista().push({ id: uid(), ...v }));
     $('#qa').onclick = () => { const c = $('#qc').value.trim(), m = num($('#qm').value); if (!c || !(m > 0)) { toast('Escribe el concepto y un monto'); return; } lista().push({ id: uid(), fecha: hoy(), concepto: c, categoria: $('#qk').value, monto: m, nota: '' }); Store.save(); toast('Gasto agregado'); render(); };
+    el.querySelectorAll('[data-s]').forEach(b => b.onclick = () => {
+      const g = lista().find(x => x.id === b.dataset.s); if (!g) return;
+      const id = uid(); S.fijos.push({ id, nombre: g.concepto, categoria: MAPA[g.categoria] || 'Otros', monto: num(g.monto), frecuencia: 'unico', fecha: g.fecha, activo: true });
+      g.gastoId = id; Store.save(); toast('Enviado a Gastos como gasto único'); render();
+    });
     el.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { const g = lista().find(x => x.id === b.dataset.e); openForm('Editar gasto', campos(), g, v => Object.assign(g, v)); });
     el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => confirmDel('¿Eliminar este gasto?', () => { S.gdia = lista().filter(x => x.id !== b.dataset.d); }));
   }
