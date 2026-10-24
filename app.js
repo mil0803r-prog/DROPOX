@@ -170,8 +170,7 @@ function analizar(pk) {
   const adsReal = k => (S.ads || []).filter(a => a.plataforma === k && metaOk(a) && (k !== 'meta' || !S.metaAuto || a.src === 'meta-api') && a.fecha >= from && a.fecha <= to).reduce((s, a) => s + num(a.gasto), 0);
   const pubReal = k => (S.pub || []).filter(a => a.plataforma === k && a.fecha >= from && a.fecha <= to).reduce((s, a) => s + num(a.gasto), 0);
   const tienePlat = k => S.plataformas.some(p => p.activo && p.tipo === 'gasto' && PAUTA_PAT[k].test(p.nombre));
-  const diarios = S.config.gdiaSuma === false ? 0 : (S.gdia || []).filter(g => g.fecha >= from && g.fecha <= to).reduce((s, g) => s + num(g.monto), 0);
-  const fijos = (fijosRecurrente() + T.suscripcion) * f + unicosEn(from, to) + diarios;
+  const fijos = (fijosRecurrente() + T.suscripcion) * f + unicosEn(from, to);
   const vars = S.plataformas.filter(p => p.activo && p.tipo === 'gasto').reduce((s, p) => {
     const k = Object.keys(PAUTA_PAT).find(x => PAUTA_PAT[x].test(p.nombre)) || '', real = k ? (k === 'google' ? pubReal('google') : adsReal(k)) : 0;
     return s + (real > 0 ? real : num(p.valor) * f);
@@ -309,7 +308,7 @@ function vDashboard(el) {
     ${tile('Ventas entregadas', fmt(A.D.ventas), `${A.ent.length} entregados`)}
     ${tile('Utilidad de pedidos', fmt(A.utilPed), 'antes de gastos', cls(A.utilPed))}
     ${tile('Gastos variables', fmt(A.vars), 'pauta y otros')}
-    ${tile('Gastos fijos', fmt(A.fijos), 'fijos, suscripciones y diarios')}
+    ${tile('Gastos fijos', fmt(A.fijos), 'fijos + suscripciones')}
     ${tile('Pedidos', A.P.length, `${A.curso.length} en curso`)}
     ${tile('Tasa de entrega', A.tasa === null ? '—' : pct(A.tasa), `${A.dev.length} devueltos`, A.tasa !== null && A.tasa < 70 ? 'warn' : '')}
     ${tile('Por cobrar', fmt(A.porCobrar), 'en proceso')}
