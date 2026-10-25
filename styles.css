@@ -439,3 +439,4 @@ dialog h2{margin:0 0 14px;font-size:19px}
 }
 .sh-filtros{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:8px}.sh-filtros .field{min-width:0}.sh-filtros select{width:100%}
 @media(max-width:420px){.sh-filtros{grid-template-columns:1fr}}
+.pin{display:inline-flex;align-items:center;gap:6px}.pin svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}.pin.on{color:var(--acc);border-color:var(--acc)}.pin.on svg{fill:currentColor}

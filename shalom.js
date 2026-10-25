@@ -6,9 +6,12 @@
     ag: { ic: 'shalom', titulo: 'Agencias Shalom', sub: 'Dirección, referencia, horario y ubicación de cada agencia', vacio: 'No hay agencias con ese filtro.' },
     pro: { ic: 'shalompro', titulo: 'Puntos PRO', sub: 'Puntos de Shalom dentro de centros comerciales y tiendas', vacio: 'No hay Puntos PRO con ese filtro.' },
   };
-  const F = { ag: { q: '', dep: '', prov: '', dist: '', lim: 40 }, pro: { q: '', dep: '', prov: '', dist: '', lim: 40 } };
+  const F = { ag: { q: '', dep: '', prov: '', dist: '', solo: false, lim: 40 }, pro: { q: '', dep: '', prov: '', dist: '', solo: false, lim: 40 } };
   let DATA = null, estado = '';
   const propios = () => (S.shalomPro = S.shalomPro || []);
+  const fijados = () => (S.shalomFijos = S.shalomFijos || []);
+  const clave = x => x.id || [x.t, x.n || x.z, x.a].join('|');
+  const PIN = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3zM12 14v7"/></svg>';
   const sinTilde = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const maps = x => x.la != null ? `https://www.google.com/maps/search/?api=1&query=${x.la},${x.lo}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([x.a, x.z, x.d, 'Perú'].filter(Boolean).join(', '))}`;
   const txt = x => [x.a, x.r ? 'Ref: ' + x.r : '', [x.z, x.p, x.d].filter((v, i, a) => v && a.indexOf(v) === i).join(' - ')].filter(Boolean).join('. ');
@@ -30,7 +33,9 @@
   };
   function filtrar(modo) {
     const f = F[modo], q = sinTilde(f.q.trim());
-    return todos(modo).filter(x => (!f.dep || x.d === f.dep) && (!f.prov || x.p === f.prov) && (!f.dist || x.z === f.dist) && (!q || sinTilde([x.n, x.z, x.p, x.d, x.a, x.r].join(' ')).includes(q)));
+    const fj = new Set(fijados()), esF = x => fj.has(clave(x));
+    return todos(modo).filter(x => (!f.solo || esF(x)) && (!f.dep || x.d === f.dep) && (!f.prov || x.p === f.prov) && (!f.dist || x.z === f.dist) && (!q || sinTilde([x.n, x.z, x.p, x.d, x.a, x.r].join(' ')).includes(q)))
+      .map((x, i) => [x, i]).sort((a, b) => esF(b[0]) - esF(a[0]) || a[1] - b[1]).map(a => a[0]);
   }
   const csv = L => {
     const c = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
@@ -60,6 +65,7 @@
     const deps = [...new Set(base.map(x => x.d).filter(Boolean))].sort();
     const provs = [...new Set(base.filter(x => !f.dep || x.d === f.dep).map(x => x.p).filter(Boolean))].sort();
     const dists = [...new Set(base.filter(x => (!f.dep || x.d === f.dep) && (!f.prov || x.p === f.prov)).map(x => x.z).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+    const fj = new Set(fijados()), nFij = base.filter(x => fj.has(clave(x))).length;
     const conMapa = L.filter(x => x.la != null).length;
     const mostrar = L.slice(0, f.lim);
     const tile = (l, v, s = '') => `<div class="t"><small>${l}</small><b>${v}</b>${s ? `<em>${s}</em>` : ''}</div>`;
@@ -71,10 +77,10 @@
       <div class="sh-filtros"><div class="field"><label>Departamento</label><select id="sh-dep"><option value="">Todos</option>${deps.map(d => `<option ${d === f.dep ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select></div>
       <div class="field"><label>Provincia</label><select id="sh-prov"><option value="">Todas</option>${provs.map(d => `<option ${d === f.prov ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select></div>
       <div class="field"><label>Distrito</label><select id="sh-dist"><option value="">Todos</option>${dists.map(d => `<option ${d === f.dist ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select></div></div>
-      <div class="it-a" style="margin:10px 0 0"><button class="btn btn-sm" id="sh-csv">Descargar Excel</button><button class="btn btn-sm" id="sh-pines" ${conMapa ? '' : 'disabled'}>Copiar pines para Meta (${pines(L).length})</button>${f.q || f.dep || f.prov || f.dist ? '<button class="btn btn-sm" id="sh-limpiar">Quitar filtros</button>' : ''}</div>
+      <div class="it-a" style="margin:10px 0 0"><button class="btn btn-sm pin ${f.solo ? 'on' : ''}" id="sh-solo" aria-pressed="${f.solo}">${PIN} Solo fijados (${nFij})</button><button class="btn btn-sm" id="sh-csv">Descargar Excel</button><button class="btn btn-sm" id="sh-pines" ${conMapa ? '' : 'disabled'}>Copiar pines para Meta (${pines(L).length})</button>${f.q || f.dep || f.prov || f.dist ? '<button class="btn btn-sm" id="sh-limpiar">Quitar filtros</button>' : ''}</div>
       <p class="note">Los pines salen con radio de 1 km, que es lo mínimo que acepta Meta. Se copian solo los que están filtrados arriba.</p></div>
     ${modo === 'pro' ? '<p class="note">Esta lista sale de un catálogo de terceros y puede estar incompleta. Si falta alguno, agrégalo con «+ Punto PRO» y queda guardado en tu cuenta.</p>' : '<p class="note">Datos de un catálogo de terceros, no oficial. Confirma horario y dirección con Shalom antes de dárselos a un cliente.</p>'}
-    <div class="list">${mostrar.length ? mostrar.map((x, i) => `<div class="it"><div class="it-h"><b>${esc(x.n || x.z)}</b><span class="tag">${esc(x.k)}</span></div>
+    <div class="list">${mostrar.length ? mostrar.map((x, i) => `<div class="it"><div class="it-h"><b>${esc(x.n || x.z)}</b><span style="display:flex;gap:6px;align-items:center"><span class="tag">${esc(x.k)}</span><button class="btn btn-sm pin ${fj.has(clave(x)) ? 'on' : ''}" data-p="${i}" aria-pressed="${fj.has(clave(x))}" aria-label="${fj.has(clave(x)) ? 'Quitar de fijados' : 'Fijar arriba'}" title="${fj.has(clave(x)) ? 'Quitar de fijados' : 'Fijar arriba'}">${PIN}</button></span></div>
       <div class="it-s">${esc([x.z, x.p, x.d].filter((v, j, a) => v && a.indexOf(v) === j).join(' · '))}</div>
       <div class="it-s" style="margin-top:-6px;color:var(--txt,inherit)">${esc(x.a)}${x.r ? `<br><span style="color:var(--mut)">Ref: ${esc(x.r)}</span>` : ''}${x.h ? `<br><span style="color:var(--mut)">${esc(x.h)}${x.tel ? ' · ' + esc(x.tel) : ''}</span>` : ''}</div>
       <div class="it-a" style="margin:0"><a class="btn btn-sm btn-pri" href="${esc(maps(x))}" target="_blank" rel="noopener noreferrer">Cómo llegar</a><button class="btn btn-sm" data-c="${i}">Copiar dirección</button>${x.propio ? `<button class="btn btn-sm" data-e="${esc(x.id)}">Editar</button><button class="btn btn-sm btn-del" data-d="${esc(x.id)}">✕</button>` : ''}</div></div>`).join('') : `<div class="card"><p class="sub">${M.vacio}</p></div>`}</div>
@@ -89,6 +95,8 @@
     const mas = $('#sh-mas'); if (mas) mas.onclick = () => { f.lim += 40; render(); };
     $('#sh-csv').onclick = () => { bajar(modo === 'pro' ? 'puntos-pro-shalom.csv' : 'agencias-shalom.csv', csv(L), 'text/csv;charset=utf-8'); toast('Archivo listo'); };
     $('#sh-pines').onclick = () => copiar(JSON.stringify({ geo_locations: { custom_locations: pines(L), location_types: ['home'] } }, null, 1), `${pines(L).length} pines copiados`);
+    $('#sh-solo').onclick = () => { f.solo = !f.solo; reset(); };
+    el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { const k = clave(mostrar[+b.dataset.p]), a = fijados(), j = a.indexOf(k); if (j < 0) a.push(k); else a.splice(j, 1); Store.save(); toast(j < 0 ? 'Fijado arriba' : 'Quitado de fijados'); render(); });
     el.querySelectorAll('[data-c]').forEach(b => b.onclick = () => copiar(txt(mostrar[+b.dataset.c]), 'Dirección copiada'));
     if (modo !== 'pro') return;
     const campos = () => [{ k: 'n', l: 'Nombre del local', req: 1, full: 1 }, { k: 'd', l: 'Departamento', req: 1 }, { k: 'p', l: 'Provincia' }, { k: 'z', l: 'Distrito / zona', req: 1 }, { k: 'a', l: 'Dirección', req: 1, full: 1 }, { k: 'r', l: 'Referencia', full: 1 }, { k: 'h', l: 'Horario' }, { k: 'tel', l: 'Teléfono' }, { k: 'la', l: 'Latitud (opcional)', t: 'text' }, { k: 'lo', l: 'Longitud (opcional)', t: 'text' }];
