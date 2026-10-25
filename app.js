@@ -22,6 +22,7 @@ const DEFAULTS = () => ({
   gdia: [],
   shalomPro: [],
   shalomFijos: [],
+  menuFijos: [],
   enlaces: [],
   invest: [],
   cuentas: [],
@@ -698,7 +699,25 @@ function render() {
   countUp(el);
 }
 const CORTO = { dashboard: 'Panel', calculadora: 'Calcular', meta: 'Meta', tiktok: 'TikTok', publicidad: 'Publi.', radar: 'Radar', prodtiktok: 'Prod. TT', gdia: 'Diarios', shalom: 'Shalom', shalompro: 'PRO', descargar: 'Bajar', caza: 'Caza', dlfb: 'Facebook', dltt: 'TikTok', investigacion: 'Invest.', dropi: 'Dropi', aliclick: 'AliClick', proyeccion: 'Proyec.' };
-$('#tabs').innerHTML = GRUPOS.map(([g, its]) => `<div class="tg">${g}</div>` + its.map(([k, l]) => `<a href="#${k}" data-v="${k}">${svg(k)}<span class="lg">${l}</span><span class="sh">${CORTO[k] || l}</span></a>`).join('')).join('');
+// Menú con secciones fijables: la chincheta de cada sección la sube al grupo «Fijados» (se guarda en S.menuFijos).
+const PIN_M = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3zM12 14v7"/></svg>';
+function pintarMenu() {
+  const t = $('#tabs'), fj = (S.menuFijos = S.menuFijos || []).filter(k => TABS.some(x => x[0] === k));
+  const a = ([k, l]) => `<a href="#${k}" data-v="${k}">${svg(k)}<span class="lg">${l}</span><span class="sh">${CORTO[k] || l}</span><span class="mpin ${fj.includes(k) ? 'on' : ''}" role="button" tabindex="0" data-pin="${k}" aria-pressed="${fj.includes(k)}" aria-label="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}" title="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}">${PIN_M}</span></a>`;
+  const grupos = fj.length ? [['Fijados', fj.map(k => TABS.find(x => x[0] === k))]] : [];
+  GRUPOS.forEach(([g, its]) => { const r = its.filter(x => !fj.includes(x[0])); if (r.length) grupos.push([g, r]); });
+  const marca = t.querySelector('.dbrand');
+  t.innerHTML = grupos.map(([g, its]) => `<div class="tg">${g}</div>` + its.map(a).join('')).join('');
+  if (marca) t.prepend(marca);
+}
+function alternarFijo(k) {
+  const fj = (S.menuFijos = S.menuFijos || []), i = fj.indexOf(k);
+  if (i < 0) fj.push(k); else fj.splice(i, 1);
+  Store.save(); pintarMenu(); render(); toast(i < 0 ? 'Sección fijada arriba' : 'Sección quitada de fijados');
+}
+$('#tabs').addEventListener('click', e => { const p = e.target.closest('.mpin'); if (p) { e.preventDefault(); e.stopImmediatePropagation(); alternarFijo(p.dataset.pin); } });
+$('#tabs').addEventListener('keydown', e => { const p = e.target.closest && e.target.closest('.mpin'); if (p && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopImmediatePropagation(); alternarFijo(p.dataset.pin); } });
+pintarMenu();
 $('#gear').innerHTML = svg('ajustes');
 $('#fabIc').innerHTML = svg('chispa');
 $('#tema').onclick = () => { S.config.tema = oscuro() ? 'light' : 'dark'; Store.save(); render(); };
