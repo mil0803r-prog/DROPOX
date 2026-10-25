@@ -20,6 +20,7 @@ const DEFAULTS = () => ({
   pub: [],
   caza: [],
   gdia: [],
+  enlaces: [],
   invest: [],
   cuentas: [],
   calcs: [],
