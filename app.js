@@ -21,6 +21,7 @@ const DEFAULTS = () => ({
   caza: [],
   gdia: [],
   shalomPro: [],
+  shalomFijos: [],
   enlaces: [],
   invest: [],
   cuentas: [],
