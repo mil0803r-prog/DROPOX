@@ -118,7 +118,8 @@
       { k: 'costo', l: 'Costo proveedor (S/)', t: 'number', req: 1 }, { k: 'pvp', l: 'Precio de venta (S/)', t: 'number', req: 1 },
       { k: 'estado', l: 'Estado', t: 'select', opts: EST, def: 'nuevo' }, { k: 'categoria', l: 'Nicho / categoría' },
       { k: 'ventas', l: 'Ventas que ves (opcional)', t: 'number' }, { k: 'link', l: 'Enlace (opcional)', full: 1 }, { k: 'nota', l: 'Nota', full: 1 }];
-    el.innerHTML = `${secH('caza', F.n, F.sub, '<button class="btn btn-pri" id="nuevo" style="white-space:nowrap">+ Producto</button>')}
+    Caza.ultimo = k;
+    el.innerHTML = `<div class="seg" id="cseg" style="margin-bottom:12px"><button data-k="dropi" class="${k === 'dropi' ? 'on' : ''}">Dropi</button><button data-k="aliclick" class="${k === 'aliclick' ? 'on' : ''}">AliClick</button></div>${secH('caza', 'Caza diaria · ' + F.corto, F.sub, '<button class="btn btn-pri" id="nuevo" style="white-space:nowrap">+ Producto</button>')}
     <div class="card"><h3>Meta de hoy</h3><p class="sub">Productos cazados hoy: <b>${hoyN}</b> de ${meta}</p>
       <div class="pb-bar"><i style="width:${pct}%;background:var(--acc)"></i></div>
       <div class="row" style="margin-top:10px"><div class="field"><label>Meta diaria (productos)</label><input id="meta" type="number" min="1" inputmode="numeric" value="${meta}"></div></div></div>
@@ -130,6 +131,7 @@
     el.querySelectorAll('[data-fc]').forEach(bn => bn.onclick = () => { const x = window.CAZA_FICHAS.items.find(y => y.dk === bn.dataset.fc); Object.assign(C, { nombre: x.n.split(/[·(]/)[0].trim(), precio: num(x.pvp), costo: num(x.costo) }); guardarCalc(); toast('Producto enviado a la Calculadora'); go('calculadora'); });
     $('#nuevo').onclick = () => openForm('Nuevo producto · ' + F.corto, campos(), { fuente: k }, v => lista('caza').push({ id: uid(), fuente: k, ...v }));
     $('#meta').onchange = e => { S.config.metaCaza = Math.max(1, num(e.target.value) || 5); Store.save(); render(); };
+    el.querySelectorAll('#cseg button').forEach(bt => bt.onclick = () => go(bt.dataset.k));
     el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { fCaza[k] = b.dataset.f; render(); });
     el.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { const c = S.caza.find(x => x.id === b.dataset.e); openForm('Editar producto', campos(), c, v => Object.assign(c, v)); });
     el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => confirmDel('¿Eliminar este producto?', () => S.caza = S.caza.filter(x => x.id !== b.dataset.d)));
@@ -155,6 +157,6 @@
     el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => confirmDel('¿Eliminar esta investigación?', () => S.invest = S.invest.filter(y => y.id !== b.dataset.d)));
   }
 
-  window.Caza = { vista: (el, k) => (k === 'invest' ? vInvest(el) : k === 'tiktok' ? vTikTok(el) : vCaza(el, k)) };
-  if (['investigacion', 'dropi', 'aliclick', 'prodtiktok'].includes(vista)) render();
+  window.Caza = { ultimo: 'dropi', vista: (el, k) => (k === 'invest' ? vInvest(el) : k === 'tiktok' ? vTikTok(el) : vCaza(el, k)) };
+  if (['investigacion', 'dropi', 'aliclick', 'prodtiktok', 'caza'].includes(vista)) render();
 })();

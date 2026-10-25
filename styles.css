@@ -425,3 +425,15 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .gd-b{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px}
 .gd-b i{display:block;width:100%;min-height:2px;background:var(--acc);border-radius:5px 5px 2px 2px}.gd-b span{font-size:10px;color:var(--mut)}
 .gd-d{margin:14px 0}.gd-d>.it-h{padding:6px 2px;border-bottom:1px solid var(--line);margin-bottom:6px}.gd-d>.it-h b:first-child::first-letter{text-transform:uppercase}
+
+/* Menú por categorías */
+.tg{display:none}
+@media (min-width:700px){
+  .tabs{overflow-y:auto}
+  .tg{display:block;margin:14px 8px 4px;font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+  .tg:first-of-type{margin-top:0}
+}
+@media (max-width:699px){
+  .tabs.open{overflow-y:auto}
+  .tabs.open .tg{display:block;margin:12px 10px 2px;font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+}
