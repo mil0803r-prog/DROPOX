@@ -25,7 +25,7 @@
     M('descubrir', 'd2', 'Pregunta sobre el uso', '¿Lo usarías en casa, en el trabajo o para llevarlo contigo?'),
     M('producto', 'p1', 'Presentación corta', 'El {producto} te ayuda a {beneficio1}.\n✅ {beneficio1}\n✅ {beneficio2}\n✅ {beneficio3}\nTe mando una foto y un video para que lo veas 👇'),
     M('producto', 'p2', 'Cómo se usa', 'Es muy fácil de usar: {como_se_usa}. Si tienes alguna duda, yo te explico por aquí.'),
-    M('precio', 'pr1', 'Precio y formas de envío', 'Hoy el {producto} está en {oferta} con envío gratis 🎁\nTienes 2 opciones:\n1️⃣ {transportadora}: contra entrega. Separas con {adelanto} de adelanto y el resto ({saldo}) lo pagas al recibir.\n2️⃣ {envio_alt}: pago anticipado de {oferta}.\n¿Cuál prefieres?'),
+    M('precio', 'pr1', 'Precio y contra entrega (Shalom)', 'Hoy el {producto} está en {oferta} con envío gratis 🎁\nLo enviamos por {transportadora} y pagas contra entrega: separas con {adelanto} de adelanto y el resto ({saldo}) lo pagas cuando lo recibes en la agencia.\n¿Te lo separo?'),
     M('precio', 'pr2', 'Oferta de 2 unidades', 'Si te llevas 2 te sale más barato: {oferta2}. Es ideal para regalar o para tener uno de repuesto. ¿Cuál prefieres, 1 o 2?'),
     M('objeciones', 'o1', '«Está caro»', 'Te entiendo, {cliente} 🙏 Por eso está en {oferta} y el envío ya va incluido, no pagas flete. Además {garantia}. ¿Te animas a probarlo?'),
     M('objeciones', 'o2', '«Lo voy a pensar»', 'Claro, tómate tu tiempo 😊 Solo te cuento que {limite}. ¿Qué duda te falta resolver? Con gusto te ayudo.'),
@@ -57,7 +57,6 @@
     M('envio', 'e1', 'Pedido en camino', 'Tu pedido ya salió 🚚 Te llega el {fecha_entrega}. Código de seguimiento: {codigo}. Cualquier consulta, me escribes.'),
     M('envio', 'e2', 'Aviso de retraso', 'Hola {cliente}, quería avisarte que tu pedido se retrasó un poco por {motivo}. Llegará el {fecha_entrega}. Disculpa la demora y gracias por tu paciencia 🙏'),
     M('envio', 'e3', 'Llegó a la agencia para recoger', 'Tu pedido ya llegó a la agencia de {agencia} en {ciudad}. Puedes recogerlo con tu DNI y pagando el saldo de {saldo}. El horario es {horario_agencia}.'),
-    M('confirmacion', 'cf3', 'Confirmar pedido con pago anticipado (Olva / bus)', '✅ Pedido confirmado\nProducto: {producto}\nCantidad: {cantidad}\nPago total recibido: {oferta} (envío gratis)\nEnvío por: {envio_alt} a {ciudad}\nTe envío la guía y el código apenas salga. ¡Gracias por tu compra!'),
     M('postventa', 'pv1', 'Preguntar si llegó bien', 'Hola {cliente} 😊 ¿Te llegó bien tu {producto}? Cuéntame cómo te fue.'),
     M('postventa', 'pv2', 'Pedir una foto o comentario', '¡Qué bueno! 🙌 ¿Nos regalas una foto o un comentario contando tu experiencia? Nos ayuda mucho a otras personas a decidirse.'),
     M('postventa', 'pv3', 'Ofrecer otro producto', 'Como compraste el {producto}, te puede servir {producto_extra}. Para clientes como tú tiene un precio especial: {oferta_extra}. ¿Te lo muestro?'),
@@ -73,24 +72,90 @@
     M('negocio', 'n3', 'Respuesta rápida «/precio»', 'El {producto} está en {oferta} con envío gratis. Con {transportadora}: adelanto de {adelanto} y pagas {saldo} al recibir. Con {envio_alt}: pago anticipado. ¿Te lo separo?'),
     M('negocio', 'n4', 'Respuesta rápida «/envio»', 'Enviamos a todo el Perú 🇵🇪 El envío es gratis. Por {transportadora} (contra entrega con adelanto de {adelanto}): {tiempo_provincia}. Por {envio_alt}: pago anticipado.'),
   ];
+  // Mensajes propios de cada transportadora (los que no están aquí ni en SHALOM sirven para las tres)
+  const SHALOM = new Set(['pr1', 'o3', 'o4', 'o6', 'o7', 'ob3', 'ob4', 'ob5', 'ob6', 'ob7', 'ob8', 'ob9', 'ob10', 'ob11', 'c1', 'c3', 'c4', 'c5', 'cf1', 'cf2', 'e3', 'n3', 'n4']);
+  BASE.forEach(b => { b.c = SHALOM.has(b.id) ? 'shalom' : 'all'; });
+  const T = (c, e, id, t, x) => BASE.push({ ...M(e, id, t, x), c });
+  // OLVA — pago anticipado, guía y número de seguimiento
+  T('olva', 'precio', 'ol_pr', 'Precio y pago anticipado (Olva)', 'Hoy el {producto} está en {oferta} con envío gratis 🎁\nLo enviamos por Olva y el pago es anticipado por {cuenta_pago}. Apenas confirmes tu pago lo despachamos y te paso la guía para que lo sigas en línea.\n¿Te lo separo?');
+  T('olva', 'objeciones', 'ol1', '«¿Por qué tengo que pagar antes?»', 'Buena pregunta, {cliente} 🙌 Con Olva el pago es anticipado para despachar tu pedido el mismo día. El total es {oferta} con el envío incluido, no pagas nada más. Apenas pagues te mando la guía de Olva con el número de seguimiento.');
+  T('olva', 'objeciones', 'ol2', '«No confío, ¿y si pago y no llega?»', 'Te entiendo, {cliente}, es normal pensarlo 🙏 Apenas pagues te envío la guía de Olva con el número de seguimiento y tú mismo lo verificas en su web. Si quieres, antes te muestro envíos que ya hicimos [aquí manda capturas reales].');
+  T('olva', 'objeciones', 'ol3', '«¿Puedo pagar contra entrega?»', 'En tu ciudad el envío por Olva es con pago anticipado 🙏 Si hay agencia {transportadora} cerca de ti, ahí sí puedes separar con {adelanto} y pagar {saldo} al recibir. Dime tu departamento y ciudad y te confirmo cuál te conviene.');
+  T('olva', 'objeciones', 'ol4', '«¿Cuánto demora con Olva?»', 'Con Olva demora {tiempo_olva} desde que se despacha. Apenas salga te mando la guía con el número de seguimiento para que veas dónde va.');
+  T('olva', 'objeciones', 'ol5', '«¿Llega a mi casa o tengo que recoger?»', 'Depende de tu zona, {cliente}. Dime tu distrito y dirección y te confirmo si Olva entrega a domicilio o si lo recoges en su agencia más cercana.');
+  T('olva', 'objeciones', 'ol6', '«Envío gratis… al final cobran»', 'Tienes razón en cuidarte, {cliente} 🙏 El total es {oferta}, todo incluido. Pagas una sola vez y no hay ningún cobro extra por el envío. Si te piden algo más, me escribes y yo lo resuelvo.');
+  T('olva', 'objeciones', 'ol7', 'Le diste el precio y te dejó en visto (a las 2 o 3 horas)', 'Hola {cliente} 😊 Te cuento que los {oferta} ya incluyen el envío por Olva, no pagas nada más. ¿Te gustó algún color? Si quieres te lo separo.');
+  T('olva', 'objeciones', 'ol8', 'Le pides el pago y te deja en visto', 'Hola {cliente} 😊 ¿Pudiste ver cómo pagar por {cuenta_pago}? Apenas me envíes la captura despacho tu pedido y te paso la guía de Olva. Si tienes alguna duda del pago, dime y te ayudo.');
+  T('olva', 'objeciones', 'ol9', 'Mostrar confianza antes de pedir el pago', 'Mientras lo piensas, te muestro cómo trabajamos 👇 [aquí manda capturas de clientes y guías Olva reales]. Cuando quieras avanzar, me dices y lo separamos.');
+  T('olva', 'cierre', 'ol10', 'Pedir los datos (Olva)', '¡Perfecto, {cliente}! Para enviarlo por Olva necesito 👇\n1) Nombre completo:\n2) DNI:\n3) Celular:\n4) Departamento, provincia y distrito:\n5) Dirección y una referencia:\n6) Cantidad:');
+  T('olva', 'cierre', 'ol11', 'Pedir el pago (Olva)', 'Para despachar tu pedido: {oferta} (envío gratis) por {cuenta_pago}. Cuando pagues, envíame la captura y lo enviamos por Olva 🚚');
+  T('olva', 'confirmacion', 'ol12', 'Confirmar pedido con pago recibido (Olva)', '✅ Pedido confirmado\nProducto: {producto}\nCantidad: {cantidad}\nPago total recibido: {oferta} (envío gratis)\nEnvío por Olva a {ciudad}\nTe envío la guía y el número de seguimiento apenas salga. ¡Gracias por tu compra!');
+  T('olva', 'envio', 'ol13', 'Pedido en camino con guía (Olva)', 'Tu pedido ya salió con Olva 🚚 Número de guía: {codigo}. Puedes seguirlo en la web de Olva. Llega en {tiempo_olva} aproximadamente. Cualquier consulta, me escribes.');
+  T('olva', 'envio', 'ol14', 'Ya está por llegar (Olva)', 'Hola {cliente} 👋 Tu {producto} ya está en {ciudad} con Olva. Ten tu DNI a la mano y avísame apenas lo recibas.');
+  T('olva', 'negocio', 'ol15', 'Respuesta rápida «/precio» (Olva)', 'El {producto} está en {oferta} con envío gratis por Olva. El pago es anticipado por {cuenta_pago} y te mando la guía apenas despachemos. ¿Te lo separo?');
+  // BUSES — pago anticipado, recojo en la agencia del bus
+  T('bus', 'precio', 'bu_pr', 'Precio y pago anticipado (bus)', 'Hoy el {producto} está en {oferta} con envío gratis 🎁\nLo mandamos por encomienda con {empresa_bus} a la agencia de tu ciudad y el pago es anticipado por {cuenta_pago}. Tú solo lo recoges con tu DNI.\n¿Te lo separo?');
+  T('bus', 'objeciones', 'bu1', '«¿Por qué tengo que pagar antes?»', 'Con la encomienda por bus el pago es anticipado, {cliente}. El total es {oferta} con el envío incluido y no pagas nada más al recoger. Cuando despache te mando la foto de la guía del bus.');
+  T('bus', 'objeciones', 'bu2', '«No confío, ¿y si no llega?»', 'Es normal dudar, {cliente} 🙏 Cuando despachamos te mando la foto de la guía de {empresa_bus} con tu nombre y DNI, y el código para que lo consultes. Si quieres, antes te muestro envíos que ya hicimos [aquí manda capturas reales].');
+  T('bus', 'objeciones', 'bu3', '«¿Dónde lo recojo?»', 'Lo recoges en la agencia de {empresa_bus} en {ciudad}. Dime tu ciudad y te confirmo la dirección. Solo llevas tu DNI.');
+  T('bus', 'objeciones', 'bu4', '«¿Cuánto demora?»', 'Por bus llega en {tiempo_bus} desde que se despacha. En cuanto salga te mando la foto de la guía con el código para que lo sigas.');
+  T('bus', 'objeciones', 'bu5', '«¿Y si se malogra en el viaje?»', 'Lo enviamos bien empaquetado para el viaje 📦 Cuando lo recojas, revísalo en la agencia: si llega con algún problema me escribes ese mismo día con una foto y lo resolvemos. {garantia}');
+  T('bus', 'objeciones', 'bu6', '«Prefiero pagar contra entrega»', 'Lo entiendo 🙌 Si en tu ciudad hay agencia {transportadora}, puedes separar con {adelanto} y pagar {saldo} al recibir. Dime tu departamento y ciudad y te confirmo.');
+  T('bus', 'objeciones', 'bu7', '«¿Hay agencia en mi ciudad?»', 'Dime tu departamento y ciudad y te confirmo si {empresa_bus} llega a tu zona 🙌 Si no, vemos otra empresa que tenga agencia cerca de ti.');
+  T('bus', 'objeciones', 'bu8', 'Le diste el precio y te dejó en visto (a las 2 o 3 horas)', 'Hola {cliente} 😊 Te cuento que los {oferta} ya incluyen el envío por {empresa_bus}, no pagas nada más al recoger. ¿Te gustó algún color? Si quieres te lo separo.');
+  T('bus', 'objeciones', 'bu9', 'Le pides el pago y te deja en visto', 'Hola {cliente} 😊 ¿Pudiste ver cómo pagar por {cuenta_pago}? Apenas me envíes la captura despacho tu pedido y te mando la foto de la guía del bus. Si tienes alguna duda, dime y te ayudo.');
+  T('bus', 'objeciones', 'bu10', 'Mostrar confianza antes de pedir el pago', 'Mientras lo piensas, te muestro cómo trabajamos 👇 [aquí manda capturas de clientes y guías de bus reales]. Cuando quieras avanzar, me dices y lo separamos.');
+  T('bus', 'cierre', 'bu11', 'Pedir los datos (bus)', '¡Perfecto, {cliente}! Para enviarlo por bus necesito 👇\n1) Nombre completo de quien recogerá:\n2) DNI:\n3) Celular:\n4) Ciudad y agencia donde recogerás:\n5) Cantidad:');
+  T('bus', 'cierre', 'bu12', 'Pedir el pago (bus)', 'Para despachar tu pedido: {oferta} (envío gratis) por {cuenta_pago}. Cuando pagues, envíame la captura y lo mandamos hoy con {empresa_bus} 🚌');
+  T('bus', 'confirmacion', 'bu13', 'Confirmar pedido con pago recibido (bus)', '✅ Pedido confirmado\nProducto: {producto}\nCantidad: {cantidad}\nPago total recibido: {oferta} (envío gratis)\nEnvío por {empresa_bus} a la agencia de {ciudad}\nTe mando la foto de la guía apenas despachemos. ¡Gracias por tu compra!');
+  T('bus', 'envio', 'bu14', 'Pedido en camino con foto de la guía (bus)', 'Tu pedido ya salió con {empresa_bus} 🚌 Te mando la foto de la guía. Código: {codigo}. Llega a la agencia de {ciudad} en {tiempo_bus} aproximadamente.');
+  T('bus', 'envio', 'bu15', 'Ya llegó a la agencia del bus', 'Tu pedido ya llegó a la agencia de {empresa_bus} en {ciudad}. Recógelo con tu DNI. El horario es {horario_agencia}.');
+  T('bus', 'negocio', 'bu16', 'Respuesta rápida «/precio» (bus)', 'El {producto} está en {oferta} con envío gratis por {empresa_bus}. El pago es anticipado por {cuenta_pago} y lo recoges en la agencia de tu ciudad con tu DNI. ¿Te lo separo?');
   const DATOS = [
     ['negocio', 'Nombre del negocio', 'Ej. D\' RAYO'], ['asesor', 'Tu nombre (quien atiende)', 'Ej. Daniel'], ['producto', 'Producto', 'Ej. Set Llave y Corazón'],
     ['beneficio1', 'Beneficio 1', 'Ej. un regalo que dura para siempre'], ['beneficio2', 'Beneficio 2', ''], ['beneficio3', 'Beneficio 3', ''], ['como_se_usa', 'Cómo se usa', ''],
-    ['colores', 'Colores disponibles', 'Ej. dorado, plateado y rosado'], ['oferta', 'Precio u oferta', 'Ej. S/ 69'], ['adelanto', 'Adelanto (Shalom contra entrega)', 'Ej. S/ 10'], ['saldo', 'Saldo al recibir (Shalom)', 'Ej. S/ 59'], ['envio_alt', 'Otras formas de envío (pago anticipado)', 'Ej. Olva o agencia de buses'], ['cuenta_pago', 'Dónde te pagan (Yape / Plin / cuenta)', 'Ej. Yape 987 654 321'], ['oferta2', 'Oferta por 2 unidades', 'Ej. 2 por S/ 129'], ['envio', 'Envío', 'Ej. Envío gratis'], ['pago', 'Forma de pago', 'Ej. contra entrega con adelanto'],
+    ['colores', 'Colores disponibles', 'Ej. dorado, plateado y rosado'], ['oferta', 'Precio u oferta', 'Ej. S/ 69'], ['adelanto', 'Adelanto (Shalom)', 'Ej. S/ 10'], ['saldo', 'Saldo al recibir (Shalom)', 'Ej. S/ 59'], ['envio_alt', 'Otras formas de envío (pago anticipado)', 'Ej. Olva o bus'], ['cuenta_pago', 'Dónde te pagan (Yape / Plin / cuenta)', 'Ej. Yape 987 654 321'], ['oferta2', 'Oferta por 2 unidades', 'Ej. 2 por S/ 129'], ['envio', 'Envío', 'Ej. Envío gratis'], ['pago', 'Forma de pago', 'Ej. contra entrega con adelanto'],
     ['garantia', 'Garantía o cambio', 'Ej. tienes 7 días para cambio si llega con falla'], ['limite', 'Motivo de urgencia real', 'Ej. quedan pocas unidades con este precio'],
-    ['transportadora', 'Transportadora', 'Ej. Shalom'], ['tiempo_lima', 'Tiempo en Lima', 'Ej. 24 a 48 horas'], ['tiempo_provincia', 'Tiempo en provincia', 'Ej. 3 a 5 días'],
+    ['transportadora', 'Transportadora contra entrega', 'Ej. Shalom'], ['empresa_bus', 'Empresa de bus (encomienda)', 'Ej. Cruz del Sur / Flores / Civa'], ['tiempo_olva', 'Tiempo con Olva', 'Ej. 3 a 5 días'], ['tiempo_bus', 'Tiempo por bus', 'Ej. 2 a 4 días'], ['tiempo_lima', 'Tiempo en Lima', 'Ej. 24 a 48 horas'], ['tiempo_provincia', 'Tiempo en provincia', 'Ej. 3 a 5 días'],
     ['horario', 'Horario de atención', 'Ej. lunes a sábado de 8 am a 8 pm'], ['whatsapp', 'Tu WhatsApp', 'Ej. 987 654 321'],
   ];
+  const TRANSP = [['shalom', 'Shalom'], ['olva', 'Olva'], ['bus', 'Buses']];
+  // Texto propio de cada transportadora en los pasos que cambian (objetivo, consejo)
+  const TIPS = {
+    shalom: {
+      precio: ['Precio, adelanto y saldo en un solo mensaje', 'Da el precio, di que el envío es gratis y explica el adelanto de {adelanto}: lo que falta se paga al recibir en la agencia Shalom. Termina con una pregunta que lleve al pedido.'],
+      objeciones: ['Quitar el miedo al adelanto y al cobro del envío', 'Las dudas típicas de Shalom: «¿por qué adelanto?», «¿es estafa?», «al final cobran el envío». Explica que el adelanto es parte del precio y que el saldo se paga al recoger. Cuando te dejen en visto, haz una pregunta fácil, nunca presiones.'],
+      cierre: ['Datos y adelanto', 'Pide los datos en un solo mensaje y luego el adelanto. Con el comprobante, el pedido queda separado.'],
+      confirmacion: ['Que recoja y pague el saldo', 'Repite los datos y recuérdale llevar su DNI y el saldo. Es la clave para bajar las devoluciones.'],
+      envio: ['Avisar cuando llega a la agencia', 'Avisa cuando sale, cuando llega a la agencia Shalom y el horario para recoger.'],
+    },
+    olva: {
+      precio: ['Precio y pago anticipado', 'Da el precio con envío gratis y di claro que con Olva el pago es anticipado. Apenas pague, despachas y le pasas la guía.'],
+      objeciones: ['Quitar el miedo a pagar antes', 'La duda de Olva es «¿y si pago y no llega?». Responde con la guía y el número de seguimiento que verificará él mismo, y con pruebas de envíos reales. No prometas fechas que no controlas.'],
+      cierre: ['Datos de entrega y comprobante del pago', 'Pide los datos completos (con dirección y referencia) y luego el pago. Despacha solo cuando llegue la captura.'],
+      confirmacion: ['Confirmar el pago y prometer la guía', 'Confirma que recibiste el pago y que le enviarás la guía con el número de seguimiento.'],
+      envio: ['Compartir la guía y el seguimiento', 'Manda la guía apenas salga, avisa cuando esté por llegar y si hay retraso avísalo tú primero.'],
+    },
+    bus: {
+      precio: ['Precio y pago anticipado, recojo en el bus', 'Da el precio con envío gratis, di que va por encomienda con la empresa de bus y que el pago es anticipado. El cliente recoge con su DNI en la agencia.'],
+      objeciones: ['Quitar el miedo a que no llegue', 'Las dudas típicas del bus: «¿y si no llega?», «¿dónde lo recojo?», «¿hay agencia en mi ciudad?». Manda la foto de la guía y confirma la agencia antes de cobrar.'],
+      cierre: ['Datos de quien recoge y comprobante del pago', 'Pide nombre, DNI, celular y la agencia donde recogerá. Despacha solo cuando llegue la captura del pago.'],
+      confirmacion: ['Confirmar el pago y la agencia', 'Confirma el pago, la empresa de bus y la agencia de destino, y promete la foto de la guía.'],
+      envio: ['Foto de la guía y aviso de llegada', 'Manda la foto de la guía apenas despaches y avisa cuando llegue a la agencia para que lo recoja.'],
+    },
+  };
   let tab = 'flujo', etapa = '';
   const datos = () => { const m = (S.mensajes = S.mensajes || {}); m.datos = m.datos || {}; m.edit = m.edit || {}; m.extra = m.extra || []; if (!m.base1) { m.base1 = 1; const d = { oferta: 'S/ 69', adelanto: 'S/ 10', saldo: 'S/ 59', envio: 'Envío gratis', pago: 'Shalom contra entrega con adelanto de S/ 10; Olva o bus con pago anticipado', transportadora: 'Shalom', envio_alt: 'Olva o agencia de buses' }; Object.keys(d).forEach(k => { if (!m.datos[k]) m.datos[k] = d[k]; }); } return m; };
-  const lista = () => { const m = datos(); return BASE.map(b => ({ ...b, x: m.edit[b.id] != null ? m.edit[b.id] : b.x, editado: m.edit[b.id] != null })).concat(m.extra.map(x => ({ ...x, propio: 1 }))); };
+  const tr = () => datos().tr || 'shalom';
+  const lista = () => { const m = datos(); const t = tr(); return BASE.filter(b => b.c === 'all' || b.c === t).map(b => ({ ...b, x: m.edit[b.id] != null ? m.edit[b.id] : b.x, editado: m.edit[b.id] != null })).concat(m.extra.filter(x => !x.c || x.c === 'all' || x.c === t).map(x => ({ ...x, propio: 1 }))); };
   const lleno = txt => { const d = datos().datos; return txt.replace(/\{(\w+)\}/g, (a, k) => (d[k] && d[k].trim()) || '[' + k.replace(/_/g, ' ') + ']'); };
   const copiar = (t, m) => (navigator.clipboard ? navigator.clipboard.writeText(t).then(() => toast(m), () => toast('No se pudo copiar')) : toast('No se pudo copiar'));
+  const nombreTr = () => (TRANSP.find(x => x[0] === tr()) || [])[1];
   const nombreEtapa = e => (ETAPAS.find(x => x[0] === e) || [])[1] || e;
 
   function flujoHtml() {
-    return `<p class="rk-p">El camino de una venta por WhatsApp tiene 12 pasos. Toca un paso para ver sus mensajes listos para copiar.</p>
-    ${ETAPAS.map(([k, t, obj, tip], i) => `<div class="card" style="cursor:pointer" data-go="${k}"><div class="it-h"><b>${i + 1}. ${esc(t)}</b><span class="tag">${lista().filter(x => x.e === k).length} mensajes</span></div><div class="it-s"><b>Objetivo:</b> ${esc(obj)}</div><div class="it-s">${esc(tip)}</div></div>`).join('')}`;
+    return `<p class="rk-p">Este es el camino de una venta por ${esc(nombreTr())}, con sus propias objeciones. Toca un paso para ver sus mensajes listos para copiar.</p>
+    ${ETAPAS.map(([k, t, obj, tip], i) => { const o = TIPS[tr()][k]; if (o) { obj = o[0]; tip = o[1]; } return `<div class="card" style="cursor:pointer" data-go="${k}"><div class="it-h"><b>${i + 1}. ${esc(t)}</b><span class="tag">${lista().filter(x => x.e === k).length} mensajes</span></div><div class="it-s"><b>Objetivo:</b> ${esc(obj)}</div><div class="it-s">${esc(lleno(tip))}</div></div>`; }).join('')}`;
   }
   function msgHtml() {
     const L = lista().filter(x => !etapa || x.e === etapa);
@@ -108,8 +173,10 @@
     const m = datos();
     const tabs = { flujo: 'Estructura', msg: 'Mensajes', datos: 'Mis datos' };
     el.innerHTML = `${secH('mensajes', 'Estructura de mensajes', 'El camino de la venta por WhatsApp y mensajes listos para copiar', tab === 'msg' ? '<button class="btn btn-pri" id="nuevo" style="white-space:nowrap">+ Mensaje</button>' : '')}
+    <div class="chips" id="ms-tr">${TRANSP.map(([k, l]) => `<button class="chip ${tr() === k ? 'on' : ''}" data-tr="${k}">${l}</button>`).join('')}</div>
     <div class="chips" id="ms-t">${Object.entries(tabs).map(([k, l]) => `<button class="chip ${tab === k ? 'on' : ''}" data-t="${k}">${l}</button>`).join('')}</div>
     ${{ flujo: flujoHtml, msg: msgHtml, datos: datosHtml }[tab]()}`;
+    el.querySelectorAll('[data-tr]').forEach(b => b.onclick = () => { m.tr = b.dataset.tr; Store.save(); render(); });
     el.querySelectorAll('#ms-t [data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
     el.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { etapa = b.dataset.go; tab = 'msg'; render(); scrollTo(0, 0); });
     el.querySelectorAll('[data-et]').forEach(b => b.onclick = () => { etapa = b.dataset.et; render(); });
@@ -117,7 +184,7 @@
     el.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => { const x = lista().find(y => y.id === b.dataset.ed); openForm('Editar mensaje', [{ k: 't', l: 'Título', full: 1 }, { k: 'x', l: 'Texto (usa {producto}, {cliente}, {oferta}…)', full: 1 }], { t: x.t, x: x.x }, v => { if (x.propio) Object.assign(m.extra.find(y => y.id === x.id), v); else m.edit[x.id] = v.x; }); });
     el.querySelectorAll('[data-rs]').forEach(b => b.onclick = () => { delete m.edit[b.dataset.rs]; Store.save(); render(); });
     el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirmDel('¿Quitar este mensaje?', () => { m.extra = m.extra.filter(y => y.id !== b.dataset.del); }));
-    const nv = $('#nuevo'); if (nv) nv.onclick = () => openForm('Nuevo mensaje', [{ k: 'e', l: 'Paso', t: 'select', opts: Object.fromEntries(ETAPAS.map(x => [x[0], x[1]])), def: etapa || 'bienvenida' }, { k: 't', l: 'Título', req: 1, full: 1 }, { k: 'x', l: 'Texto', req: 1, full: 1 }], { e: etapa || 'bienvenida' }, v => m.extra.push({ id: uid(), ...v }));
+    const nv = $('#nuevo'); if (nv) nv.onclick = () => openForm('Nuevo mensaje', [{ k: 'c', l: 'Transportadora', t: 'select', opts: { shalom: 'Shalom', olva: 'Olva', bus: 'Buses', all: 'Las tres' }, def: tr() }, { k: 'e', l: 'Paso', t: 'select', opts: Object.fromEntries(ETAPAS.map(x => [x[0], x[1]])), def: etapa || 'bienvenida' }, { k: 't', l: 'Título', req: 1, full: 1 }, { k: 'x', l: 'Texto', req: 1, full: 1 }], { c: tr(), e: etapa || 'bienvenida' }, v => m.extra.push({ id: uid(), ...v }));
     el.querySelectorAll('[data-v]').forEach(i => i.onchange = () => { m.datos[i.dataset.v] = i.value; Store.save(); });
   }
   window.Mensajes = { vista };
