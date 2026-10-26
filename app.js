@@ -243,6 +243,7 @@ function openForm(title, fields, vals, onSave) {
     const v = vals[fd.k] ?? fd.def ?? '';
     let inp;
     if (fd.t === 'select') inp = `<select name="${fd.k}" style="width:100%">${Object.entries(fd.opts).map(([k, l]) => `<option value="${esc(k)}" ${k == v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+    else if (fd.t === 'area') inp = `<textarea name="${fd.k}" rows="${fd.rows || 10}" ${fd.req ? 'required' : ''} style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:14px/1.5 inherit;resize:vertical;white-space:pre-wrap">${esc(v)}</textarea>`;
     else if (fd.t === 'check') inp = `<label class="chk"><input type="checkbox" name="${fd.k}" ${v ? 'checked' : ''}> ${esc(fd.l)}</label>`;
     else inp = `<input name="${fd.k}" type="${fd.t || 'text'}" ${fd.t === 'number' ? 'step="any" min="0" inputmode="decimal"' : ''} value="${esc(v)}" ${fd.req ? 'required' : ''} ${fd.list ? `list="dl-${fd.k}"` : ''}>` + (fd.list ? `<datalist id="dl-${fd.k}">${fd.list.map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : '');
     return `<div class="field" style="${fd.full ? 'grid-column:1/-1' : ''}">${fd.t === 'check' ? '' : `<label>${esc(fd.l)}</label>`}${inp}</div>`;
