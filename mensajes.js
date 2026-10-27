@@ -119,7 +119,7 @@
     ['transportadora', 'Transportadora contra entrega', 'Ej. Shalom'], ['empresa_bus', 'Empresa de bus (encomienda)', 'Ej. Cruz del Sur / Flores / Civa'], ['tiempo_olva', 'Tiempo con Olva', 'Ej. 3 a 5 días'], ['tiempo_bus', 'Tiempo por bus', 'Ej. 2 a 4 días'], ['tiempo_lima', 'Tiempo en Lima', 'Ej. 24 a 48 horas'], ['tiempo_provincia', 'Tiempo en provincia', 'Ej. 3 a 5 días'],
     ['horario', 'Horario de atención', 'Ej. lunes a sábado de 8 am a 8 pm'], ['whatsapp', 'Tu WhatsApp', 'Ej. 987 654 321'],
   ];
-  const TRANSP = [['shalom', 'Shalom'], ['olva', 'Olva'], ['bus', 'Buses']];
+  const TRANSP = [['shalom', 'Shalom', 'Contra entrega'], ['olva', 'Olva', 'Pago anticipado'], ['bus', 'Buses', 'Pago anticipado']];
   // Texto propio de cada transportadora en los pasos que cambian (objetivo, consejo)
   const TIPS = {
     shalom: {
@@ -173,7 +173,7 @@
     const m = datos();
     const tabs = { flujo: 'Estructura', msg: 'Mensajes', datos: 'Mis datos' };
     el.innerHTML = `${secH('mensajes', 'Estructura de mensajes', 'El camino de la venta por WhatsApp y mensajes listos para copiar', tab === 'msg' ? '<button class="btn btn-pri" id="nuevo" style="white-space:nowrap">+ Mensaje</button>' : '')}
-    <div class="chips" id="ms-tr">${TRANSP.map(([k, l]) => `<button class="chip ${tr() === k ? 'on' : ''}" data-tr="${k}">${l}</button>`).join('')}</div>
+    <div class="tr-sel" id="ms-tr">${TRANSP.map(([k, l, d]) => `<button class="tr-b ${tr() === k ? 'on' : ''}" data-tr="${k}"><b>${l}</b><span>${d}</span></button>`).join('')}</div>
     <div class="chips" id="ms-t">${Object.entries(tabs).map(([k, l]) => `<button class="chip ${tab === k ? 'on' : ''}" data-t="${k}">${l}</button>`).join('')}</div>
     ${{ flujo: flujoHtml, msg: msgHtml, datos: datosHtml }[tab]()}`;
     el.querySelectorAll('[data-tr]').forEach(b => b.onclick = () => { m.tr = b.dataset.tr; Store.save(); render(); });
