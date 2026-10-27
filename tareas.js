@@ -128,6 +128,12 @@
       t.personas = t.personas.map((n, i) => (/^Persona [12]$/.test(n) ? ['Fray', 'Milner'][i] : n)); t.ver = 2;
     }
     if (!(t.ver >= 4)) { t.lista = []; t.hechas = {}; t.falta = {}; t.reg = {}; t.apr = {}; t.ver = 4; } // empezar en cero: sin tareas, sin marcas, sin registro ni avances
+    if (!(t.ver >= 5)) { // tareas de Fray
+      t.lista.push(
+        { id: uid(), h: '11:00', d: 45, p: 0, c: 'Publicar', t: 'Publicar 3 imágenes en carrusel en Facebook e Instagram (Meta Business Suite)', n: 'En Meta Business Suite: Crear publicación, marca la página de Facebook y la cuenta de Instagram, sube las 3 imágenes en orden, escribe el texto con gancho, revisa la vista previa y publica o programa.', r: 'diario' },
+        { id: uid(), h: '13:00', d: 45, p: 0, c: 'Investigación', t: 'Buscar los hooks más virales del producto', n: 'Busca en TikTok, Instagram y la Biblioteca de anuncios de Meta los videos más virales de este producto. Anota la frase o escena de los primeros 3 segundos de cada uno (mínimo 5 hooks) y marca los 2 mejores para usar.', r: 'diario' });
+      t.ver = 5;
+    }
     t.hechas = t.hechas || {}; t.falta = t.falta || {}; t.reg = t.reg || {}; t.apr = t.apr || {};
     return t;
   };
