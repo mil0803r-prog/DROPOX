@@ -123,11 +123,11 @@
     const t = (S.tareas = S.tareas || {});
     if (!t.personas) t.personas = ['Fray', 'Milner'];
     if (!t.lista) t.lista = PLANTILLA.map(x => ({ id: uid(), ...x }));
-    if (t.ver !== 2) { // agenda por roles: Fray (logística, imágenes, investigación) y Milner (publicidad y métricas); se conservan las tareas de una sola vez
+    if (!(t.ver >= 2)) { // agenda por roles: Fray (logística, imágenes, investigación) y Milner (publicidad y métricas); se conservan las tareas de una sola vez
       t.lista = PLANTILLA.map(x => ({ id: uid(), ...x })).concat(t.lista.filter(x => x.r === 'una'));
       t.personas = t.personas.map((n, i) => (/^Persona [12]$/.test(n) ? ['Fray', 'Milner'][i] : n)); t.ver = 2;
     }
-    if (t.ver !== 3) { t.hechas = {}; t.falta = {}; t.reg = {}; t.apr = {}; t.ver = 3; } // empezar en cero: borra marcas, registro y avances
+    if (!(t.ver >= 4)) { t.lista = []; t.hechas = {}; t.falta = {}; t.reg = {}; t.apr = {}; t.ver = 4; } // empezar en cero: sin tareas, sin marcas, sin registro ni avances
     t.hechas = t.hechas || {}; t.falta = t.falta || {}; t.reg = t.reg || {}; t.apr = t.apr || {};
     return t;
   };
@@ -238,7 +238,7 @@
     if (ent + dev >= 5 && dev / (ent + dev) > 0.25) A.push(['alta', `${Math.round(dev / (ent + dev) * 100)}% de tus pedidos terminados fueron devoluciones. Confirma mejor cada pedido antes de despachar.`]);
     const imp = FALTA.flatMap(g => g[1]).filter(x => x[2] === 'alta' && !t.falta[x[0]]);
     if (imp.length) A.push(['media', `Te faltan ${imp.length} puntos importantes en «Qué falta». El siguiente: ${imp[0][1]}.`]);
-    const sug = PLANTILLA.filter(p => !t.lista.some(x => x.t === p.t));
+    const sug = t.lista.length ? PLANTILLA.filter(p => !t.lista.some(x => x.t === p.t)) : [];
     return { A, sug, cump };
   }
 
