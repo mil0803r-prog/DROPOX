@@ -139,12 +139,14 @@
       envio: ['Foto de la guía y aviso de llegada', 'Manda la foto de la guía apenas despaches y avisa cuando llegue a la agencia para que lo recoja.'],
     },
   };
+  const FAV = '__fav';
   const ETAPAS_TR = ['objeciones', 'cierre', 'confirmacion', 'envio'];
   const selTr = () => `<div class="tr-sel" id="ms-tr">${TRANSP.map(([k, l, d]) => `<button class="tr-b ${tr() === k ? 'on' : ''}" data-tr="${k}"><b>${l}</b><span>${d}</span></button>`).join('')}</div>`;
   let tab = 'flujo', etapa = '';
-  const datos = () => { const m = (S.mensajes = S.mensajes || {}); m.datos = m.datos || {}; m.edit = m.edit || {}; m.extra = m.extra || []; if (!m.base1) { m.base1 = 1; const d = { oferta: 'S/ 69', adelanto: 'S/ 10', saldo: 'S/ 59', envio: 'Envío gratis', pago: 'Shalom contra entrega con adelanto de S/ 10; Olva o bus con pago anticipado', transportadora: 'Shalom', envio_alt: 'Olva o agencia de buses' }; Object.keys(d).forEach(k => { if (!m.datos[k]) m.datos[k] = d[k]; }); } return m; };
+  const paso = () => (etapa && etapa !== FAV ? etapa : 'bienvenida');
+  const datos = () => { const m = (S.mensajes = S.mensajes || {}); m.datos = m.datos || {}; m.edit = m.edit || {}; m.extra = m.extra || []; m.fav = m.fav || {}; if (!m.base1) { m.base1 = 1; const d = { oferta: 'S/ 69', adelanto: 'S/ 10', saldo: 'S/ 59', envio: 'Envío gratis', pago: 'Shalom contra entrega con adelanto de S/ 10; Olva o bus con pago anticipado', transportadora: 'Shalom', envio_alt: 'Olva o agencia de buses' }; Object.keys(d).forEach(k => { if (!m.datos[k]) m.datos[k] = d[k]; }); } return m; };
   const tr = () => datos().tr || 'shalom';
-  const lista = () => { const m = datos(); const t = tr(); return BASE.filter(b => b.c === 'all' || b.c === t).map(b => ({ ...b, x: m.edit[b.id] != null ? m.edit[b.id] : b.x, editado: m.edit[b.id] != null })).concat(m.extra.filter(x => !x.c || x.c === 'all' || x.c === t).map(x => ({ ...x, propio: 1 }))); };
+  const lista = () => { const m = datos(); const t = tr(); return BASE.filter(b => b.c === 'all' || b.c === t).map(b => ({ ...b, x: m.edit[b.id] != null ? m.edit[b.id] : b.x, editado: m.edit[b.id] != null, fav: !!m.fav[b.id] })).concat(m.extra.filter(x => !x.c || x.c === 'all' || x.c === t).map(x => ({ ...x, propio: 1, fav: !!m.fav[x.id] }))); };
   const lleno = txt => { const d = datos().datos; return txt.replace(/\{(\w+)\}/g, (a, k) => (d[k] && d[k].trim()) || '[' + k.replace(/_/g, ' ') + ']'); };
   const copiar = (t, m) => (navigator.clipboard ? navigator.clipboard.writeText(t).then(() => toast(m), () => toast('No se pudo copiar')) : toast('No se pudo copiar'));
   const nombreTr = () => (TRANSP.find(x => x[0] === tr()) || [])[1];
@@ -160,10 +162,10 @@
     ${h('Para todos: después y fuera del chat')}${grupo(8, ETAPAS.length)}`;
   }
   function msgHtml() {
-    const L = lista().filter(x => !etapa || x.e === etapa);
-    return `${!etapa || ETAPAS_TR.includes(etapa) ? selTr() : ''}<div class="chips"><button class="chip ${etapa === '' ? 'on' : ''}" data-et="">Todos</button>${ETAPAS.map(([k, t]) => `<button class="chip ${etapa === k ? 'on' : ''}" data-et="${k}">${esc(t)}</button>`).join('')}</div>
+    const L = lista().filter(x => etapa === FAV ? x.fav : !etapa || x.e === etapa).sort((a, b) => b.fav - a.fav);
+    return `${!etapa || etapa === FAV || ETAPAS_TR.includes(etapa) ? selTr() : ''}<div class="chips"><button class="chip ${etapa === '' ? 'on' : ''}" data-et="">Todos</button><button class="chip ${etapa === FAV ? 'on' : ''}" data-et="${FAV}">★ Favoritos</button>${ETAPAS.map(([k, t]) => `<button class="chip ${etapa === k ? 'on' : ''}" data-et="${k}">${esc(t)}</button>`).join('')}</div>
     <p class="note" style="margin:0 0 10px">Las partes entre corchetes [así] se llenan con tus datos en la pestaña «Mis datos». Lo que no llenes queda entre corchetes para que lo escribas al enviar.</p>
-    ${L.map(x => `<div class="card"><div class="it-h"><b>${esc(x.t)}</b><span class="tag">${esc(nombreEtapa(x.e))}</span></div><pre class="prompt" style="max-height:none;font-family:inherit;font-size:13.5px;margin:8px 0">${esc(lleno(x.x))}</pre><div class="it-a" style="margin:0"><button class="btn btn-sm btn-pri" data-cp="${x.id}">Copiar</button><button class="btn btn-sm" data-ed="${x.id}">Editar</button>${x.editado ? `<button class="btn btn-sm" data-rs="${x.id}">Restaurar</button>` : ''}${x.propio ? `<button class="btn btn-sm btn-del" data-del="${x.id}">✕</button>` : ''}</div></div>`).join('') || '<div class="card empty">No hay mensajes en este paso.</div>'}`;
+    ${L.map(x => `<div class="card"${x.fav ? ' style="border-color:var(--acc2)"' : ''}><div class="it-h"><b>${x.fav ? '★ ' : ''}${esc(x.t)}</b><span class="tag">${esc(nombreEtapa(x.e))}</span></div><pre class="prompt" style="max-height:none;font-family:inherit;font-size:13.5px;margin:8px 0">${esc(lleno(x.x))}</pre><div class="it-a" style="margin:0"><button class="btn btn-sm btn-pri" data-cp="${x.id}">Copiar</button><button class="btn btn-sm" data-fv="${x.id}">${x.fav ? '★ Quitar' : '☆ Favorito'}</button><button class="btn btn-sm" data-ed="${x.id}">Editar</button>${x.editado ? `<button class="btn btn-sm" data-rs="${x.id}">Restaurar</button>` : ''}${x.propio ? `<button class="btn btn-sm btn-del" data-del="${x.id}">✕</button>` : ''}</div></div>`).join('') || `<div class="card empty">${etapa === FAV ? 'Aún no tienes favoritos. Toca «☆ Favorito» en un mensaje para fijarlo aquí.' : 'No hay mensajes en este paso.'}</div>`}`;
   }
   function datosHtml() {
     const d = datos().datos;
@@ -183,9 +185,10 @@
     el.querySelectorAll('[data-et]').forEach(b => b.onclick = () => { etapa = b.dataset.et; render(); });
     el.querySelectorAll('[data-cp]').forEach(b => b.onclick = () => copiar(lleno(lista().find(x => x.id === b.dataset.cp).x), 'Mensaje copiado'));
     el.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => { const x = lista().find(y => y.id === b.dataset.ed); openForm('Editar mensaje', [{ k: 't', l: 'Título', full: 1 }, { k: 'x', l: 'Texto completo (usa {producto}, {cliente}, {oferta}…)', full: 1, t: 'area', rows: 14 }], { t: x.t, x: x.x }, v => { if (x.propio) Object.assign(m.extra.find(y => y.id === x.id), v); else m.edit[x.id] = v.x; }); });
+    el.querySelectorAll('[data-fv]').forEach(b => b.onclick = () => { const k = b.dataset.fv; if (m.fav[k]) delete m.fav[k]; else m.fav[k] = 1; Store.save(); render(); });
     el.querySelectorAll('[data-rs]').forEach(b => b.onclick = () => { delete m.edit[b.dataset.rs]; Store.save(); render(); });
     el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirmDel('¿Quitar este mensaje?', () => { m.extra = m.extra.filter(y => y.id !== b.dataset.del); }));
-    const nv = $('#nuevo'); if (nv) nv.onclick = () => openForm('Nuevo mensaje', [{ k: 'c', l: 'Transportadora', t: 'select', opts: { shalom: 'Shalom', olva: 'Olva', bus: 'Buses', all: 'Las tres' }, def: ETAPAS_TR.includes(etapa) ? tr() : 'all' }, { k: 'e', l: 'Paso', t: 'select', opts: Object.fromEntries(ETAPAS.map(x => [x[0], x[1]])), def: etapa || 'bienvenida' }, { k: 't', l: 'Título', req: 1, full: 1 }, { k: 'x', l: 'Texto completo', req: 1, full: 1, t: 'area', rows: 14 }], { c: ETAPAS_TR.includes(etapa) ? tr() : 'all', e: etapa || 'bienvenida' }, v => m.extra.push({ id: uid(), ...v }));
+    const nv = $('#nuevo'); if (nv) nv.onclick = () => openForm('Nuevo mensaje', [{ k: 'c', l: 'Transportadora', t: 'select', opts: { shalom: 'Shalom', olva: 'Olva', bus: 'Buses', all: 'Las tres' }, def: ETAPAS_TR.includes(etapa) ? tr() : 'all' }, { k: 'e', l: 'Paso', t: 'select', opts: Object.fromEntries(ETAPAS.map(x => [x[0], x[1]])), def: paso() }, { k: 't', l: 'Título', req: 1, full: 1 }, { k: 'x', l: 'Texto completo', req: 1, full: 1, t: 'area', rows: 14 }], { c: ETAPAS_TR.includes(etapa) ? tr() : 'all', e: paso() }, v => m.extra.push({ id: uid(), ...v }));
     el.querySelectorAll('[data-v]').forEach(i => i.onchange = () => { m.datos[i.dataset.v] = i.value; Store.save(); });
   }
   window.Mensajes = { vista };
