@@ -4,6 +4,13 @@
   const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const REP = { diario: 'Todos los días', lv: 'Lunes a viernes', ls: 'Lunes a sábado', d1: 'Solo lunes', d2: 'Solo martes', d3: 'Solo miércoles', d4: 'Solo jueves', d5: 'Solo viernes', d6: 'Solo sábado', d0: 'Solo domingo', una: 'Una sola vez (en la fecha)' };
   const CATS = ['Organización', 'Atención al cliente', 'Pedidos y envíos', 'Imágenes', 'Video', 'Contenido y textos', 'Publicar', 'Publicidad', 'Métricas', 'Comunidad', 'Investigación', 'Aprender', 'Finanzas', 'Cierre'];
+  const TODOS = [1, 2, 3, 4, 5, 6, 0], ABR = { 1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb', 0: 'Dom' };
+  const diasDe = x => (Array.isArray(x.dias) ? x.dias : x.r === 'diario' ? TODOS : x.r === 'lv' ? [1, 2, 3, 4, 5] : x.r === 'ls' ? [1, 2, 3, 4, 5, 6] : /^d[0-6]$/.test(x.r) ? [+x.r[1]] : []);
+  const repTxt = x => {
+    if (x.r === 'una') return REP.una;
+    const d = diasDe(x).slice().sort((a, b) => (a || 7) - (b || 7)), k = d.join();
+    return d.length === 7 ? 'Todos los días' : k === '1,2,3,4,5' ? 'Lunes a viernes' : k === '1,2,3,4,5,6' ? 'Lunes a sábado' : d.map(n => ABR[n]).join(', ') || 'Sin días';
+  };
   const rep_ok = (r, dow, fecha, f) => (r === 'diario' || (r === 'lv' && dow >= 1 && dow <= 5) || (r === 'ls' && dow >= 1 && dow <= 6) || r === 'd' + dow || (r === 'una' && fecha === f));
 
   // p: 0 = persona 1, 1 = persona 2, 2 = ambos
@@ -141,7 +148,7 @@
   const dow = f => new Date(f + 'T12:00:00').getDay();
   const mover = (f, n) => { const d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() + n); return iso(d); };
   const fechaLarga = f => { const x = new Date(f + 'T12:00:00').toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' }); return x.charAt(0).toUpperCase() + x.slice(1); };
-  const delDia = f => E().lista.filter(x => rep_ok(x.r, dow(f), x.f, f)).sort((a, b) => a.h.localeCompare(b.h) || a.p - b.p);
+  const delDia = f => E().lista.filter(x => (Array.isArray(x.dias) && x.r !== 'una' ? x.dias.includes(dow(f)) : rep_ok(x.r, dow(f), x.f, f))).sort((a, b) => a.h.localeCompare(b.h) || a.p - b.p);
   const hecha = (f, id) => (E().hechas[f] || []).includes(id);
   const fin = x => { const [h, m] = x.h.split(':').map(Number), t = h * 60 + m + (num(x.d) || 0), z = n => String(n).padStart(2, '0'); return z(Math.floor(t / 60) % 24) + ':' + z(t % 60); };
   const ahoraMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
@@ -149,9 +156,14 @@
 
   const campos = () => [{ k: 'h', l: 'Hora de inicio', t: 'time', def: '09:00', req: 1 }, { k: 'd', l: 'Duración (minutos)', t: 'number', def: 30 },
     { k: 't', l: 'Tarea', req: 1, full: 1 }, { k: 'p', l: 'Quién', t: 'select', opts: { 0: nom(0), 1: nom(1), 2: 'Ambos' }, def: 2 },
-    { k: 'c', l: 'Categoría', t: 'select', opts: Object.fromEntries(CATS.map(c => [c, c])) }, { k: 'r', l: 'Se repite', t: 'select', opts: REP, def: 'diario', full: 1 },
+    { k: 'c', l: 'Categoría', t: 'select', opts: Object.fromEntries(CATS.map(c => [c, c])) }, { k: 'r', l: 'Cuándo', t: 'select', opts: { dias: 'En los días que marque abajo', una: 'Una sola vez (en la fecha)' }, def: 'dias', full: 1 },
+    { k: 'dias', l: 'Días de la semana', t: 'dias', def: TODOS, full: 1 },
     { k: 'f', l: 'Fecha (solo si es una sola vez)', t: 'date' }, { k: 'n', l: 'Cómo se hace / nota', full: 1 }];
-  const guardarForm = v => ({ ...v, p: +v.p, d: num(v.d) });
+  const guardarForm = v => {
+    if (v.r === 'una') return { ...v, p: +v.p, d: num(v.d), dias: [] };
+    if (!v.dias.length) { toast('No marcaste días: se asignó a todos'); v = { ...v, dias: TODOS }; }
+    return { ...v, p: +v.p, d: num(v.d), r: 'dias' };
+  };
 
   function hoyHtml() {
     const t = E(), f = fecha || hoy(), L = delDia(f).filter(x => filtro === 'todos' || String(x.p) === filtro || x.p === 2);
@@ -173,7 +185,7 @@
     const hp = p => L.filter(x => x.p === p || x.p === 2).reduce((s, x) => s + num(x.d), 0);
     return `<div class="seg" id="tp-d" style="margin-bottom:12px;flex-wrap:wrap">${orden.map(i => `<button data-d="${i}" class="${i === d ? 'on' : ''}">${DIAS[i].slice(0, 3)}</button>`).join('')}</div>
     <div class="tiles"><div class="t"><small>Tareas ese día</small><b>${L.length}</b></div><div class="t"><small>${esc(nom(0))}</small><b>${(hp(0) / 60).toFixed(1)} h</b></div><div class="t"><small>${esc(nom(1))}</small><b>${(hp(1) / 60).toFixed(1)} h</b></div></div>
-    <div class="card"><h3>${DIAS[d]}</h3><div class="list">${L.map(x => `<div class="it"><div class="it-h"><b>${esc(x.h)}–${esc(fin(x))} · ${esc(x.t)}</b></div><div class="it-s">${esc(nom(x.p))} · ${esc(x.c)} · ${esc(REP[x.r] || '')}</div></div>`).join('')}</div></div>
+    <div class="card"><h3>${DIAS[d]}</h3><div class="list">${L.map(x => `<div class="it"><div class="it-h"><b>${esc(x.h)}–${esc(fin(x))} · ${esc(x.t)}</b></div><div class="it-s">${esc(nom(x.p))} · ${esc(x.c)} · ${esc(repTxt(x))}</div></div>`).join('')}</div></div>
     <p class="note">Para cambiar una tarea o sus horarios, abre la pestaña Hoy y toca Editar. Los cambios valen para todos los días en que se repite.</p>`;
   }
 
@@ -253,7 +265,7 @@
     const ord = ['alta', 'media', 'ok'];
     return `<div class="card"><h3>Análisis de tus últimos 7 días</h3><p class="note">Se calcula con tus tareas marcadas y tu Registro. Lo más urgente va primero.</p></div>
     ${A.sort((a, b) => ord.indexOf(a[0]) - ord.indexOf(b[0])).map(([n, tx]) => `<div class="card"><span class="rv ${cl[n][1]}">${cl[n][0]}</span> <span>${esc(tx)}</span></div>`).join('')}
-    ${sug.length ? `<div class="card"><h3>Tareas que te faltan en la agenda</h3><p class="note">Son tareas recomendadas que no tienes. Agrégalas con un toque.</p>${sug.map((x, i) => `<div class="it"><div class="it-h"><b>${esc(x.h)} · ${esc(x.t)}</b></div><div class="it-s">${esc(nom(x.p))} · ${esc(x.c)} · ${esc(REP[x.r])}</div><div class="it-s">${esc(x.n)}</div><div class="it-a" style="margin:0"><button class="btn btn-sm btn-pri" data-sg="${i}">Agregar</button></div></div>`).join('')}${sug.length > 1 ? '<button class="btn btn-pri" id="tp-sgall" style="margin-top:10px">Agregar todas</button>' : ''}</div>` : ''}`;
+    ${sug.length ? `<div class="card"><h3>Tareas que te faltan en la agenda</h3><p class="note">Son tareas recomendadas que no tienes. Agrégalas con un toque.</p>${sug.map((x, i) => `<div class="it"><div class="it-h"><b>${esc(x.h)} · ${esc(x.t)}</b></div><div class="it-s">${esc(nom(x.p))} · ${esc(x.c)} · ${esc(repTxt(x))}</div><div class="it-s">${esc(x.n)}</div><div class="it-a" style="margin:0"><button class="btn btn-sm btn-pri" data-sg="${i}">Agregar</button></div></div>`).join('')}${sug.length > 1 ? '<button class="btn btn-pri" id="tp-sgall" style="margin-top:10px">Agregar todas</button>' : ''}</div>` : ''}`;
   }
 
   function ajustesHtml() {
@@ -270,11 +282,11 @@
     <div class="chips" id="tp-t">${Object.entries(tabs).map(([k, l]) => `<button class="chip ${tab === k ? 'on' : ''}" data-t="${k}">${l}</button>`).join('')}</div>
     ${{ hoy: hoyHtml, plan: planHtml, falta: faltaHtml, ana: anaHtml, apr: aprHtml, reg: regHtml, aj: ajustesHtml }[tab]()}`;
     el.querySelectorAll('#tp-t [data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
-    const nv = $('#nuevo'); if (nv) nv.onclick = () => openForm('Nueva tarea', campos(), { f: fecha || hoy() }, v => t.lista.push({ id: uid(), ...guardarForm(v) }));
+    const nv = $('#nuevo'); if (nv) nv.onclick = () => openForm('Nueva tarea', campos(), { f: fecha || hoy(), r: 'dias', dias: TODOS }, v => t.lista.push({ id: uid(), ...guardarForm(v) }));
     el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { fecha = b.dataset.m === '0' ? null : mover(fecha || hoy(), +b.dataset.m); render(); });
     el.querySelectorAll('#tp-f [data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; render(); });
     el.querySelectorAll('[data-k]').forEach(i => i.onchange = () => { const f = fecha || hoy(), a = (t.hechas[f] = t.hechas[f] || []); const k = i.dataset.k; t.hechas[f] = i.checked ? [...new Set([...a, k])] : a.filter(x => x !== k); Store.save(); render(); });
-    el.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { const x = t.lista.find(y => y.id === b.dataset.e); openForm('Editar tarea', campos(), x, v => Object.assign(x, guardarForm(v))); });
+    el.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { const x = t.lista.find(y => y.id === b.dataset.e); openForm('Editar tarea', campos(), { ...x, r: x.r === 'una' ? 'una' : 'dias', dias: diasDe(x) }, v => Object.assign(x, guardarForm(v))); });
     el.querySelectorAll('#view [data-d]').forEach(b => { if (b.closest('#tp-d')) b.onclick = () => { diaPlan = +b.dataset.d; render(); }; else b.onclick = () => confirmDel('¿Quitar esta tarea?', () => { t.lista = t.lista.filter(y => y.id !== b.dataset.d); }); });
     el.querySelectorAll('[data-fa]').forEach(i => i.onchange = () => { t.falta[i.dataset.fa] = i.checked; Store.save(); render(); });
     el.querySelectorAll('[data-ap]').forEach(i => i.onchange = () => { t.apr[i.dataset.ap] = i.checked; Store.save(); render(); });

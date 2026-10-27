@@ -244,6 +244,7 @@ function openForm(title, fields, vals, onSave) {
     let inp;
     if (fd.t === 'select') inp = `<select name="${fd.k}" style="width:100%">${Object.entries(fd.opts).map(([k, l]) => `<option value="${esc(k)}" ${k == v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
     else if (fd.t === 'area') inp = `<textarea name="${fd.k}" rows="${fd.rows || 10}" ${fd.req ? 'required' : ''} style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:14px/1.5 inherit;resize:vertical;white-space:pre-wrap">${esc(v)}</textarea>`;
+    else if (fd.t === 'dias') inp = `<div style="display:flex;flex-wrap:wrap;gap:10px 14px">${[[1, 'Lun'], [2, 'Mar'], [3, 'Mié'], [4, 'Jue'], [5, 'Vie'], [6, 'Sáb'], [0, 'Dom']].map(([n, l]) => `<label class="chk"><input type="checkbox" name="${fd.k}__${n}" ${(Array.isArray(v) ? v : []).includes(n) ? 'checked' : ''}> ${l}</label>`).join('')}</div>`;
     else if (fd.t === 'check') inp = `<label class="chk"><input type="checkbox" name="${fd.k}" ${v ? 'checked' : ''}> ${esc(fd.l)}</label>`;
     else inp = `<input name="${fd.k}" type="${fd.t || 'text'}" ${fd.t === 'number' ? 'step="any" min="0" inputmode="decimal"' : ''} value="${esc(v)}" ${fd.req ? 'required' : ''} ${fd.list ? `list="dl-${fd.k}"` : ''}>` + (fd.list ? `<datalist id="dl-${fd.k}">${fd.list.map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : '');
     return `<div class="field" style="${fd.full ? 'grid-column:1/-1' : ''}">${fd.t === 'check' ? '' : `<label>${esc(fd.l)}</label>`}${inp}</div>`;
@@ -251,7 +252,7 @@ function openForm(title, fields, vals, onSave) {
   $('#dlgCancel').onclick = () => d.close();
   f.onsubmit = e => {
     e.preventDefault(); const out = {};
-    fields.forEach(fd => { const el = f.elements[fd.k]; out[fd.k] = fd.t === 'check' ? el.checked : fd.t === 'number' ? num(el.value) : el.value.trim(); });
+    fields.forEach(fd => { if (fd.t === 'dias') { out[fd.k] = [1, 2, 3, 4, 5, 6, 0].filter(n => f.elements[fd.k + '__' + n].checked); return; } const el = f.elements[fd.k]; out[fd.k] = fd.t === 'check' ? el.checked : fd.t === 'number' ? num(el.value) : el.value.trim(); });
     onSave(out); Store.save(); d.close(); render();
   };
   d.showModal();
