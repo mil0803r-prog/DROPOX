@@ -165,9 +165,64 @@
     const sem = [...Array(7)].map((_, i) => mover(f, -i)).map(d => t.reg[d] || {});
     const sm = k => sem.reduce((s, x) => s + num(x[k]), 0);
     const campo = (k, l) => `<div class="field"><label>${l}</label><input data-r="${k}" type="number" min="0" inputmode="numeric" value="${r[k] ?? ''}"></div>`;
-    return `<div class="card"><h3>Registro de hoy</h3><p class="sub">${esc(fechaLarga(f))}</p><div class="row">${campo('videos', 'Videos publicados')}${campo('imagenes', 'Imágenes publicadas')}${campo('mensajes', 'Mensajes recibidos')}${campo('pedidos', 'Pedidos confirmados')}</div>
+    return `<div class="card"><h3>Registro de hoy</h3><p class="sub">${esc(fechaLarga(f))}</p><div class="row">${campo('videos', 'Videos publicados')}${campo('imagenes', 'Imágenes publicadas')}${campo('mensajes', 'Mensajes recibidos')}${campo('pedidos', 'Pedidos confirmados')}${campo('entregados', 'Pedidos entregados')}${campo('devueltos', 'Pedidos devueltos')}${campo('pauta', 'Gasto en publicidad (S/)')}</div>
       <div class="field"><label>¿Qué salió bien, qué falló, qué haremos mañana?</label><input data-r="nota" type="text" maxlength="300" value="${esc(r.nota || '')}"></div></div>
-    <div class="tiles"><div class="t"><small>Videos (7 días)</small><b>${sm('videos')}</b></div><div class="t"><small>Imágenes (7 días)</small><b>${sm('imagenes')}</b></div><div class="t"><small>Mensajes (7 días)</small><b>${sm('mensajes')}</b></div><div class="t"><small>Pedidos (7 días)</small><b>${sm('pedidos')}</b></div></div>`;
+    <div class="tiles"><div class="t"><small>Videos (7 días)</small><b>${sm('videos')}</b></div><div class="t"><small>Imágenes (7 días)</small><b>${sm('imagenes')}</b></div><div class="t"><small>Mensajes (7 días)</small><b>${sm('mensajes')}</b></div><div class="t"><small>Pedidos (7 días)</small><b>${sm('pedidos')}</b></div><div class="t"><small>Publicidad (7 días)</small><b>S/ ${sm('pauta').toFixed(0)}</b></div></div>`;
+  }
+
+
+  // Análisis: revisa los últimos 7 días de tareas y registro, y dice qué atender primero
+  function analisis() {
+    const t = E(), f0 = hoy(), A = [];
+    const dias = [...Array(7)].map((_, i) => mover(f0, -(i + 1)));
+    const usados = dias.filter(f => (t.hechas[f] || []).length || t.reg[f]);
+    let tot = 0, ok = 0; const porCat = {}, porP = [[0, 0], [0, 0]];
+    usados.forEach(f => delDia(f).forEach(x => {
+      const h = hecha(f, x.id); tot++; if (h) ok++;
+      const c = (porCat[x.c] = porCat[x.c] || [0, 0]); c[1]++; if (h) c[0]++;
+      [0, 1].forEach(p => { if (x.p === p || x.p === 2) { porP[p][1]++; if (h) porP[p][0]++; } });
+    }));
+    const pct = (a, b) => (b ? Math.round(a / b * 100) : null);
+    const cump = pct(ok, tot);
+    if (!usados.length) A.push(['media', 'Todavía no hay días marcados. Marca tus tareas y llena el Registro al cerrar el día para que el análisis funcione.']);
+    else if (cump < 50) A.push(['alta', `Solo cumpliste el ${cump}% de las tareas en los últimos días. Quita las que no usas o baja la carga: es mejor una agenda corta que se cumple.`]);
+    else if (cump >= 80) A.push(['ok', `Buen ritmo: cumpliste el ${cump}% de las tareas de los últimos días.`]);
+    else A.push(['media', `Cumpliste el ${cump}% de las tareas de los últimos días. La meta es 80%.`]);
+    const peor = Object.entries(porCat).filter(([, v]) => v[1] >= 3).map(([k, v]) => [k, pct(v[0], v[1])]).sort((a, b) => a[1] - b[1])[0];
+    if (peor && peor[1] < 60) A.push(['alta', `Lo que más se te queda sin hacer es «${peor[0]}» (${peor[1]}% hecho). Muévelo a una hora más temprana o repártelo.`]);
+    [0, 1].forEach(p => { const v = pct(porP[p][0], porP[p][1]); if (v != null && v < 50 && porP[p][1] >= 5) A.push(['media', `${nom(p)} cumple solo el ${v}% de sus tareas. Revisen si tiene demasiadas.`]); });
+    const hp = p => delDia(f0).filter(x => x.p === p || x.p === 2).reduce((s, x) => s + num(x.d), 0);
+    if (Math.abs(hp(0) - hp(1)) > 120) A.push(['media', `La carga de hoy está desigual: ${nom(0)} ${(hp(0) / 60).toFixed(1)} h y ${nom(1)} ${(hp(1) / 60).toFixed(1)} h. Pasen alguna tarea al otro.`]);
+    const am = ahoraMin(), atras = delDia(f0).filter(x => !hecha(f0, x.id) && am >= aMin(fin(x)));
+    if (atras.length) A.push(['alta', `Hoy tienes ${atras.length} tarea${atras.length > 1 ? 's' : ''} atrasada${atras.length > 1 ? 's' : ''}: ${atras.slice(0, 3).map(x => x.t).join('; ')}.`]);
+    const reg = dias.concat([f0]).filter(f => t.reg[f]).map(f => t.reg[f]);
+    const sm = k => reg.reduce((s, x) => s + num(x[k]), 0);
+    const sinPub = reg.filter(x => !num(x.videos) && !num(x.imagenes)).length;
+    if (sinPub >= 2) A.push(['alta', `${sinPub} días de los últimos 7 sin publicar videos ni imágenes. Sin contenido no hay mensajes.`]);
+    const sinReg = dias.filter(f => (t.hechas[f] || []).length && !t.reg[f]).length;
+    if (sinReg) A.push(['media', `${sinReg} día${sinReg > 1 ? 's' : ''} con tareas marcadas pero sin Registro. Llénalo al cierre del día.`]);
+    if (sm('mensajes') >= 20) {
+      const cv = Math.round(sm('pedidos') / sm('mensajes') * 100);
+      A.push([cv < 5 ? 'alta' : cv >= 15 ? 'ok' : 'media', `De cada 100 mensajes cierras ${cv} pedidos. ${cv < 5 ? 'Es bajo: revisa el guion de venta y el seguimiento a quienes dijeron «lo pienso».' : cv >= 15 ? 'Muy bien.' : 'Se puede subir con mejor seguimiento.'}`]);
+    }
+    if (sm('pauta') > 0) {
+      if (!sm('pedidos')) A.push(['alta', `Gastaste S/ ${sm('pauta').toFixed(0)} en publicidad y no registraste pedidos. Revisa los anuncios hoy.`]);
+      else A.push(['media', `Costo de publicidad por pedido: S/ ${(sm('pauta') / sm('pedidos')).toFixed(2)}. Compáralo con tu utilidad por pedido en la Calculadora.`]);
+    }
+    const ent = sm('entregados'), dev = sm('devueltos');
+    if (ent + dev >= 5 && dev / (ent + dev) > 0.25) A.push(['alta', `${Math.round(dev / (ent + dev) * 100)}% de tus pedidos terminados fueron devoluciones. Confirma mejor cada pedido antes de despachar.`]);
+    const imp = FALTA.flatMap(g => g[1]).filter(x => x[2] === 'alta' && !t.falta[x[0]]);
+    if (imp.length) A.push(['media', `Te faltan ${imp.length} puntos importantes en «Qué falta». El siguiente: ${imp[0][1]}.`]);
+    const sug = PLANTILLA.filter(p => !t.lista.some(x => x.t === p.t));
+    return { A, sug, cump };
+  }
+
+  function anaHtml() {
+    const { A, sug } = analisis(), cl = { alta: ['Atender ya', 'rv-no'], media: ['Revisar', 'rv-mid'], ok: ['Bien', 'rv-ok'] };
+    const ord = ['alta', 'media', 'ok'];
+    return `<div class="card"><h3>Análisis de tus últimos 7 días</h3><p class="note">Se calcula con tus tareas marcadas y tu Registro. Lo más urgente va primero.</p></div>
+    ${A.sort((a, b) => ord.indexOf(a[0]) - ord.indexOf(b[0])).map(([n, tx]) => `<div class="card"><span class="rv ${cl[n][1]}">${cl[n][0]}</span> <span>${esc(tx)}</span></div>`).join('')}
+    ${sug.length ? `<div class="card"><h3>Tareas que te faltan en la agenda</h3><p class="note">Son tareas recomendadas que no tienes. Agrégalas con un toque.</p>${sug.map((x, i) => `<div class="it"><div class="it-h"><b>${esc(x.h)} · ${esc(x.t)}</b></div><div class="it-s">${esc(nom(x.p))} · ${esc(x.c)} · ${esc(REP[x.r])}</div><div class="it-s">${esc(x.n)}</div><div class="it-a" style="margin:0"><button class="btn btn-sm btn-pri" data-sg="${i}">Agregar</button></div></div>`).join('')}${sug.length > 1 ? '<button class="btn btn-pri" id="tp-sgall" style="margin-top:10px">Agregar todas</button>' : ''}</div>` : ''}`;
   }
 
   function ajustesHtml() {
@@ -178,10 +233,10 @@
 
   function vista(el) {
     const t = E();
-    const tabs = { hoy: 'Hoy', plan: 'Plan semanal', falta: 'Qué falta', apr: 'Aprender', reg: 'Registro', aj: 'Ajustes' };
+    const tabs = { hoy: 'Hoy', plan: 'Plan semanal', falta: 'Qué falta', ana: 'Análisis', apr: 'Aprender', reg: 'Registro', aj: 'Ajustes' };
     el.innerHTML = `${secH('tareas', 'Tareas diarias', 'La agenda del día para los dos, paso a paso', tab === 'hoy' ? '<button class="btn btn-pri" id="nuevo" style="white-space:nowrap">+ Tarea</button>' : '')}
     <div class="chips" id="tp-t">${Object.entries(tabs).map(([k, l]) => `<button class="chip ${tab === k ? 'on' : ''}" data-t="${k}">${l}</button>`).join('')}</div>
-    ${{ hoy: hoyHtml, plan: planHtml, falta: faltaHtml, apr: aprHtml, reg: regHtml, aj: ajustesHtml }[tab]()}`;
+    ${{ hoy: hoyHtml, plan: planHtml, falta: faltaHtml, ana: anaHtml, apr: aprHtml, reg: regHtml, aj: ajustesHtml }[tab]()}`;
     el.querySelectorAll('#tp-t [data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
     const nv = $('#nuevo'); if (nv) nv.onclick = () => openForm('Nueva tarea', campos(), { f: fecha || hoy() }, v => t.lista.push({ id: uid(), ...guardarForm(v) }));
     el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { fecha = b.dataset.m === '0' ? null : mover(fecha || hoy(), +b.dataset.m); render(); });
@@ -193,6 +248,9 @@
     el.querySelectorAll('[data-ap]').forEach(i => i.onchange = () => { t.apr[i.dataset.ap] = i.checked; Store.save(); render(); });
     el.querySelectorAll('[data-r]').forEach(i => i.onchange = () => { const f = hoy(); t.reg[f] = t.reg[f] || {}; t.reg[f][i.dataset.r] = i.dataset.r === 'nota' ? i.value.trim() : num(i.value); Store.save(); render(); });
     el.querySelectorAll('[data-n]').forEach(i => i.onchange = () => { t.personas[+i.dataset.n] = i.value.trim() || 'Persona ' + (+i.dataset.n + 1); Store.save(); render(); });
+    const sg = analisis().sug, addSg = x => t.lista.push({ id: uid(), h: x.h, d: x.d, p: x.p, c: x.c, t: x.t, n: x.n, r: x.r });
+    el.querySelectorAll('[data-sg]').forEach(b => b.onclick = () => { addSg(sg[+b.dataset.sg]); Store.save(); toast('Tarea agregada'); render(); });
+    const sa = $('#tp-sgall'); if (sa) sa.onclick = () => { sg.forEach(addSg); Store.save(); toast('Tareas agregadas'); render(); };
     const rs = $('#tp-reset'); if (rs) rs.onclick = () => confirmDel('¿Restaurar la agenda original? Se pierden tus cambios en las tareas.', () => { t.lista = PLANTILLA.map(x => ({ id: uid(), ...x })); });
   }
   window.Tareas = { vista };
