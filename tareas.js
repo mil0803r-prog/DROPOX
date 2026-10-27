@@ -127,6 +127,7 @@
       t.lista = PLANTILLA.map(x => ({ id: uid(), ...x })).concat(t.lista.filter(x => x.r === 'una'));
       t.personas = t.personas.map((n, i) => (/^Persona [12]$/.test(n) ? ['Fray', 'Milner'][i] : n)); t.ver = 2;
     }
+    if (t.ver !== 3) { t.hechas = {}; t.falta = {}; t.reg = {}; t.apr = {}; t.ver = 3; } // empezar en cero: borra marcas, registro y avances
     t.hechas = t.hechas || {}; t.falta = t.falta || {}; t.reg = t.reg || {}; t.apr = t.apr || {};
     return t;
   };
@@ -252,6 +253,7 @@
   function ajustesHtml() {
     const t = E();
     return `<div class="card"><h3>Nombres del equipo</h3><div class="row"><div class="field"><label>Persona 1</label><input data-n="0" type="text" maxlength="30" value="${esc(t.personas[0])}"></div><div class="field"><label>Persona 2</label><input data-n="1" type="text" maxlength="30" value="${esc(t.personas[1])}"></div></div></div>
+    <div class="card"><h3>Empezar de cero</h3><p class="sub">Borra todo el historial: tareas marcadas, Registro del día, «Qué falta» y «Aprender». La agenda y los nombres se conservan.</p><button class="btn btn-del" id="tp-cero">Borrar historial</button></div>
     <div class="card"><h3>Volver a la agenda original</h3><p class="sub">Borra tus cambios en las tareas y deja la agenda que venía de fábrica. Lo ya marcado como hecho se conserva.</p><button class="btn btn-del" id="tp-reset">Restaurar agenda</button></div>`;
   }
 
@@ -275,6 +277,7 @@
     const sg = analisis().sug, addSg = x => t.lista.push({ id: uid(), h: x.h, d: x.d, p: x.p, c: x.c, t: x.t, n: x.n, r: x.r });
     el.querySelectorAll('[data-sg]').forEach(b => b.onclick = () => { addSg(sg[+b.dataset.sg]); Store.save(); toast('Tarea agregada'); render(); });
     const sa = $('#tp-sgall'); if (sa) sa.onclick = () => { sg.forEach(addSg); Store.save(); toast('Tareas agregadas'); render(); };
+    const cz = $('#tp-cero'); if (cz) cz.onclick = () => confirmDel('¿Borrar todo el historial de Tareas diarias? No se puede deshacer.', () => { t.hechas = {}; t.falta = {}; t.reg = {}; t.apr = {}; });
     const rs = $('#tp-reset'); if (rs) rs.onclick = () => confirmDel('¿Restaurar la agenda original? Se pierden tus cambios en las tareas.', () => { t.lista = PLANTILLA.map(x => ({ id: uid(), ...x })); });
   }
   window.Tareas = { vista };
