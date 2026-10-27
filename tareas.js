@@ -3,33 +3,53 @@
 (() => {
   const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const REP = { diario: 'Todos los días', lv: 'Lunes a viernes', ls: 'Lunes a sábado', d1: 'Solo lunes', d2: 'Solo martes', d3: 'Solo miércoles', d4: 'Solo jueves', d5: 'Solo viernes', d6: 'Solo sábado', d0: 'Solo domingo', una: 'Una sola vez (en la fecha)' };
-  const CATS = ['Organización', 'Atención al cliente', 'Pedidos y envíos', 'Imágenes', 'Video', 'Contenido y textos', 'Publicar', 'Publicidad', 'Comunidad', 'Investigación', 'Aprender', 'Finanzas', 'Cierre'];
+  const CATS = ['Organización', 'Atención al cliente', 'Pedidos y envíos', 'Imágenes', 'Video', 'Contenido y textos', 'Publicar', 'Publicidad', 'Métricas', 'Comunidad', 'Investigación', 'Aprender', 'Finanzas', 'Cierre'];
   const rep_ok = (r, dow, fecha, f) => (r === 'diario' || (r === 'lv' && dow >= 1 && dow <= 5) || (r === 'ls' && dow >= 1 && dow <= 6) || r === 'd' + dow || (r === 'una' && fecha === f));
 
   // p: 0 = persona 1, 1 = persona 2, 2 = ambos
   const T = (h, d, p, c, t, n, r = 'diario') => ({ h, d, p, c, t, n, r });
+  // p: 0 = Fray (logística, imágenes e investigación), 1 = Milner (publicidad y métricas), 2 = ambos
   const PLANTILLA = [
-    T('08:00', 15, 2, 'Organización', 'Reunión corta: metas del día', 'Cada uno dice qué hará hoy. Revisen pedidos pendientes, qué se publica hoy y qué falta de ayer.'),
-    T('08:15', 45, 0, 'Atención al cliente', 'Responder WhatsApp, Messenger e Instagram', 'Responde a todos los mensajes nuevos. Usa respuestas rápidas y etiqueta cada chat (nuevo, interesado, pedido, pagado). Meta: responder en menos de 15 minutos.'),
-    T('08:15', 45, 1, 'Pedidos y envíos', 'Revisar pedidos de ayer y seguimiento de envíos', 'Confirma cada pedido (nombre, teléfono, dirección y referencia), despacha lo confirmado y pregunta por los envíos que van en camino.'),
-    T('09:00', 90, 0, 'Imágenes', 'Crear 3 imágenes del producto', 'En Canva: foto del producto, beneficio principal, precio u oferta y botón «Escríbenos». Formatos 1:1 para el feed y 9:16 para historias.'),
-    T('09:00', 90, 1, 'Video', 'Grabar 2 o 3 videos cortos (15 a 30 segundos)', 'Ideas: mostrar el producto en uso, antes y después, desempaque, 3 razones para comprarlo. Graba vertical, con buena luz y el producto en los primeros 3 segundos.'),
-    T('10:30', 60, 0, 'Contenido y textos', 'Escribir textos y hashtags del día', 'Un gancho fuerte en la primera línea, el beneficio, la oferta y a dónde escribir. Prepara también el texto de los videos.'),
-    T('10:30', 60, 1, 'Video', 'Editar los videos', 'En CapCut: cortar silencios, subtítulos, música sin derechos de autor, formato 9:16, portada clara.'),
-    T('11:30', 30, 2, 'Publicar', 'Publicar en Facebook y TikTok', 'Una publicación y un reel en Facebook; un video en TikTok. Revisa que el enlace o el botón de WhatsApp funcione.'),
+    T('08:00', 15, 2, 'Organización', 'Reunión corta: metas del día', 'Cada uno dice qué hará hoy. Revisen pedidos pendientes, qué se publica hoy y qué falló ayer.'),
+    // ───── Fray: logística, imágenes e investigación ─────
+    T('08:15', 45, 0, 'Pedidos y envíos', 'Confirmar pedidos de ayer y despacharlos', 'Confirma cada pedido (nombre, teléfono, dirección y referencia). Despacha lo confirmado y anota la guía de cada envío.'),
+    T('09:00', 30, 0, 'Pedidos y envíos', 'Seguimiento de envíos en camino', 'Revisa en la web de la transportadora (Shalom, Olva, etc.) cuáles llegan hoy, cuáles están retenidos o con problema, y avisa al cliente.'),
+    T('09:30', 15, 0, 'Organización', 'Revisar stock y confirmar con el proveedor', 'Confirma que hay stock del producto que se va a promocionar antes de que Milner lo anuncie.'),
+    T('09:45', 75, 0, 'Imágenes', 'Crear o editar 3 imágenes del producto', 'En Canva: foto del producto, beneficio principal, precio u oferta. Formatos 1:1 para el feed y 9:16 para historias.'),
+    T('11:00', 45, 0, 'Publicar', 'Subir imágenes a la cuenta', 'Sube las imágenes a la página de Facebook, a la tienda o catálogo. Revisa título, precio, descripción y orden de las fotos.'),
+    T('14:00', 45, 0, 'Aprender', 'Aprender algo nuevo (45 minutos)', 'Sigue el tema del día en la pestaña Aprender y escribe 3 cosas que aplicarás mañana.'),
+    T('14:45', 30, 0, 'Pedidos y envíos', 'Llamar a clientes con devolución y anotar el motivo', 'Pregunta por qué no recibió o rechazó el pedido y anótalo: así se reducen las devoluciones.'),
+    T('15:15', 30, 0, 'Pedidos y envíos', 'Seguimiento a clientes con pedido pendiente', 'Escribe a los que dijeron «lo pienso», confirma entregas y avisa a quienes recibirán su pedido hoy.'),
+    T('15:45', 30, 0, 'Finanzas', 'Anotar entregados, devueltos y gastos del día', 'Actualiza el estado de cada pedido en la plataforma y registra los gastos en Gastos diarios. Concilia pagos de Yape, Plin y transferencias.'),
+    T('16:15', 45, 0, 'Contenido y textos', 'Preparar las fotos y textos de mañana', 'Deja listas las fotos del producto, los precios y las descripciones. Ordena el almacén y el empaque.'),
+    // ───── Milner: publicidad, métricas y video ─────
+    T('08:15', 45, 1, 'Publicidad', 'Revisar los anuncios de Meta y TikTok', 'Mira gasto, mensajes recibidos y costo por mensaje de ayer. No toques los anuncios con menos de 3 días. Pausa lo que gasta mucho y no trae mensajes.'),
+    T('09:00', 30, 1, 'Métricas', 'Anotar las métricas de ayer', 'Registra en Meta Ads y TikTok Ads el gasto, los mensajes y las compras de ayer.'),
+    T('09:30', 90, 1, 'Video', 'Grabar 2 o 3 videos para los anuncios', 'Muestra el producto en uso, antes y después, desempaque, 3 razones para comprarlo. Vertical, buena luz y producto en los primeros 3 segundos.'),
+    T('11:00', 60, 1, 'Video', 'Editar los videos', 'En CapCut: cortar silencios, subtítulos, música sin derechos de autor, formato 9:16, portada clara.'),
+    T('13:00', 45, 1, 'Publicidad', 'Segunda revisión de anuncios y presupuesto', 'Decide con la regla escrita: qué se pausa, qué se deja correr y qué sube de presupuesto. Cambia una sola cosa a la vez.'),
+    T('13:45', 45, 1, 'Atención al cliente', 'Responder mensajes que llegan de los anuncios', 'Responde WhatsApp, Messenger e Instagram. Usa respuestas rápidas y etiqueta cada chat. Meta: menos de 15 minutos.'),
+    T('14:30', 45, 1, 'Investigación', 'Revisar anuncios de la competencia', 'Mira 5 anuncios de la competencia en la Biblioteca de anuncios de Meta y 5 videos virales. Guarda las ideas.', 'd1'),
+    T('14:30', 45, 1, 'Investigación', 'Revisar anuncios de la competencia', 'Mira 5 anuncios de la competencia en la Biblioteca de anuncios de Meta y 5 videos virales. Guarda las ideas.', 'd2'),
+    T('14:30', 60, 1, 'Publicidad', 'Probar un anuncio o creativo nuevo', 'Cambia una sola cosa a la vez (imagen, texto o público). Sube el nuevo en una campaña de bajo presupuesto.', 'd3'),
+    T('14:30', 45, 1, 'Investigación', 'Revisar anuncios de la competencia', 'Mira 5 anuncios de la competencia en la Biblioteca de anuncios de Meta y 5 videos virales. Guarda las ideas.', 'd4'),
+    T('14:30', 45, 1, 'Investigación', 'Revisar anuncios de la competencia', 'Mira 5 anuncios de la competencia en la Biblioteca de anuncios de Meta y 5 videos virales. Guarda las ideas.', 'd5'),
+    T('15:30', 30, 1, 'Comunidad', 'Responder comentarios de TikTok y Facebook', 'Responde cada comentario y pasa a los interesados a WhatsApp. Interactúa con 10 cuentas de tu nicho.'),
+    T('16:00', 30, 1, 'Publicar', 'Publicar el video del día', 'Un reel en Facebook y un video en TikTok. Revisa que el botón de WhatsApp funcione.'),
+    T('16:30', 45, 1, 'Métricas', 'Calcular costo por mensaje, por pedido y utilidad', 'Calcula costo por mensaje, costo por pedido, ROAS y utilidad por pedido. Anótalos en el Registro del día.', 'ls'),
+    // ───── Ambos ─────
+    T('17:15', 20, 2, 'Cierre', 'Cierre del día', 'Anoten en el Registro del día: videos, imágenes, mensajes, pedidos, entregados, devueltos y publicidad. Qué salió bien, qué falló y qué se hace mañana.'),
     T('12:00', 60, 2, 'Organización', 'Almuerzo y descanso', 'Desconéctense una hora. Se rinde más en la tarde.'),
-    T('13:00', 45, 0, 'Publicidad', 'Revisar los anuncios de Meta', 'Mira gasto, mensajes recibidos y costo por mensaje. No toques los anuncios con menos de 3 días. Pausa lo que gasta mucho y no trae mensajes. Usa la sección Meta Ads.'),
-    T('13:00', 45, 1, 'Comunidad', 'Responder comentarios y mensajes de TikTok y Facebook', 'Responde cada comentario y pasa a los interesados a WhatsApp. Interactúa con 10 cuentas de tu nicho.'),
-    T('14:00', 60, 0, 'Investigación', 'Investigar competencia y videos virales', 'Mira 5 anuncios de la competencia y 5 videos virales del nicho. Guarda ideas en Investigación de mercado.'),
-    T('14:00', 45, 1, 'Aprender', 'Aprender algo nuevo (45 minutos)', 'Sigue el tema del día en la pestaña Aprender y escribe 3 cosas que aplicarás mañana.'),
-    T('15:00', 45, 2, 'Pedidos y envíos', 'Seguimiento a clientes con pedido pendiente', 'Escribe a los que dijeron «lo pienso», confirma entregas y avisa a quienes recibirán su pedido hoy.'),
-    T('16:00', 30, 0, 'Finanzas', 'Anotar gastos del día y pedidos en la plataforma', 'Registra en Gastos diarios lo gastado hoy y actualiza los pedidos entregados o devueltos.'),
-    T('16:00', 60, 1, 'Contenido y textos', 'Preparar el contenido de mañana', 'Guion y lista de tomas de los próximos videos; deja las imágenes casi listas.'),
-    T('17:00', 20, 2, 'Cierre', 'Cierre del día', 'Anoten en el Registro del día: videos, imágenes, mensajes y pedidos. Qué salió bien, qué falló y qué se hace mañana.'),
-    T('09:00', 60, 2, 'Organización', 'Planificar el contenido de la semana', 'Calendario de 7 días: qué imagen, qué video y qué oferta cada día. Anoten ideas nuevas.', 'd1'),
-    T('15:30', 60, 2, 'Publicidad', 'Probar un anuncio o creativo nuevo', 'Cambia una sola cosa a la vez (imagen, texto o público). Sube el nuevo en una campaña de bajo presupuesto.', 'd3'),
+    // ───── Semanales ─────
+    T('09:00', 60, 2, 'Organización', 'Planificar la semana', 'Fray: qué productos y fotos se suben. Milner: qué anuncios, videos y presupuesto. Calendario de 7 días.', 'd1'),
+    T('13:00', 60, 0, 'Investigación', 'Investigar: cómo funciona el contra entrega en Perú', 'Pedido, envío, cobro y devolución. Qué transportadoras hay (Shalom, Olva, Serpost) y cuánto cobran.', 'd1'),
+    T('13:00', 60, 0, 'Investigación', 'Investigar: productos ganadores', 'Usa Caza y Radar. Busca 3 productos candidatos, calcula su margen en la Calculadora y guarda el mejor.', 'd2'),
+    T('13:00', 60, 0, 'Investigación', 'Investigar: proveedores y precios', 'Compara 3 proveedores (Dropi, locales, importación): precio, stock, tiempo de entrega y calidad.', 'd3'),
+    T('13:00', 60, 0, 'Investigación', 'Investigar: la competencia', 'Mira 5 tiendas que venden lo mismo: precio, ofertas, fotos y política de envío. Anota qué haces diferente.', 'd4'),
+    T('13:00', 60, 0, 'Investigación', 'Investigar: los clientes', 'Lee comentarios de la competencia: qué dudas y quejas tienen. Escribe las 10 preguntas más repetidas.', 'd5'),
+    T('13:00', 60, 0, 'Investigación', 'Resumen de lo investigado en la semana', 'Escribe una hoja con lo más importante que aprendiste y se lo cuentas a Milner.', 'd6'),
     T('16:30', 45, 2, 'Finanzas', 'Revisión semanal de números', 'Pedidos entregados y devueltos, gasto en publicidad, utilidad real de la semana (Dashboard y Calculadora). Ajusten precios u ofertas.', 'd5'),
-    T('10:00', 90, 2, 'Aprender', 'Bloque de estudio y revisión', 'Repasen lo aprendido en la semana y anoten dudas. Media jornada, el resto es descanso.', 'd6'),
+    T('10:00', 90, 2, 'Aprender', 'Bloque de estudio y revisión', 'Repasen lo aprendido en la semana y anoten dudas. Bajen el respaldo de datos en Ajustes. Media jornada, el resto es descanso.', 'd6'),
   ];
 
   // Lo que falta: lista de verificación para empezar un e-commerce con contra entrega
@@ -101,8 +121,12 @@
   let tab = 'hoy', fecha = null, filtro = 'todos', diaPlan = null;
   const E = () => {
     const t = (S.tareas = S.tareas || {});
-    if (!t.personas) t.personas = ['Persona 1', 'Persona 2'];
+    if (!t.personas) t.personas = ['Fray', 'Milner'];
     if (!t.lista) t.lista = PLANTILLA.map(x => ({ id: uid(), ...x }));
+    if (t.ver !== 2) { // agenda por roles: Fray (logística, imágenes, investigación) y Milner (publicidad y métricas); se conservan las tareas de una sola vez
+      t.lista = PLANTILLA.map(x => ({ id: uid(), ...x })).concat(t.lista.filter(x => x.r === 'una'));
+      t.personas = t.personas.map((n, i) => (/^Persona [12]$/.test(n) ? ['Fray', 'Milner'][i] : n)); t.ver = 2;
+    }
     t.hechas = t.hechas || {}; t.falta = t.falta || {}; t.reg = t.reg || {}; t.apr = t.apr || {};
     return t;
   };
