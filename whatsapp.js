@@ -76,6 +76,20 @@
         if (nuevos.length) { c.msgs = (c.msgs || []).concat(nuevos).sort((a, b) => a.ts - b.ts); c.ult = Math.max(c.ult || 0, ...nuevos.map(y => y.ts)); cambio = true; }
         c.sync = Math.max(x.ult || 0, c.sync || 0);
       }
+      let n = 0;
+      for (const c of chats()) {
+        if (n >= (forzar ? 20 : 6) || !c.jid || /@g\.us$/.test(c.jid)) continue;
+        if (c.foto && c.perfilTs && Date.now() - c.perfilTs < 864e5) continue;
+        if (c.perfilTs && Date.now() - c.perfilTs < 36e5) continue;
+        n++; c.perfilTs = Date.now();
+        try {
+          const f = await api('perfil', { numero: c.tel || c.jid }); if (!f.ok) continue;
+          if (f.foto && f.foto !== c.foto) c.foto = f.foto;
+          if (f.info) c.info = f.info;
+          if (f.nombre && c.auto && /^\d+$|Sin nombre/.test(c.nombre || '')) c.nombre = f.nombre;
+          cambio = true;
+        } catch (e) { /* sigue con el siguiente */ }
+      }
       con.sync = Date.now();
     } catch (e) { con.error = e.message || 'No se pudo sincronizar.'; }
     con.sincronizando = false;
@@ -114,7 +128,7 @@
     if (!c) return `<div class="wa-c wa-vacio"><div class="card empty">Elige un chat a la izquierda<br><small>o crea uno con «+ Chat».</small></div></div>`;
     const T = plantillas();
     return `<div class="wa-c">
-      <div class="wa-hd"><button class="btn btn-sm wa-back" id="wback">←</button>${av(c)}<div class="wa-hb"><b>${esc(c.nombre)}</b><small>${esc(c.tel || 'sin celular')}${c.ciudad ? ' · ' + esc(c.ciudad) : ''}${c.producto ? ' · ' + esc(c.producto) : ''}</small></div><button class="btn btn-sm" id="ced">Editar</button></div>
+      <div class="wa-hd"><button class="btn btn-sm wa-back" id="wback">←</button>${av(c)}<div class="wa-hb"><b>${esc(c.nombre)}</b><small>${esc((c.tel ? '+' + String(c.tel).replace(/\D/g, '') : 'sin celular') + (c.info ? ' · ' + c.info : ''))}${c.ciudad ? ' · ' + esc(c.ciudad) : ''}${c.producto ? ' · ' + esc(c.producto) : ''}</small></div><button class="btn btn-sm" id="ced">Editar</button></div>
       <div class="wa-est wa-etq">${etqs().map(e => `<button class="wa-et ${(c.etq || []).includes(e.n) ? 'on' : 'off'}" style="--c:${e.c}" data-et="${esc(e.n)}">${esc(e.n)}</button>`).join('')}</div>
       <div class="wa-est">${Object.entries(ESTADOS).map(([k, l]) => `<button class="chip ${c.estado === k ? 'on' : ''}" data-st="${k}">${l}</button>`).join('')}</div>
       <div class="wa-msgs" id="wmsgs">${(c.msgs || []).length ? c.msgs.map((m, i) => `<div class="wa-b ${m.d}"><span>${esc(m.t).replace(/\n/g, '<br>')}</span><small>${hora(m.ts)}${m.d === 'out' ? ' <i class="wa-tk">✓✓</i>' : ''} <a data-dm="${i}" title="Quitar">✕</a></small></div>`).join('') : '<p class="note" style="text-align:center">Aún no hay mensajes. Escribe abajo, o pega lo que te escribió el cliente.</p>'}</div>

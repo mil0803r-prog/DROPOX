@@ -59,6 +59,13 @@ module.exports = async (req, res) => {
         camposChat: ch[0] ? Object.keys(ch[0]) : [], camposContacto: ko[0] ? Object.keys(ko[0]) : [], camposUltimoMensaje: ch[0] && ch[0].lastMessage ? Object.keys(ch[0].lastMessage) : [],
         camposClave: ch[0] && ch[0].lastMessage && ch[0].lastMessage.key ? Object.keys(ch[0].lastMessage.key) : [] });
     }
+    if (b.accion === 'perfil') {
+      const num = String(b.numero || '').replace(/[^\d@a-z.]/gi, '');
+      if (!num) return res.status(400).json({ error: 'Falta el número.' });
+      const [f, i] = await Promise.all([evo('POST', `/chat/fetchProfilePictureUrl/${INST}`, { number: num }).catch(() => ({})), evo('POST', `/chat/fetchProfile/${INST}`, { number: num }).catch(() => ({}))]);
+      const fj = f.j || {}, ij = i.j || {};
+      return res.json({ ok: true, foto: fj.profilePictureUrl || fj.picture || ij.picture || '', nombre: ij.name || '', info: typeof ij.status === 'string' ? ij.status : (ij.status && ij.status.status) || '', negocio: !!ij.isBusiness });
+    }
     if (b.accion === 'chats') {
       const r = await evo('POST', `/chat/findChats/${INST}`, {});
       const arr = Array.isArray(r.j) ? r.j : [];
