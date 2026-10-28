@@ -131,16 +131,18 @@
   }
   // ── Detectar los datos de pedido que el cliente escribió ──
   function leer(txt) {
-    const L = String(txt).split(/\n+/).map(x => x.replace(/^\s*(?:\d+\s*[).:-]|[-•*])\s*/, '').trim()).filter(Boolean);
-    const d = { nombre: '', dni: '', cel: '', ciudad: '', cantidad: '' }, libres = [];
+    const L = String(txt).split(/\n+/).map(x => x.replace(/^[^\p{L}\p{N}]+/u, '').replace(/^\d{1,2}\s*[).]\s*/, '').trim()).filter(Boolean);
+    const d = { nombre: '', dni: '', cel: '', ciudad: '', direccion: '', cantidad: '' }, libres = [];
     L.forEach(l => {
-      const m = l.match(/^([^:]{2,40}):\s*(.+)$/); const k = m ? m[1].toLowerCase() : '', v = m ? m[2].trim() : l;
-      if (/nombre/.test(k)) d.nombre = v;
+      if (/:\s*$/.test(l)) return; // título sin respuesta
+      const m = l.match(/^([^:]{2,45}):\s*(.+)$/); const k = m ? m[1].toLowerCase() : '', v = m ? m[2].trim() : l;
+      if (!m) libres.push(v);
+      else if (/agencia|direcci|referencia/.test(k)) d.direccion = d.direccion ? d.direccion + ' · ' + v : v;
+      else if (/departamento|provincia|distrito|ciudad|lugar/.test(k)) d.ciudad = d.ciudad ? d.ciudad + ', ' + v : v;
+      else if (/nombre/.test(k)) d.nombre = v;
       else if (/dni|documento/.test(k)) d.dni = (v.match(/\d{8}/) || [''])[0];
       else if (/cel|tel|n[uú]mero|whats/.test(k)) d.cel = (v.replace(/\D/g, '').match(/9\d{8}$/) || [''])[0];
-      else if (/agencia|ciudad|departamento|provincia|distrito|direcci|lugar/.test(k)) d.ciudad = d.ciudad ? d.ciudad + ', ' + v : v;
       else if (/cantidad|unidades/.test(k)) d.cantidad = (v.match(/\d+/) || [''])[0];
-      else if (!m) libres.push(v);
     });
     libres.forEach(v => {
       const dig = v.replace(/\D/g, '');
@@ -149,8 +151,9 @@
       else if (!d.cantidad && /^\d{1,2}$/.test(v.trim())) d.cantidad = v.trim();
       else if (!d.nombre && /^[A-Za-zÁÉÍÓÚÑáéíóúñ .'-]{4,}$/.test(v)) d.nombre = v;
       else if (!d.ciudad && /[A-Za-zÁÉÍÓÚÑáéíóúñ]{3,}/.test(v)) d.ciudad = v;
+      else if (!d.direccion && /[A-Za-zÁÉÍÓÚÑáéíóúñ]{3,}/.test(v)) d.direccion = v;
     });
-    d.puntos = ['nombre', 'dni', 'cel', 'ciudad'].filter(k => d[k]).length;
+    d.puntos = ['nombre', 'dni', 'cel', 'ciudad', 'direccion'].filter(k => d[k]).length;
     return d;
   }
   function detectar(c) {
@@ -167,13 +170,13 @@
   const nuevoPedido = (c, d, ex) => {
     const of = window.Mensajes && Mensajes.dato ? Mensajes.dato('oferta') : '', precio = parseFloat((of.match(/[\d.]+/) || [0])[0]) || 0;
     const id = uid();
-    S.pedidos.push({ id, fecha: hoy(), estado: 'pendiente', producto: (window.Mensajes && Mensajes.dato('producto')) || c.producto || 'Producto', cliente: d.nombre || c.nombre, telefono: d.cel || c.tel || '', ciudad: d.ciudad || c.ciudad || '', canal: 'WhatsApp', cantidad: +d.cantidad || 1, precio, costo: 0, flete: 0, otros: 0, dni: d.dni || '', ...(ex || {}) });
+    S.pedidos.push({ id, fecha: hoy(), estado: 'pendiente', producto: (window.Mensajes && Mensajes.dato('producto')) || c.producto || 'Producto', cliente: d.nombre || c.nombre, telefono: d.cel || c.tel || '', ciudad: [d.ciudad || c.ciudad, d.direccion].filter(Boolean).join(' · '), canal: 'WhatsApp', cantidad: +d.cantidad || 1, precio, costo: 0, flete: 0, otros: 0, dni: d.dni || '', ...(ex || {}) });
     c.pedidoId = id; if (!c.estado || ['nuevo', 'interesado', 'esperando'].includes(c.estado)) c.estado = 'confirmado';
     if (d.cel && !c.tel) c.tel = d.cel;
   };
   function revisar() {
     const L = listos(); if (!L.length) return toast('No encontré chats con datos de pedido completos');
-    openForm('Pasar a Pedidos (' + L.length + ')', L.map(({ c, d }) => ({ k: 'c_' + c.id, t: 'check', def: true, l: `${d.nombre || c.nombre} · ${d.cel || c.tel || 'sin cel'} · ${d.ciudad || 'sin ciudad'} · x${d.cantidad || 1}${d.dni ? ' · DNI ' + d.dni : ''}` })), {}, v => {
+    openForm('Pasar a Pedidos (' + L.length + ')', L.map(({ c, d }) => ({ k: 'c_' + c.id, t: 'check', def: true, l: `${d.nombre || c.nombre} · ${d.cel || c.tel || 'sin cel'} · ${[d.ciudad, d.direccion].filter(Boolean).join(' · ') || 'sin ciudad'} · x${d.cantidad || 1}${d.dni ? ' · DNI ' + d.dni : ''}` })), {}, v => {
       let n = 0; L.forEach(({ c, d }) => { if (v['c_' + c.id]) { nuevoPedido(c, d); n++; } });
       toast(n + ' pedido' + (n === 1 ? '' : 's') + ' creado' + (n === 1 ? '' : 's') + ' en Pedidos ✅');
     });
