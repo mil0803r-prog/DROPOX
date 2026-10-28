@@ -8,6 +8,9 @@
     },
     "api/descargar.js": {
       "maxDuration": 60
+    },
+    "api/wa.js": {
+      "maxDuration": 30
     }
   }
 }

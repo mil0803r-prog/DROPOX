@@ -22,6 +22,74 @@
     { k: 'nota', l: 'Nota', t: 'area', rows: 3, full: 1 },
   ];
 
+  // ── Conexión con tu WhatsApp (QR) ──
+  const con = { estado: '', qr: '', error: '', cargando: false, sync: 0 };
+  let timer = null, tqr = 0;
+  async function api(accion, extra) {
+    const tk = window.Nube && Nube.activo ? await Nube.token() : null;
+    if (!tk) throw new Error('Inicia sesión con tu cuenta para conectar WhatsApp.');
+    const r = await fetch('/api/wa', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk }, body: JSON.stringify({ accion, ...(extra || {}) }) });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 401) throw new Error(d.error || 'Sesión vencida.');
+    return d;
+  }
+  const abierto = () => con.estado === 'open';
+  const viendo = () => (location.hash || '').slice(1) === 'whatsapp';
+  const mismo = (c, t) => c.tel && t && String(c.tel).replace(/\D/g, '').slice(-9) === String(t).replace(/\D/g, '').slice(-9);
+  async function estado(redib) {
+    try {
+      const d = await api('estado');
+      con.error = d.sinConfig ? '' : (d.ok ? '' : d.error || '');
+      con.estado = d.sinConfig ? 'sinConfig' : (d.ok ? d.estado : con.estado);
+    } catch (e) { con.error = e.message; }
+    if (redib) render();
+  }
+  async function pedirQr() {
+    con.cargando = true; con.error = ''; render();
+    try { const d = await api('qr'); if (!d.ok) con.error = d.error || 'No se pudo generar el QR.'; else if (d.sinConfig) con.estado = 'sinConfig'; con.qr = d.qr || ''; tqr = Date.now(); } catch (e) { con.error = e.message; }
+    con.cargando = false; render();
+  }
+  async function sincronizar(forzar) {
+    if (!abierto() || con.sincronizando) return;
+    con.sincronizando = true; let cambio = false;
+    try {
+      const d = await api('chats'); if (!d.ok) throw new Error(d.error || '');
+      const ocupados = [];
+      d.chats.forEach(x => {
+        let c = chats().find(y => (y.jid && y.jid === x.jid) || mismo(y, x.tel));
+        if (!c) { c = { id: uid(), nombre: x.nombre || x.tel || 'Sin nombre', tel: x.tel, jid: x.jid, estado: 'nuevo', etq: ['Nuevo cliente'], msgs: [], ult: x.ult || Date.now(), auto: 1 }; chats().push(c); cambio = true; }
+        if (!c.jid) { c.jid = x.jid; cambio = true; }
+        if (x.nombre && c.auto && /^\d+$|Sin nombre/.test(c.nombre || '')) { c.nombre = x.nombre; cambio = true; }
+        if (forzar || c.id === sel || (x.ult || 0) > (c.sync || 0)) ocupados.push([c, x]);
+      });
+      for (const [c, x] of ocupados.slice(0, forzar ? 25 : 8)) {
+        const m = await api('mensajes', { jid: c.jid }); if (!m.ok) continue;
+        const ids = new Set((c.msgs || []).map(y => y.id).filter(Boolean));
+        const nuevos = m.msgs.filter(y => !ids.has(y.id));
+        if (nuevos.length) { c.msgs = (c.msgs || []).concat(nuevos).sort((a, b) => a.ts - b.ts); c.ult = Math.max(c.ult || 0, ...nuevos.map(y => y.ts)); cambio = true; }
+        c.sync = Math.max(x.ult || 0, c.sync || 0);
+      }
+      con.sync = Date.now();
+    } catch (e) { con.error = e.message || 'No se pudo sincronizar.'; }
+    con.sincronizando = false;
+    if (cambio) Store.save();
+    if (viendo()) render();
+  }
+  function latido() {
+    if (timer) return;
+    timer = setInterval(async () => {
+      if (!viendo()) { clearInterval(timer); timer = null; return; }
+      if (con.estado === 'sinConfig') return;
+      if (!abierto()) { if (con.qr || con.estado === 'connecting') { const antes = con.estado; await estado(false); if (abierto()) { con.qr = ''; render(); sincronizar(true); } else if (con.qr && Date.now() - tqr > 25000) pedirQr(); else if (antes !== con.estado) render(); } return; }
+      if (Date.now() - con.sync > 25000) sincronizar(false);
+    }, 4000);
+  }
+  function barra() {
+    if (con.estado === 'sinConfig') return `<div class="card wa-con"><b>Conectar tu WhatsApp con QR</b><p class="note" style="margin:6px 0 0">Todavía falta instalar el servidor de WhatsApp. Sigue los pasos que te di (Railway) y pon su dirección y clave en Vercel como <code>WA_URL</code> y <code>WA_KEY</code>. Cuando esté listo, aquí aparece el botón para escanear el QR.</p></div>`;
+    if (abierto()) return `<div class="card wa-con wa-ok">🟢 <b>WhatsApp conectado</b> <small>${con.sync ? 'Última sincronización ' + hora(con.sync) : 'Sincronizando…'}</small><span class="push"><button class="btn btn-sm" id="wsync">${con.sincronizando ? 'Sincronizando…' : 'Sincronizar ahora'}</button> <button class="btn btn-sm btn-del" id="wout">Desconectar</button></span></div>`;
+    if (con.qr) return `<div class="card wa-con"><b>Escanea este QR</b><p class="note" style="margin:6px 0">En tu celular: WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo.</p><img class="wa-qr" alt="QR de WhatsApp" src="${con.qr.startsWith('data:') ? con.qr : 'data:image/png;base64,' + con.qr}"><p class="note" style="margin:6px 0 0">Se renueva solo. Cuando lo escanees, esta pantalla cambia sola.</p></div>`;
+    return `<div class="card wa-con">⚪ <b>WhatsApp sin conectar</b> <small>${esc(con.error || 'Conéctalo para que los chats lleguen solos.')}</small><span class="push"><button class="btn btn-sm btn-pri" id="wqr">${con.cargando ? 'Generando…' : 'Conectar con QR'}</button></span></div>`;
+  }
   function lista(el) {
     const L = chats().filter(c => (!filtro || c.estado === filtro) && (!fet || (c.etq || []).includes(fet)) && (!q || [c.nombre, c.tel, c.ciudad, c.producto].join(' ').toLowerCase().includes(q)))
       .sort((a, b) => (b.ult || 0) - (a.ult || 0));
@@ -46,7 +114,7 @@
       <div class="wa-in">
         <select id="wpl"><option value="">Mensaje listo…</option>${T.map(t => `<option value="${esc(t.id)}">${esc(t.t)}</option>`).join('')}</select>
         <textarea id="wtx" rows="3" placeholder="Escribe tu respuesta o elige un mensaje listo…"></textarea>
-        <div class="wa-ac"><button class="btn btn-pri" id="wcopy">Copiar mensaje</button><button class="btn" id="wsend">Abrir en WhatsApp</button><button class="btn" id="wcli">Pegar lo que dijo el cliente</button></div>
+        <div class="wa-ac">${abierto() ? '<button class="btn btn-pri" id="wapi">Enviar</button><button class="btn" id="wcopy">Copiar</button>' : '<button class="btn btn-pri" id="wcopy">Copiar mensaje</button>'}<button class="btn" id="wsend">Abrir en WhatsApp</button><button class="btn" id="wcli">Pegar lo que dijo el cliente</button></div>
       </div>
       <div class="wa-ac2">${c.pedidoId && S.pedidos.some(p => p.id === c.pedidoId) ? '<span class="tag t-entregado">✅ Ya está en Pedidos</span>' : '<button class="btn btn-sm" id="wped">Pasar a Pedidos</button>'}<button class="btn btn-sm btn-del" id="wdel">Eliminar chat</button></div>
     </div>`;
@@ -54,10 +122,18 @@
 
   function vista(el) {
     const c = chats().find(x => x.id === sel);
+    const ant = document.querySelector('#wtx'), borrador = ant ? ant.value : '';
     el.innerHTML = `${secH('mensajes', 'WhatsApp', `${chats().length} chats · ${chats().filter(x => x.estado === 'esperando').length} esperando pago`, `<button class="btn" id="wweb">WhatsApp Web ↗</button> <button class="btn btn-pri" id="wnew">+ Chat</button>`)}
+    ${barra()}
     <div class="wa ${c ? 'abierto' : ''}">${lista(el)}${chat(c)}</div>
     <p class="note">Uso manual, igual que las etiquetas de WhatsApp Business: etiqueta a cada cliente aquí, copia el mensaje listo y pégalo en tu WhatsApp Business. No lee tu WhatsApp automáticamente. Las etiquetas también debes ponerlas allá si quieres verlas en la app.</p>`;
     const g = (i) => el.querySelector(i);
+    if (borrador && g('#wtx')) g('#wtx').value = borrador;
+    if (g('#wqr')) g('#wqr').onclick = pedirQr;
+    if (g('#wsync')) g('#wsync').onclick = () => { sincronizar(true); render(); };
+    if (g('#wout')) g('#wout').onclick = () => confirmDel('¿Desconectar tu WhatsApp de la plataforma?', () => { api('salir').then(() => { con.estado = 'close'; con.qr = ''; render(); }); });
+    if (!con.estado && !con.pidio) { con.pidio = 1; estado(true).then(() => { if (abierto()) sincronizar(true); }); }
+    latido();
     g('#wweb').onclick = web;
     g('#wnew').onclick = () => openForm('Nuevo chat', CAMPOS, {}, v => { const n = { id: uid(), ...v, msgs: [], ult: Date.now() }; chats().push(n); sel = n.id; });
     g('#wq').oninput = e => { q = e.target.value.toLowerCase(); const p = e.target.selectionStart; vista(el); const i = el.querySelector('#wq'); i.focus(); i.setSelectionRange(p, p); };
@@ -75,6 +151,13 @@
     g('#wpl').onchange = e => { const t = plantillas().find(x => x.id === e.target.value); if (t) g('#wtx').value = t.x.replace(/\[cliente\]/g, (c.nombre || '').split(' ')[0]).replace(/\[producto\]/g, c.producto || '[producto]'); };
     const add = (d, t) => { c.msgs.push({ d, t, ts: Date.now() }); c.ult = Date.now(); Store.save(); };
     g('#wcopy').onclick = () => { const t = g('#wtx').value.trim(); if (!t) return toast('Escribe o elige un mensaje'); add('out', t); (navigator.clipboard ? navigator.clipboard.writeText(t).then(() => toast('Copiado: pégalo en tu WhatsApp Business'), () => toast('No se pudo copiar')) : toast('No se pudo copiar')); vista(el); };
+    if (g('#wapi')) g('#wapi').onclick = async () => {
+      const t = g('#wtx').value.trim(); if (!t) return toast('Escribe o elige un mensaje');
+      const n = c.jid && !c.tel ? c.jid : tel(c.tel); if (!n) return toast('Falta el celular del cliente (Editar)');
+      g('#wapi').disabled = true;
+      try { const d = await api('enviar', { numero: n, texto: t }); if (!d.ok) throw new Error(d.error || 'No se pudo enviar'); add('out', t); g('#wtx').value = ''; toast('Enviado ✅'); } catch (e) { toast(e.message); }
+      vista(el);
+    };
     g('#wsend').onclick = () => {
       const t = g('#wtx').value.trim(); if (!t) return toast('Escribe o elige un mensaje');
       const n = tel(c.tel); if (!n) return toast('Falta el celular del cliente (Editar)');

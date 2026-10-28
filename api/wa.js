@@ -1,0 +1,80 @@
+/* Función de Vercel: puente entre la plataforma y tu WhatsApp conectado con QR (Evolution API en tu servidor).
+   Exige sesión iniciada. La dirección y la clave del servidor van en variables de Vercel: WA_URL, WA_KEY y WA_INSTANCE (opcional). */
+const URL_SB = process.env.SUPABASE_URL || 'https://ehlkytblkxupiepbtgja.supabase.co';
+const KEY_SB = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_fOT8lAd9F19z1piNdCWX9A_stA2MDjU';
+
+async function sesionValida(token) {
+  try {
+    const r = await fetch(`${URL_SB}/auth/v1/user`, { headers: { apikey: KEY_SB, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) });
+    return r.ok;
+  } catch (e) { return false; }
+}
+const texto = m => {
+  const x = (m && m.message) || {};
+  const t = x.conversation || (x.extendedTextMessage && x.extendedTextMessage.text) || (x.imageMessage && (x.imageMessage.caption || '📷 Foto')) || (x.videoMessage && (x.videoMessage.caption || '🎥 Video')) || (x.audioMessage && '🎤 Audio') || (x.documentMessage && '📄 Documento') || (x.stickerMessage && 'Sticker') || (x.ephemeralMessage && texto({ message: x.ephemeralMessage.message })) || '';
+  return t;
+};
+const ms = t => { const n = Number(t && t.low !== undefined ? t.low : t); return n ? (n < 1e12 ? n * 1000 : n) : 0; };
+const telDe = jid => (/@s\.whatsapp\.net$/.test(jid || '') ? jid.split('@')[0] : '');
+
+module.exports = async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido.' });
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!token || !(await sesionValida(token))) return res.status(401).json({ error: 'Inicia sesión para usar WhatsApp.' });
+  const BASE = (process.env.WA_URL || '').replace(/\/+$/, ''), KEY = process.env.WA_KEY, INST = process.env.WA_INSTANCE || 'dropox';
+  if (!BASE || !KEY) return res.status(200).json({ ok: false, sinConfig: true, error: 'Falta conectar el servidor de WhatsApp (WA_URL y WA_KEY en Vercel).' });
+  const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  const evo = async (metodo, ruta, cuerpo) => {
+    const r = await fetch(BASE + ruta, { method: metodo, headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: cuerpo ? JSON.stringify(cuerpo) : undefined, signal: AbortSignal.timeout(20000) });
+    const j = await r.json().catch(() => null);
+    return { ok: r.ok, status: r.status, j };
+  };
+  try {
+    if (b.accion === 'estado') {
+      const r = await evo('GET', `/instance/connectionState/${INST}`);
+      if (r.status === 404) return res.json({ ok: true, estado: 'sin_instancia' });
+      if (!r.ok) return res.json({ ok: false, error: 'El servidor de WhatsApp respondió con error ' + r.status });
+      const e = (r.j && ((r.j.instance && r.j.instance.state) || r.j.state)) || 'close';
+      return res.json({ ok: true, estado: e });
+    }
+    if (b.accion === 'qr') {
+      let r = await evo('GET', `/instance/connectionState/${INST}`);
+      if (r.status === 404) {
+        const c = await evo('POST', '/instance/create', { instanceName: INST, integration: 'WHATSAPP-BAILEYS', qrcode: true });
+        if (!c.ok) return res.json({ ok: false, error: 'No pude crear la conexión (' + c.status + ').' });
+      }
+      const q = await evo('GET', `/instance/connect/${INST}`);
+      const img = q.j && (q.j.base64 || (q.j.qrcode && q.j.qrcode.base64));
+      if (!q.ok || !img) return res.json({ ok: true, qr: '', esperando: true });
+      return res.json({ ok: true, qr: img });
+    }
+    if (b.accion === 'salir') { await evo('DELETE', `/instance/logout/${INST}`); return res.json({ ok: true }); }
+    if (b.accion === 'chats') {
+      const r = await evo('POST', `/chat/findChats/${INST}`, {});
+      const arr = Array.isArray(r.j) ? r.j : [];
+      const chats = arr.map(c => {
+        const jid = c.remoteJid || c.id || '';
+        return { jid, tel: telDe(jid), nombre: c.pushName || c.name || '', ult: ms(c.updatedAt ? Date.parse(c.updatedAt) : (c.lastMessage && c.lastMessage.messageTimestamp)), noLeidos: c.unreadMessages || 0 };
+      }).filter(c => c.jid && !/@g\.us$|@broadcast$|status@/.test(c.jid)).sort((a, c) => c.ult - a.ult).slice(0, 60);
+      return res.json({ ok: true, chats });
+    }
+    if (b.accion === 'mensajes') {
+      if (!b.jid) return res.status(400).json({ error: 'Falta el chat.' });
+      const r = await evo('POST', `/chat/findMessages/${INST}`, { where: { key: { remoteJid: b.jid } }, page: 1, offset: 40 });
+      const rec = Array.isArray(r.j) ? r.j : (r.j && r.j.messages && (r.j.messages.records || r.j.messages)) || [];
+      const msgs = (Array.isArray(rec) ? rec : []).map(m => ({ id: (m.key && m.key.id) || m.id, d: m.key && m.key.fromMe ? 'out' : 'in', t: texto(m), ts: ms(m.messageTimestamp), nombre: m.pushName || '' })).filter(m => m.id && m.t).sort((a, c) => a.ts - c.ts);
+      return res.json({ ok: true, msgs });
+    }
+    if (b.accion === 'enviar') {
+      const num = String(b.numero || '').replace(/[^\d@a-z.]/gi, ''), t = String(b.texto || '').slice(0, 4000);
+      if (!num || !t.trim()) return res.status(400).json({ error: 'Falta el número o el texto.' });
+      const r = await evo('POST', `/message/sendText/${INST}`, { number: num, text: t });
+      if (!r.ok) return res.json({ ok: false, error: 'No se pudo enviar (' + r.status + ').' });
+      return res.json({ ok: true, id: r.j && r.j.key && r.j.key.id });
+    }
+    return res.status(400).json({ error: 'Acción desconocida.' });
+  } catch (e) {
+    return res.status(200).json({ ok: false, error: 'No pude hablar con el servidor de WhatsApp. ¿Está encendido?' });
+  }
+};
