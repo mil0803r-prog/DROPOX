@@ -504,3 +504,4 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .wa-con{background:var(--w-dgreen);color:#fff;border:0;border-radius:12px}.wa-con small,.wa-con .note{color:#d1f4ea}.wa-con.wa-ok{background:var(--w-dgreen)}
 .wa-con .btn{background:#fff;color:var(--w-dgreen);border:0}.wa-con .btn-del{background:transparent;color:#fff;border:1px solid #fff}.wa-con .btn-pri{background:#25d366;color:#073b2a}
 @media(max-width:820px){.wa{height:auto;min-height:70vh}.wa-msgs{padding:12px 4%}.wa-b{max-width:85%}}
+.wa-img{display:block;max-width:100%;max-height:300px;border-radius:6px;margin-bottom:4px}.wa-b audio{max-width:240px}

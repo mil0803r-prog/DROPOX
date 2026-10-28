@@ -26,6 +26,19 @@
   // ── Conexión con tu WhatsApp (QR) ──
   const con = { estado: '', qr: '', error: '', cargando: false, sync: 0 };
   let timer = null, tqr = 0;
+  const media = {}; // archivos ya descargados (en memoria, no se guardan)
+  const ICO = { imagen: '📷 Ver foto', video: '🎥 Ver video', audio: '🎤 Escuchar audio', doc: '📄 Abrir documento', sticker: 'Sticker' };
+  const aBlob = (b64, mime) => { const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return URL.createObjectURL(new Blob([u], { type: mime || 'application/octet-stream' })); };
+  async function bajarMedia(m) {
+    if (media[m.id] || media[m.id] === 0) return;
+    media[m.id] = 0;
+    try { const d = await api('media', { id: m.id }); if (d.ok) media[m.id] = { url: aBlob(d.base64, d.mime || ({ imagen: 'image/jpeg', video: 'video/mp4', audio: 'audio/ogg', sticker: 'image/webp' })[m.tipo]), nombre: d.nombre || 'archivo' }; else delete media[m.id]; } catch (e) { delete media[m.id]; }
+  }
+  const medioHtml = m => {
+    const f = media[m.id];
+    if (f) return m.tipo === 'imagen' || m.tipo === 'sticker' ? `<img class="wa-img" src="${f.url}" alt="">` : m.tipo === 'video' ? `<video class="wa-img" src="${f.url}" controls></video>` : m.tipo === 'audio' ? `<audio src="${f.url}" controls></audio>` : `<a class="btn btn-sm" href="${f.url}" download="${esc(f.nombre)}">📄 ${esc(f.nombre)}</a>`;
+    return `<button class="btn btn-sm" data-md="${esc(m.id)}">${media[m.id] === 0 ? 'Cargando…' : ICO[m.tipo]}</button>`;
+  };
   const intentados = new Set();
   async function api(accion, extra) {
     const tk = window.Nube && Nube.activo ? await Nube.token() : null;
@@ -131,11 +144,11 @@
       <div class="wa-hd"><button class="btn btn-sm wa-back" id="wback">←</button>${av(c)}<div class="wa-hb"><b>${esc(c.nombre)}</b><small>${esc((c.tel ? '+' + String(c.tel).replace(/\D/g, '') : 'sin celular') + (c.info ? ' · ' + c.info : ''))}${c.ciudad ? ' · ' + esc(c.ciudad) : ''}${c.producto ? ' · ' + esc(c.producto) : ''}</small></div><button class="btn btn-sm" id="ced">Editar</button></div>
       <div class="wa-est wa-etq">${etqs().map(e => `<button class="wa-et ${(c.etq || []).includes(e.n) ? 'on' : 'off'}" style="--c:${e.c}" data-et="${esc(e.n)}">${esc(e.n)}</button>`).join('')}</div>
       <div class="wa-est">${Object.entries(ESTADOS).map(([k, l]) => `<button class="chip ${c.estado === k ? 'on' : ''}" data-st="${k}">${l}</button>`).join('')}</div>
-      <div class="wa-msgs" id="wmsgs">${(c.msgs || []).length ? c.msgs.map((m, i) => `<div class="wa-b ${m.d}"><span>${esc(m.t).replace(/\n/g, '<br>')}</span><small>${hora(m.ts)}${m.d === 'out' ? ' <i class="wa-tk">✓✓</i>' : ''} <a data-dm="${i}" title="Quitar">✕</a></small></div>`).join('') : '<p class="note" style="text-align:center">Aún no hay mensajes. Escribe abajo, o pega lo que te escribió el cliente.</p>'}</div>
+      <div class="wa-msgs" id="wmsgs">${(c.msgs || []).length ? c.msgs.map((m, i) => `<div class="wa-b ${m.d}">${m.tipo && m.id ? medioHtml(m) : ''}${m.tipo && /^(📷 Foto|🎥 Video|🎤 Audio|📄 Documento|Sticker)$/.test(m.t) ? '' : `<span>${esc(m.t).replace(/\n/g, '<br>')}</span>`}<small>${hora(m.ts)}${m.d === 'out' ? ' <i class="wa-tk">✓✓</i>' : ''} <a data-dm="${i}" title="Quitar">✕</a></small></div>`).join('') : '<p class="note" style="text-align:center">Aún no hay mensajes. Escribe abajo, o pega lo que te escribió el cliente.</p>'}</div>
       <div class="wa-in">
         <select id="wpl"><option value="">Mensaje listo…</option>${T.map(t => `<option value="${esc(t.id)}">${esc(t.t)}</option>`).join('')}</select>
         <textarea id="wtx" rows="3" placeholder="Escribe un mensaje"></textarea>
-        <div class="wa-ac">${abierto() ? '<button class="btn btn-pri" id="wapi">Enviar</button><button class="btn" id="wcopy">Copiar</button>' : '<button class="btn btn-pri" id="wcopy">Copiar mensaje</button>'}<button class="btn" id="wsend">Abrir en WhatsApp</button><button class="btn" id="wcli">Pegar lo que dijo el cliente</button></div>
+        <div class="wa-ac">${abierto() ? '<button class="btn btn-pri" id="wapi">Enviar</button><button class="btn" id="wcopy">Copiar</button>' : '<button class="btn btn-pri" id="wcopy">Copiar mensaje</button>'}${abierto() ? '<button class="btn" id="wfile">📎 Archivo</button><input type="file" id="wfin" hidden>' : ''}<button class="btn" id="wsend">Abrir en WhatsApp</button><button class="btn" id="wcli">Pegar lo que dijo el cliente</button></div>
       </div>
       <div class="wa-ac2">${c.pedidoId && S.pedidos.some(p => p.id === c.pedidoId) ? '<span class="tag t-entregado">✅ Ya está en Pedidos</span>' : '<button class="btn btn-sm" id="wped">Pasar a Pedidos</button>'}<button class="btn btn-sm btn-del" id="wdel">Eliminar chat</button></div>
     </div>`;
@@ -173,6 +186,16 @@
     g('#wpl').onchange = e => { const t = plantillas().find(x => x.id === e.target.value); if (t) g('#wtx').value = t.x.replace(/\[cliente\]/g, (c.nombre || '').split(' ')[0]).replace(/\[producto\]/g, c.producto || '[producto]'); };
     const add = (d, t) => { c.msgs.push({ d, t, ts: Date.now() }); c.ult = Date.now(); Store.save(); };
     g('#wcopy').onclick = () => { const t = g('#wtx').value.trim(); if (!t) return toast('Escribe o elige un mensaje'); add('out', t); (navigator.clipboard ? navigator.clipboard.writeText(t).then(() => toast('Copiado: pégalo en tu WhatsApp Business'), () => toast('No se pudo copiar')) : toast('No se pudo copiar')); vista(el); };
+    el.querySelectorAll('[data-md]').forEach(b => b.onclick = async () => { const m = c.msgs.find(y => y.id === b.dataset.md); if (!m) return; media[m.id] = 0; vista(el); await bajarMedia(m); vista(el); });
+    if (abierto()) (async () => { let hubo = false; for (const m of (c.msgs || []).filter(y => y.tipo === 'imagen' && y.id && media[y.id] === undefined).slice(-6)) { await bajarMedia(m); hubo = true; } if (hubo && sel === c.id && viendo()) vista(el); })();
+    if (g('#wfile')) { g('#wfile').onclick = () => g('#wfin').click(); g('#wfin').onchange = async e => {
+      const f = e.target.files[0]; if (!f) return; if (f.size > 3.2e6) return toast('El archivo es muy grande (máximo 3 MB)');
+      const n = c.jid && !c.tel ? c.jid : tel(c.tel); if (!n) return toast('Falta el celular del cliente (Editar)');
+      const b64 = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.readAsDataURL(f); });
+      const tipo = f.type.startsWith('image/') ? 'image' : f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : 'document';
+      try { toast('Enviando…'); const d = await api('enviarMedia', { numero: n, tipo, base64: b64, mime: f.type, nombre: f.name, texto: g('#wtx').value.trim() }); if (!d.ok) throw new Error(d.error || 'No se pudo enviar'); add('out', g('#wtx').value.trim() || ({ image: '📷 Foto', video: '🎥 Video', audio: '🎤 Audio', document: '📄 ' + f.name })[tipo]); toast('Enviado ✅'); } catch (x) { toast(x.message); }
+      vista(el);
+    }; }
     if (g('#wapi')) g('#wapi').onclick = async () => {
       const t = g('#wtx').value.trim(); if (!t) return toast('Escribe o elige un mensaje');
       const n = c.jid && !c.tel ? c.jid : tel(c.tel); if (!n) return toast('Falta el celular del cliente (Editar)');

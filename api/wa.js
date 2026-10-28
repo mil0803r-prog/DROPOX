@@ -14,6 +14,11 @@ const texto = m => {
   const t = x.conversation || (x.extendedTextMessage && x.extendedTextMessage.text) || (x.imageMessage && (x.imageMessage.caption || '📷 Foto')) || (x.videoMessage && (x.videoMessage.caption || '🎥 Video')) || (x.audioMessage && '🎤 Audio') || (x.documentMessage && '📄 Documento') || (x.stickerMessage && 'Sticker') || (x.ephemeralMessage && texto({ message: x.ephemeralMessage.message })) || '';
   return t;
 };
+const tipoDe = m => {
+  const x = (m && m.message) || {};
+  if (x.ephemeralMessage) return tipoDe({ message: x.ephemeralMessage.message });
+  return x.imageMessage ? 'imagen' : x.videoMessage ? 'video' : x.audioMessage ? 'audio' : x.documentMessage ? 'doc' : x.stickerMessage ? 'sticker' : '';
+};
 const ms = t => { const n = Number(t && t.low !== undefined ? t.low : t); return n ? (n < 1e12 ? n * 1000 : n) : 0; };
 const telDe = jid => (/@s\.whatsapp\.net$/.test(jid || '') ? jid.split('@')[0] : '');
 
@@ -59,6 +64,22 @@ module.exports = async (req, res) => {
         camposChat: ch[0] ? Object.keys(ch[0]) : [], camposContacto: ko[0] ? Object.keys(ko[0]) : [], camposUltimoMensaje: ch[0] && ch[0].lastMessage ? Object.keys(ch[0].lastMessage) : [],
         camposClave: ch[0] && ch[0].lastMessage && ch[0].lastMessage.key ? Object.keys(ch[0].lastMessage.key) : [] });
     }
+    if (b.accion === 'media') {
+      if (!b.id) return res.status(400).json({ error: 'Falta el mensaje.' });
+      const r = await evo('POST', `/chat/getBase64FromMediaMessage/${INST}`, { message: { key: { id: b.id } }, convertToMp4: false });
+      const j = r.j || {};
+      if (!r.ok || !j.base64) return res.json({ ok: false, error: 'No se pudo descargar el archivo.' });
+      return res.json({ ok: true, base64: String(j.base64).replace(/^data:[^,]*,/, ''), mime: j.mimetype || '', nombre: j.fileName || '' });
+    }
+    if (b.accion === 'enviarMedia') {
+      const num = String(b.numero || '').replace(/[^\d@a-z.]/gi, '');
+      const tipo = ['image', 'video', 'audio', 'document'].includes(b.tipo) ? b.tipo : 'document';
+      if (!num || !b.base64) return res.status(400).json({ error: 'Falta el número o el archivo.' });
+      const cuerpo = { number: num, mediatype: tipo, mimetype: String(b.mime || ''), caption: String(b.texto || '').slice(0, 1000), media: String(b.base64), fileName: String(b.nombre || 'archivo').slice(0, 120) };
+      const r = await evo('POST', `/message/sendMedia/${INST}`, cuerpo);
+      if (!r.ok) return res.json({ ok: false, error: 'No se pudo enviar el archivo (' + r.status + ').' });
+      return res.json({ ok: true, id: r.j && r.j.key && r.j.key.id });
+    }
     if (b.accion === 'perfil') {
       const num = String(b.numero || '').replace(/[^\d@a-z.]/gi, '');
       if (!num) return res.status(400).json({ error: 'Falta el número.' });
@@ -86,7 +107,7 @@ module.exports = async (req, res) => {
       if (!b.jid) return res.status(400).json({ error: 'Falta el chat.' });
       const r = await evo('POST', `/chat/findMessages/${INST}`, { where: { key: { remoteJid: b.jid } }, page: 1, offset: 40 });
       const rec = Array.isArray(r.j) ? r.j : (r.j && r.j.messages && (r.j.messages.records || r.j.messages)) || [];
-      const msgs = (Array.isArray(rec) ? rec : []).map(m => ({ id: (m.key && m.key.id) || m.id, d: m.key && m.key.fromMe ? 'out' : 'in', t: texto(m), ts: ms(m.messageTimestamp), nombre: m.pushName || '' })).filter(m => m.id && m.t).sort((a, c) => a.ts - c.ts);
+      const msgs = (Array.isArray(rec) ? rec : []).map(m => ({ id: (m.key && m.key.id) || m.id, d: m.key && m.key.fromMe ? 'out' : 'in', t: texto(m), tipo: tipoDe(m), ts: ms(m.messageTimestamp), nombre: m.pushName || '' })).filter(m => m.id && m.t).sort((a, c) => a.ts - c.ts);
       let nombre = '', tel = '';
       (Array.isArray(rec) ? rec : []).forEach(m => { const k = m.key || {}; if (!k.fromMe && !nombre && m.pushName) nombre = m.pushName; if (!tel) tel = telDe(k.remoteJidAlt) || telDe(k.senderPn) || telDe(k.participantPn) || ''; });
       return res.json({ ok: true, msgs, nombre, tel });
