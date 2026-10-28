@@ -169,6 +169,6 @@
     const nv = $('#nuevo'); if (nv) nv.onclick = () => openForm('Nuevo mensaje', [{ k: 'c', l: 'Transportadora', t: 'select', opts: { shalom: 'Shalom', olva: 'Olva', bus: 'Buses', all: 'Las tres' }, def: ETAPAS_TR.includes(etapa) ? tr() : 'all' }, { k: 'e', l: 'Paso', t: 'select', opts: Object.fromEntries(ETAPAS.map(x => [x[0], x[1]])), def: paso() }, { k: 't', l: 'Título', req: 1, full: 1 }, { k: 'x', l: 'Texto completo', req: 1, full: 1, t: 'area', rows: 14 }], { c: ETAPAS_TR.includes(etapa) ? tr() : 'all', e: paso() }, v => m.extra.push({ id: uid(), ...v }));
     el.querySelectorAll('[data-v]').forEach(i => i.onchange = () => { m.datos[i.dataset.v] = i.value; Store.save(); });
   }
-  window.Mensajes = { vista };
+  window.Mensajes = { vista, plantillas: () => lista().map(x => ({ id: x.id, t: x.t, e: x.e, x: lleno(x.x) })) };
   if ((location.hash || '').slice(1) === 'mensajes') render();
 })();
