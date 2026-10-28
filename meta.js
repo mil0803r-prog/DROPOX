@@ -38,14 +38,19 @@ const Meta = (() => {
     return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b(obj.iv) }, k, b(obj.ct)));
   }
   // si la clave quedó recordada en este dispositivo, los datos nuevos de Claude se abren solos al entrar a Meta Ads
-  let autoHecho = false;
+  let autoHecho = false, revisado = false, hayNuevo = false, fechaNueva = '';
+  async function revisarRemoto() {
+    if (revisado || demo()) return; revisado = true;
+    try { const r = await fetch('datos/meta.enc.json', { cache: 'no-store' }); if (!r.ok) return; const o = await r.json(); fechaNueva = o.actualizado || ''; if (fechaNueva && fechaNueva !== S.metaAct) { hayNuevo = true; render(); } } catch (e) { /* sin archivo */ }
+  }
   async function autoCargar() {
     if (autoHecho || demo()) return; autoHecho = true;
     let cl = ''; try { cl = localStorage.getItem('dropox.metaclave') || ''; } catch (e) { /* sin almacenamiento */ }
     if (!cl) return;
     try {
       const r = await fetch('datos/meta.enc.json', { cache: 'no-store' }); if (!r.ok) return;
-      const snap = normalizarImport(await descifrar(await r.json(), cl));
+      const obj = await r.json(); const snap = normalizarImport(await descifrar(obj, cl));
+      S.metaAct = obj.actualizado || ''; hayNuevo = false;
       if ((S.metaSnap || {}).hasta === snap.hasta && (S.metaSnap || {}).campanas && JSON.stringify((S.metaSnap.campanas || []).map(c => c.m && c.m.gasto)) === JSON.stringify(snap.campanas.map(c => c.m && c.m.gasto))) return;
       S.metaSnap = snap; datos = snap; clave = claveActual(); error = ''; falta = false; alimentarDashboard(snap); Store.save(); render();
     } catch (e) { /* clave distinta o archivo ausente: se queda con lo que hay */ }
@@ -190,7 +195,7 @@ const Meta = (() => {
   function mostrar(el) {
     if (!demo() && !(window.Nube && Nube.listo)) return false;
     const [d, h] = rangoActual();
-    autoCargar();
+    autoCargar(); revisarRemoto();
     if (demo() && (!datos || clave !== d + '|' + h)) cargar();
     if (!datos && !cargando && S.metaSnap && !demo()) { datos = S.metaSnap; clave = d + '|' + h; }
     const cab = secH('meta', 'Meta Ads', 'Campañas, conjuntos y anuncios', '<button class="btn btn-pri" id="mact" style="white-space:nowrap">Actualizar</button>');
@@ -202,8 +207,9 @@ const Meta = (() => {
     else if (window.Nube && Nube.activo) cuerpoH = `<div class="card"><p class="mt-aviso">Toca <b>Actualizar</b> para traer tus campañas, conjuntos y anuncios de Meta. No se actualiza solo.</p></div>`;
     else cuerpoH = `<div class="card"><p class="mt-aviso">Inicia sesión para ver las campañas de Meta.</p></div>`;
     const avisoErr = datos && datos.importado && error ? `<div class="card"><p class="mt-aviso">${esc(error)}</p></div>` : '';
-    const importador = demo() ? '' : `<details class="card mt-imp" ${!datos ? 'open' : ''}><summary><b>Importar datos de Meta</b></summary><p class="sub">Si Claude dejó datos guardados, escribe tu clave y pulsa Cargar. O pega aquí el texto que te dio.</p><div class="mt-clave"><input id="mclave" type="password" autocomplete="off" placeholder="Tu clave"><button class="btn btn-pri btn-sm" id="mcargar" type="button">Cargar datos de Claude</button></div><label class="chk" style="margin:6px 0"><input type="checkbox" id="mrec" checked> Recordar mi clave en este dispositivo (así se actualiza sola)</label><textarea id="mimp" rows="5" placeholder="Pega aquí el texto"></textarea><div class="mt-impb"><button class="btn btn-pri btn-sm" id="mimpok" type="button">Importar</button>${S.metaSnap ? '<button class="btn btn-sm btn-del" id="mimpdel" type="button">Borrar lo importado</button>' : ''}</div><div class="nube-msg" id="mimpmsg"></div></details>`;
-    el.innerHTML = cab + avisoErr + cuerpoH + importador;
+    const importador = demo() ? '' : `<details class="card mt-imp" ${!datos || hayNuevo ? 'open' : ''}><summary><b>Importar datos de Meta</b></summary><p class="sub">Si Claude dejó datos guardados, escribe tu clave y pulsa Cargar. O pega aquí el texto que te dio.</p><div class="mt-clave"><input id="mclave" type="password" autocomplete="off" placeholder="Tu clave"><button class="btn btn-pri btn-sm" id="mcargar" type="button">Cargar datos de Claude</button></div><label class="chk" style="margin:6px 0"><input type="checkbox" id="mrec" checked> Recordar mi clave en este dispositivo (así se actualiza sola)</label><textarea id="mimp" rows="5" placeholder="Pega aquí el texto"></textarea><div class="mt-impb"><button class="btn btn-pri btn-sm" id="mimpok" type="button">Importar</button>${S.metaSnap ? '<button class="btn btn-sm btn-del" id="mimpdel" type="button">Borrar lo importado</button>' : ''}</div><div class="nube-msg" id="mimpmsg"></div></details>`;
+    const nuevoH = hayNuevo ? `<div class="card" style="border-color:var(--acc2)"><p class="mt-aviso">🔔 <b>Hay datos nuevos de Meta</b> (${esc(fechaNueva.slice(0, 10))}). Abajo, escribe tu clave y pulsa <b>Cargar datos de Claude</b>.</p></div>` : '';
+    el.innerHTML = cab + nuevoH + avisoErr + cuerpoH + importador;
     const ok = $('#mimpok');
     if (ok) ok.onclick = () => { const msg = $('#mimpmsg'); const t = ($('#mimp').value || '').trim(); if (!t) { msg.textContent = 'Pega primero el texto.'; return; }
       try { aplicarImport(t); } catch (e) { msg.textContent = e.message; } };
@@ -213,6 +219,7 @@ const Meta = (() => {
       let obj; try { const r = await fetch('datos/meta.enc.json', { cache: 'no-store' }); if (!r.ok) throw 0; obj = await r.json(); } catch (e) { msg.textContent = 'Todavía no hay datos guardados por Claude.'; return; }
       let txt; try { txt = await descifrar(obj, cl); } catch (e) { msg.textContent = 'La clave no es correcta.'; return; }
       const recordar = !$('#mrec') || $('#mrec').checked;
+      S.metaAct = obj.actualizado || ''; hayNuevo = false;
       try { aplicarImport(txt); if (recordar) { try { localStorage.setItem('dropox.metaclave', cl); } catch (e) { /* sin almacenamiento */ } } } catch (e) { msg.textContent = e.message; } };
     const del = $('#mimpdel'); if (del) del.onclick = () => ask('¿Borrar los datos importados de Meta?', () => { delete S.metaSnap; if (datos && datos.importado) datos = null; Store.save(); render(); }, 'Borrar');
     const bt = $('#mact'); if (bt) bt.onclick = () => { cargar(true); sync(); render(); };
