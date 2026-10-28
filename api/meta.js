@@ -27,12 +27,7 @@ function metricas(r) {
 }
 const VACIO = () => metricas({});
 
-async function sesionValida(token) {
-  try {
-    const r = await fetch(`${URL_SB}/auth/v1/user`, { headers: { apikey: KEY_SB, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) });
-    return r.ok;
-  } catch (e) { return false; }
-}
+async function sesionValida(token) { return require('./_acceso').validar(token); }
 
 async function graph(ruta, params, tokenMeta) {
   let url = new URL(GRAPH + ruta);

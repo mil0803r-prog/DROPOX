@@ -5,6 +5,8 @@ const Nube = (() => {
   const cfg = window.DROPOX_CFG || {};
   const listo = !!(cfg.url && cfg.key && window.supabase);
   const N = { listo, activo: false, email: '', estado: '' };
+  const OK = (cfg.permitidos || []).map(x => String(x).toLowerCase());
+  const permitido = e => !OK.length || OK.includes(String(e || '').toLowerCase());
   const LK = 'dropox.nube.uid', DK = 'dropox.nube.sucio';
   let sb, user, recuperando = false, timer, remotoVer = null, subiendo = false, pendiente = false, sincronizado = false;
 
@@ -63,6 +65,7 @@ const Nube = (() => {
     document.getElementById('nubeReg').onclick = async () => {
       const { email, pass } = val();
       if (!email || !email.includes('@')) return $m('Escribe un correo válido.');
+      if (!permitido(email)) return $m('Esta plataforma es privada. Ese correo no tiene permiso.');
       if (pass.length < 8) return $m('La contraseña debe tener al menos 8 caracteres.');
       ocupado(true); $m('Creando tu cuenta…');
       const { data, error } = await sb.auth.signUp({ email, password: pass, options: { emailRedirectTo: volver() } });
@@ -148,6 +151,7 @@ const Nube = (() => {
 
   async function entrar(u) {
     user = u; N.email = u.email || '';
+    if (!permitido(u.email)) { await sb.auth.signOut(); ls.del(KEY); ls.del(LK); ls.del(DK); user = null; N.email = ''; pantallaLogin('Esta plataforma es privada. El correo ' + (u.email || '') + ' no tiene permiso para entrar.'); return; }
     pantalla('<p class="nube-msg">Cargando tus datos…</p>');
     const { data, error } = await sb.from('datos').select('contenido,actualizado').eq('user_id', u.id).maybeSingle();
     if (error) {

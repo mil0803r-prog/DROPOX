@@ -23,8 +23,7 @@ module.exports = async (req, res) => {
   const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) return res.status(401).json({ error: 'Inicia sesión para usar el asistente.' });
   try {
-    const u = await fetch(`${URL_SB}/auth/v1/user`, { headers: { apikey: KEY_SB, Authorization: `Bearer ${token}` } });
-    if (!u.ok) return res.status(401).json({ error: 'Tu sesión venció. Vuelve a entrar.' });
+    if (!(await require('./_acceso').validar(token))) return res.status(401).json({ error: 'Tu sesión venció o tu correo no tiene permiso.' });
   } catch (e) {
     return res.status(502).json({ error: 'No se pudo verificar tu sesión.' });
   }

@@ -3,12 +3,7 @@
 const URL_SB = process.env.SUPABASE_URL || 'https://ehlkytblkxupiepbtgja.supabase.co';
 const KEY_SB = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_fOT8lAd9F19z1piNdCWX9A_stA2MDjU';
 
-async function sesionValida(token) {
-  try {
-    const r = await fetch(`${URL_SB}/auth/v1/user`, { headers: { apikey: KEY_SB, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) });
-    return r.ok;
-  } catch (e) { return false; }
-}
+async function sesionValida(token) { return require('./_acceso').validar(token); }
 const texto = m => {
   const x = (m && m.message) || {};
   const t = x.conversation || (x.extendedTextMessage && x.extendedTextMessage.text) || (x.imageMessage && (x.imageMessage.caption || '📷 Foto')) || (x.videoMessage && (x.videoMessage.caption || '🎥 Video')) || (x.audioMessage && '🎤 Audio') || (x.documentMessage && '📄 Documento') || (x.stickerMessage && 'Sticker') || (x.ephemeralMessage && texto({ message: x.ephemeralMessage.message })) || '';
