@@ -1,16 +1,78 @@
 {
   "functions": {
-    "api/asistente.js": { "maxDuration": 30 },
-    "api/meta.js": { "maxDuration": 30 },
-    "api/descargar.js": { "maxDuration": 60 },
-    "api/wa.js": { "maxDuration": 30 },
-    "api/tienda.js": { "maxDuration": 15, "includeFiles": "tienda-render.js" },
-    "api/pedido-tienda.js": { "maxDuration": 15, "includeFiles": "tienda-render.js" }
+    "api/asistente.js": {
+      "maxDuration": 30
+    },
+    "api/meta.js": {
+      "maxDuration": 30
+    },
+    "api/descargar.js": {
+      "maxDuration": 60
+    },
+    "api/wa.js": {
+      "maxDuration": 30
+    },
+    "api/tienda.js": {
+      "maxDuration": 15,
+      "includeFiles": "tienda-render.js"
+    },
+    "api/pedido-tienda.js": {
+      "maxDuration": 15,
+      "includeFiles": "tienda-render.js"
+    }
   },
   "rewrites": [
-    { "source": "/t/:t", "destination": "/api/tienda?t=:t" },
-    { "source": "/t/:t/:p", "destination": "/api/tienda?t=:t&p=:p" },
-    { "source": "/", "has": [{ "type": "host", "value": "^(?!.*\\.vercel\\.app$)(?!localhost)(?!dropox\\.).+$" }], "destination": "/api/tienda" },
-    { "source": "/:p((?!api/|t/)[a-z0-9-]+)", "has": [{ "type": "host", "value": "^(?!.*\\.vercel\\.app$)(?!localhost)(?!dropox\\.).+$" }], "destination": "/api/tienda?p=:p" }
+    {
+      "source": "/t/:t",
+      "destination": "/api/tienda?t=:t"
+    },
+    {
+      "source": "/t/:t/:p",
+      "destination": "/api/tienda?t=:t&p=:p"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "^(?!.*\\.vercel\\.app$)(?!localhost)(?!dropox\\.).+$"
+        }
+      ],
+      "destination": "/api/tienda"
+    },
+    {
+      "source": "/:p((?!api/|t/)[a-z0-9-]+)",
+      "has": [
+        {
+          "type": "host",
+          "value": "^(?!.*\\.vercel\\.app$)(?!localhost)(?!dropox\\.).+$"
+        }
+      ],
+      "destination": "/api/tienda?p=:p"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/:archivo(.+\\..+)",
+      "has": [
+        {
+          "type": "host",
+          "value": "^(?!.*\\.vercel\\.app$)(?!localhost)(?!dropox\\.).+$"
+        }
+      ],
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/t/:resto*",
+      "has": [
+        {
+          "type": "host",
+          "value": "^(?!.*\\.vercel\\.app$)(?!localhost)(?!dropox\\.).+$"
+        }
+      ],
+      "destination": "/",
+      "permanent": false
+    }
   ]
 }
