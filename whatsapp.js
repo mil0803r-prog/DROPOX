@@ -115,14 +115,18 @@
       if (!viendo()) { clearInterval(timer); timer = null; return; }
       if (con.estado === 'sinConfig') return;
       if (!abierto()) { if (con.qr || con.estado === 'connecting') { const antes = con.estado; await estado(false); if (abierto()) { con.qr = ''; render(); sincronizar(true); } else if (con.qr && Date.now() - tqr > 25000) pedirQr(); else if (antes !== con.estado) render(); } return; }
-      if (Date.now() - con.sync > 25000) sincronizar(false);
+      if (Date.now() - con.sync > 25000) {
+        await estado(false);
+        if (!abierto()) { con.error = 'Se desconectó. Escanea el QR otra vez (tus chats guardados siguen aquí).'; render(); return; }
+        sincronizar(false);
+      }
     }, 4000);
   }
   function barra() {
     if (con.estado === 'sinConfig') return `<div class="card wa-con"><b>Conectar tu WhatsApp con QR</b><p class="note" style="margin:6px 0 0">Todavía falta instalar el servidor de WhatsApp. Sigue los pasos que te di (Railway) y pon su dirección y clave en Vercel como <code>WA_URL</code> y <code>WA_KEY</code>. Cuando esté listo, aquí aparece el botón para escanear el QR.</p></div>`;
     if (abierto()) return `<div class="card wa-con wa-ok">🟢 <b>WhatsApp conectado</b> <small>${con.sync ? 'Última sincronización ' + hora(con.sync) : 'Sincronizando…'}</small><span class="push"><button class="btn btn-sm" id="wsync">${con.sincronizando ? 'Sincronizando…' : 'Sincronizar ahora'}</button> <button class="btn btn-sm" id="wdiag">Diagnóstico</button> <button class="btn btn-sm btn-del" id="wout">Desconectar</button></span></div>`;
     if (con.qr) return `<div class="card wa-con"><b>Escanea este QR</b><p class="note" style="margin:6px 0">En tu celular: WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo.</p><img class="wa-qr" alt="QR de WhatsApp" src="${con.qr.startsWith('data:') ? con.qr : 'data:image/png;base64,' + con.qr}"><p class="note" style="margin:6px 0 0">Se renueva solo. Cuando lo escanees, esta pantalla cambia sola.</p></div>`;
-    return `<div class="card wa-con">⚪ <b>WhatsApp sin conectar</b> <small>${esc(con.error || 'Conéctalo para que los chats lleguen solos.')}</small><span class="push"><button class="btn btn-sm btn-pri" id="wqr">${con.cargando ? 'Generando…' : 'Conectar con QR'}</button></span></div>`;
+    return `<div class="card wa-con">⚪ <b>WhatsApp sin conectar</b> <small>${esc(con.error || (con.estado === 'close' ? 'Está desconectado: escanea el QR para volver a recibir los chats.' : 'Conéctalo para que los chats lleguen solos.'))}</small><span class="push"><button class="btn btn-sm btn-pri" id="wqr">${con.cargando ? 'Generando…' : 'Conectar con QR'}</button></span></div>`;
   }
   function lista(el) {
     const L = chats().filter(c => (!filtro || c.estado === filtro) && (!fet || (c.etq || []).includes(fet)) && (!q || [c.nombre, c.tel, c.ciudad, c.producto].join(' ').toLowerCase().includes(q)))
