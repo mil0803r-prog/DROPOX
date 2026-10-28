@@ -9,6 +9,7 @@
   const chats = () => W().chats;
   const etqs = () => { const w = W(); if (!w.etq) w.etq = ET0.map(([n, c]) => ({ n, c })); return w.etq; };
   const col = n => (etqs().find(e => e.n === n) || { c: '#7a8794' }).c;
+  const av = c => `<div class="wa-av">${c.foto ? `<img src="${esc(c.foto)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}${esc((c.nombre || '?')[0].toUpperCase())}</div>`;
   const pill = n => `<span class="wa-et" style="background:${col(n)}">${esc(n)}</span>`;
   const tel = t => { const d = String(t || '').replace(/\D/g, ''); return d.length === 9 ? '51' + d : d; };
   const hora = ts => { const d = new Date(ts); return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }); };
@@ -25,6 +26,7 @@
   // ── Conexión con tu WhatsApp (QR) ──
   const con = { estado: '', qr: '', error: '', cargando: false, sync: 0 };
   let timer = null, tqr = 0;
+  const intentados = new Set();
   async function api(accion, extra) {
     const tk = window.Nube && Nube.activo ? await Nube.token() : null;
     if (!tk) throw new Error('Inicia sesión con tu cuenta para conectar WhatsApp.');
@@ -60,10 +62,15 @@
         if (!c) { c = { id: uid(), nombre: x.nombre || x.tel || 'Sin nombre', tel: x.tel, jid: x.jid, estado: 'nuevo', etq: ['Nuevo cliente'], msgs: [], ult: x.ult || Date.now(), auto: 1 }; chats().push(c); cambio = true; }
         if (!c.jid) { c.jid = x.jid; cambio = true; }
         if (x.nombre && c.auto && /^\d+$|Sin nombre/.test(c.nombre || '')) { c.nombre = x.nombre; cambio = true; }
-        if (forzar || c.id === sel || (x.ult || 0) > (c.sync || 0)) ocupados.push([c, x]);
+        if (x.tel && !c.tel) { c.tel = x.tel; cambio = true; }
+        if (x.foto && c.foto !== x.foto) { c.foto = x.foto; cambio = true; }
+        if (forzar || (!intentados.has(c.id) && (!c.tel || /Sin nombre/.test(c.nombre || ''))) || c.id === sel || (x.ult || 0) > (c.sync || 0)) ocupados.push([c, x]);
       });
-      for (const [c, x] of ocupados.slice(0, forzar ? 25 : 8)) {
+      for (const [c, x] of ocupados.slice(0, forzar ? 40 : 12)) {
         const m = await api('mensajes', { jid: c.jid }); if (!m.ok) continue;
+        intentados.add(c.id);
+        if (m.tel && !c.tel) { c.tel = m.tel; cambio = true; }
+        if (m.nombre && c.auto && /^\d+$|Sin nombre/.test(c.nombre || '')) { c.nombre = m.nombre; cambio = true; }
         const ids = new Set((c.msgs || []).map(y => y.id).filter(Boolean));
         const nuevos = m.msgs.filter(y => !ids.has(y.id));
         if (nuevos.length) { c.msgs = (c.msgs || []).concat(nuevos).sort((a, b) => a.ts - b.ts); c.ult = Math.max(c.ult || 0, ...nuevos.map(y => y.ts)); cambio = true; }
@@ -99,7 +106,7 @@
       <div class="chips"><button class="chip ${filtro === '' ? 'on' : ''}" data-f="">Todos<i>${chats().length}</i></button>${Object.entries(ESTADOS).map(([k, l]) => `<button class="chip ${filtro === k ? 'on' : ''}" data-f="${k}">${l}<i>${chats().filter(c => c.estado === k).length}</i></button>`).join('')}</div>
       <div class="chips"><button class="chip ${fet === '' ? 'on' : ''}" data-fe="">Etiquetas</button>${etqs().map(e => `<button class="chip ${fet === e.n ? 'on' : ''}" data-fe="${esc(e.n)}"><i style="background:${e.c};width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px"></i>${esc(e.n)}<i>${chats().filter(c => (c.etq || []).includes(e.n)).length}</i></button>`).join('')}<button class="chip" id="wne">+ Etiqueta</button></div>
       ${dueHoy ? `<div class="card wa-due">📌 ${dueHoy} cliente${dueHoy > 1 ? 's' : ''} para dar seguimiento hoy</div>` : ''}
-      ${L.length ? L.map(c => `<div class="wa-r ${c.id === sel ? 'on' : ''}" data-c="${c.id}"><div class="wa-av">${esc((c.nombre || '?')[0].toUpperCase())}</div><div class="wa-rb"><div class="wa-rt"><b>${esc(c.nombre)}</b><small>${c.ult ? hora(c.ult) : ''}</small></div><div class="wa-rp">${esc(prev(c))}</div><div class="wa-rg">${(c.etq || []).map(pill).join('')}<span class="tag">${ESTADOS[c.estado]}</span>${c.tr ? `<span class="tag">${TR[c.tr]}</span>` : ''}${c.seg && c.seg <= hoyS && !['entregado', 'perdido'].includes(c.estado) ? '<span class="tag t-pendiente">Seguir</span>' : ''}</div></div></div>`).join('') : `<div class="card empty">${chats().length ? 'Ningún chat coincide.' : 'Aún no hay chats. Pulsa «+ Chat» cuando te escriba un cliente.'}</div>`}
+      ${L.length ? L.map(c => `<div class="wa-r ${c.id === sel ? 'on' : ''}" data-c="${c.id}">${av(c)}<div class="wa-rb"><div class="wa-rt"><b>${esc(c.nombre)}${c.tel ? ' <small class="wa-n">+' + esc(String(c.tel).replace(/\D/g, '')) + '</small>' : ''}</b><small>${c.ult ? hora(c.ult) : ''}</small></div><div class="wa-rp">${esc(prev(c))}</div><div class="wa-rg">${(c.etq || []).map(pill).join('')}<span class="tag">${ESTADOS[c.estado]}</span>${c.tr ? `<span class="tag">${TR[c.tr]}</span>` : ''}${c.seg && c.seg <= hoyS && !['entregado', 'perdido'].includes(c.estado) ? '<span class="tag t-pendiente">Seguir</span>' : ''}</div></div></div>`).join('') : `<div class="card empty">${chats().length ? 'Ningún chat coincide.' : 'Aún no hay chats. Pulsa «+ Chat» cuando te escriba un cliente.'}</div>`}
     </div>`;
   }
 
@@ -107,7 +114,7 @@
     if (!c) return `<div class="wa-c wa-vacio"><div class="card empty">Elige un chat a la izquierda<br><small>o crea uno con «+ Chat».</small></div></div>`;
     const T = plantillas();
     return `<div class="wa-c">
-      <div class="wa-hd"><button class="btn btn-sm wa-back" id="wback">←</button><div class="wa-av">${esc((c.nombre || '?')[0].toUpperCase())}</div><div class="wa-hb"><b>${esc(c.nombre)}</b><small>${esc(c.tel || 'sin celular')}${c.ciudad ? ' · ' + esc(c.ciudad) : ''}${c.producto ? ' · ' + esc(c.producto) : ''}</small></div><button class="btn btn-sm" id="ced">Editar</button></div>
+      <div class="wa-hd"><button class="btn btn-sm wa-back" id="wback">←</button>${av(c)}<div class="wa-hb"><b>${esc(c.nombre)}</b><small>${esc(c.tel || 'sin celular')}${c.ciudad ? ' · ' + esc(c.ciudad) : ''}${c.producto ? ' · ' + esc(c.producto) : ''}</small></div><button class="btn btn-sm" id="ced">Editar</button></div>
       <div class="wa-est wa-etq">${etqs().map(e => `<button class="wa-et ${(c.etq || []).includes(e.n) ? 'on' : 'off'}" style="--c:${e.c}" data-et="${esc(e.n)}">${esc(e.n)}</button>`).join('')}</div>
       <div class="wa-est">${Object.entries(ESTADOS).map(([k, l]) => `<button class="chip ${c.estado === k ? 'on' : ''}" data-st="${k}">${l}</button>`).join('')}</div>
       <div class="wa-msgs" id="wmsgs">${(c.msgs || []).length ? c.msgs.map((m, i) => `<div class="wa-b ${m.d}"><span>${esc(m.t).replace(/\n/g, '<br>')}</span><small>${hora(m.ts)} <a data-dm="${i}" title="Quitar">✕</a></small></div>`).join('') : '<p class="note" style="text-align:center">Aún no hay mensajes. Escribe abajo, o pega lo que te escribió el cliente.</p>'}</div>

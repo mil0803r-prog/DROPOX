@@ -53,9 +53,16 @@ module.exports = async (req, res) => {
     if (b.accion === 'chats') {
       const r = await evo('POST', `/chat/findChats/${INST}`, {});
       const arr = Array.isArray(r.j) ? r.j : [];
+      const rc = await evo('POST', `/chat/findContacts/${INST}`, { where: {} }).catch(() => ({ j: [] }));
+      const cont = {};
+      (Array.isArray(rc.j) ? rc.j : []).forEach(k => { const id = k.remoteJid || k.id; if (id) cont[id] = k; });
       const chats = arr.map(c => {
         const jid = c.remoteJid || c.id || '';
-        return { jid, tel: telDe(jid), nombre: c.pushName || c.name || '', ult: ms(c.updatedAt ? Date.parse(c.updatedAt) : (c.lastMessage && c.lastMessage.messageTimestamp)), noLeidos: c.unreadMessages || 0 };
+        const lm = c.lastMessage || {}, lk = lm.key || {};
+        const alt = lk.remoteJidAlt || c.remoteJidAlt || lk.senderPn || '';
+        const k = cont[jid] || cont[alt] || {};
+        const nombre = k.pushName || k.name || c.pushName || c.name || (!lk.fromMe && lm.pushName) || '';
+        return { jid, tel: telDe(jid) || telDe(alt), nombre, foto: k.profilePicUrl || c.profilePicUrl || '', ult: ms(c.updatedAt ? Date.parse(c.updatedAt) : lm.messageTimestamp), noLeidos: c.unreadMessages || 0 };
       }).filter(c => c.jid && !/@g\.us$|@broadcast$|status@/.test(c.jid)).sort((a, c) => c.ult - a.ult).slice(0, 60);
       return res.json({ ok: true, chats });
     }
@@ -64,7 +71,9 @@ module.exports = async (req, res) => {
       const r = await evo('POST', `/chat/findMessages/${INST}`, { where: { key: { remoteJid: b.jid } }, page: 1, offset: 40 });
       const rec = Array.isArray(r.j) ? r.j : (r.j && r.j.messages && (r.j.messages.records || r.j.messages)) || [];
       const msgs = (Array.isArray(rec) ? rec : []).map(m => ({ id: (m.key && m.key.id) || m.id, d: m.key && m.key.fromMe ? 'out' : 'in', t: texto(m), ts: ms(m.messageTimestamp), nombre: m.pushName || '' })).filter(m => m.id && m.t).sort((a, c) => a.ts - c.ts);
-      return res.json({ ok: true, msgs });
+      let nombre = '', tel = '';
+      (Array.isArray(rec) ? rec : []).forEach(m => { const k = m.key || {}; if (!k.fromMe && !nombre && m.pushName) nombre = m.pushName; if (!tel) tel = telDe(k.remoteJidAlt) || telDe(k.senderPn) || telDe(k.participantPn) || ''; });
+      return res.json({ ok: true, msgs, nombre, tel });
     }
     if (b.accion === 'enviar') {
       const num = String(b.numero || '').replace(/[^\d@a-z.]/gi, ''), t = String(b.texto || '').slice(0, 4000);
