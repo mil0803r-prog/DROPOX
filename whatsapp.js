@@ -46,7 +46,7 @@
   }
   async function pedirQr() {
     con.cargando = true; con.error = ''; render();
-    try { const d = await api('qr'); if (!d.ok) con.error = d.error || 'No se pudo generar el QR.'; else if (d.sinConfig) con.estado = 'sinConfig'; con.qr = d.qr || ''; tqr = Date.now(); } catch (e) { con.error = e.message; }
+    try { const d = await api('qr'); if (d.sinConfig) con.estado = 'sinConfig'; else if (!d.ok) con.error = d.error || 'No se pudo generar el QR.'; con.qr = d.qr || ''; tqr = Date.now(); } catch (e) { con.error = e.message; }
     con.cargando = false; render();
   }
   async function sincronizar(forzar) {
