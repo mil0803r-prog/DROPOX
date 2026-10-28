@@ -278,6 +278,7 @@
     });
     g('#wdel').onclick = () => confirmDel('¿Eliminar este chat?', () => { W().chats = chats().filter(x => x.id !== c.id); sel = ''; });
   }
+  window.LeerDatos = leer;
   window.WhatsApp = { vista };
   if ((location.hash || '').slice(1) === 'whatsapp') render();
 })();
