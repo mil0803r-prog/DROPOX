@@ -154,6 +154,30 @@
       else if (!d.direccion && /[A-Za-zÁÉÍÓÚÑáéíóúñ]{3,}/.test(v)) d.direccion = v;
     });
     d.puntos = ['nombre', 'dni', 'cel', 'ciudad', 'direccion'].filter(k => d[k]).length;
+    if (d.puntos < 4) { // texto corrido, sin títulos: «NOMBRE. 921992845 62667412. Huánuco. Dirección…»
+      const t = String(txt).replace(/\s+/g, ' ').trim();
+      const mc = t.match(/(?<!\d)9\d{2}[\s-]?\d{3}[\s-]?\d{3}(?!\d)/), cel = mc ? mc[0].replace(/\D/g, '') : '';
+      const sinCel = mc ? t.replace(mc[0], ' '.repeat(mc[0].length)) : t;
+      const md = sinCel.match(/(?<!\d)\d{8}(?!\d)/), dni = md ? md[0] : '';
+      const pos = [mc ? t.indexOf(mc[0]) : -1, md ? sinCel.indexOf(md[0]) : -1].filter(x => x >= 0);
+      if (cel || dni) {
+        const ini = Math.min(...pos), fin = Math.max(...[mc ? t.indexOf(mc[0]) + mc[0].length : 0, md ? sinCel.indexOf(md[0]) + 8 : 0]);
+        const nom = t.slice(0, ini).replace(/[^\p{L} .'-]/gu, ' ').replace(/[.\s]+$/, '').replace(/\s+/g, ' ').trim();
+        const ruido = /\b(then|yes|exactly|another|episode|siempre|n[uú]meros)\b/i;
+        let resto = t.slice(fin); const cut = resto.search(ruido); if (cut >= 0) resto = resto.slice(0, cut);
+        const segs = resto.split(/(?<=\p{L}{4,})[.;]\s+|[;\n]|,\s*/u).map(x => x.replace(/^[.\s]+|[.\s]+$/g, '')).filter(x => /\p{L}{3,}/u.test(x));
+        const roto = v => !v || (cel && v.includes(cel)) || (dni && v.includes(dni)) || v.length > 90;
+        if (roto(d.nombre)) d.nombre = '';
+        if (roto(d.ciudad)) d.ciudad = '';
+        if (roto(d.direccion)) d.direccion = '';
+        if (!d.nombre && nom.length >= 4) d.nombre = nom;
+        if (!d.dni) d.dni = dni;
+        if (!d.cel) d.cel = cel;
+        if (!d.ciudad && !d.direccion && segs.length === 1) { const w = segs[0].match(/^(\S+)\s+(.+)$/); d.ciudad = w ? w[1] : segs[0]; d.direccion = w ? w[2] : ''; }
+        else { if (!d.ciudad && segs.length) d.ciudad = segs[0]; if (!d.direccion && segs.length > 1) d.direccion = segs.slice(1).join(' · '); }
+      }
+      d.puntos = ['nombre', 'dni', 'cel', 'ciudad', 'direccion'].filter(k => d[k]).length;
+    }
     return d;
   }
   function detectar(c) {
