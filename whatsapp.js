@@ -71,19 +71,20 @@
       const d = await api('chats'); if (!d.ok) throw new Error(d.error || '');
       const ocupados = [];
       d.chats.forEach(x => {
-        let c = chats().find(y => (y.jid && y.jid === x.jid) || mismo(y, x.tel));
-        if (!c) { c = { id: uid(), nombre: x.nombre || x.tel || 'Sin nombre', tel: x.tel, jid: x.jid, estado: '', etq: [], msgs: [], ult: x.ult || Date.now(), auto: 1 }; chats().push(c); cambio = true; }
+        let c = chats().find(y => (y.jid && y.jid === x.jid) || (!x.grupo && mismo(y, x.tel)));
+        if (!c) { c = { id: uid(), nombre: x.nombre || x.tel || 'Sin nombre', tel: x.tel, jid: x.jid, grupo: !!x.grupo, estado: '', etq: [], msgs: [], ult: x.ult || Date.now(), auto: 1 }; chats().push(c); cambio = true; }
         if (!c.jid) { c.jid = x.jid; cambio = true; }
         if (x.nombre && c.auto && /^\d+$|Sin nombre/.test(c.nombre || '')) { c.nombre = x.nombre; cambio = true; }
+        if (x.grupo && x.nombre && c.nombre !== x.nombre) { c.nombre = x.nombre; c.grupo = true; cambio = true; }
         if (x.tel && !c.tel) { c.tel = x.tel; cambio = true; }
         if (x.foto && c.foto !== x.foto) { c.foto = x.foto; cambio = true; }
-        if (forzar || (!intentados.has(c.id) && (!c.tel || /Sin nombre/.test(c.nombre || ''))) || c.id === sel || (x.ult || 0) > (c.sync || 0)) ocupados.push([c, x]);
+        if (forzar || (!intentados.has(c.id) && !x.grupo && (!c.tel || /Sin nombre/.test(c.nombre || ''))) || c.id === sel || (x.ult || 0) > (c.sync || 0)) ocupados.push([c, x]);
       });
       for (const [c, x] of ocupados.slice(0, forzar ? 40 : 12)) {
         const m = await api('mensajes', { jid: c.jid }); if (!m.ok) continue;
         intentados.add(c.id);
-        if (m.tel && !c.tel) { c.tel = m.tel; cambio = true; }
-        if (m.nombre && c.auto && /^\d+$|Sin nombre/.test(c.nombre || '')) { c.nombre = m.nombre; cambio = true; }
+        if (m.tel && !c.tel && !c.grupo) { c.tel = m.tel; cambio = true; }
+        if (m.nombre && c.auto && !c.grupo && /^\d+$|Sin nombre/.test(c.nombre || '')) { c.nombre = m.nombre; cambio = true; }
         const ids = new Set((c.msgs || []).map(y => y.id).filter(Boolean));
         const nuevos = m.msgs.filter(y => !ids.has(y.id));
         if (nuevos.length) { c.msgs = (c.msgs || []).concat(nuevos).sort((a, b) => a.ts - b.ts); c.ult = Math.max(c.ult || 0, ...nuevos.map(y => y.ts)); cambio = true; }
@@ -129,12 +130,12 @@
     return `<div class="card wa-con">⚪ <b>WhatsApp sin conectar</b> <small>${esc(con.error || (con.estado === 'close' ? 'Está desconectado: escanea el QR para volver a recibir los chats.' : 'Conéctalo para que los chats lleguen solos.'))}</small><span class="push"><button class="btn btn-sm btn-pri" id="wqr">${con.cargando ? 'Generando…' : 'Conectar con QR'}</button></span></div>`;
   }
   function lista(el) {
-    const L = chats().filter(c => (!filtro || c.estado === filtro) && (!fet || (c.etq || []).includes(fet)) && (!q || [c.nombre, c.tel, c.ciudad, c.producto].join(' ').toLowerCase().includes(q)))
+    const L = chats().filter(c => (!filtro || (filtro === '__g' ? c.grupo : c.estado === filtro)) && (!fet || (c.etq || []).includes(fet)) && (!q || [c.nombre, c.tel, c.ciudad, c.producto].join(' ').toLowerCase().includes(q)))
       .sort((a, b) => (b.ult || 0) - (a.ult || 0));
     const hoyS = hoy(); const dueHoy = chats().filter(c => c.seg && c.seg <= hoyS && !['entregado', 'perdido'].includes(c.estado)).length;
     return `<div class="wa-l">
       <input class="search" id="wq" type="search" placeholder="Buscar nombre, celular, ciudad…" value="${esc(q)}">
-      <div class="chips"><button class="chip ${filtro === '' ? 'on' : ''}" data-f="">Todos<i>${chats().length}</i></button>${Object.entries(ESTADOS).map(([k, l]) => `<button class="chip ${filtro === k ? 'on' : ''}" data-f="${k}">${l}<i>${chats().filter(c => c.estado === k).length}</i></button>`).join('')}</div>
+      <div class="chips"><button class="chip ${filtro === '' ? 'on' : ''}" data-f="">Todos<i>${chats().length}</i></button><button class="chip ${filtro === '__g' ? 'on' : ''}" data-f="__g">Grupos<i>${chats().filter(c => c.grupo).length}</i></button>${Object.entries(ESTADOS).map(([k, l]) => `<button class="chip ${filtro === k ? 'on' : ''}" data-f="${k}">${l}<i>${chats().filter(c => c.estado === k).length}</i></button>`).join('')}</div>
       <div class="chips"><button class="chip ${fet === '' ? 'on' : ''}" data-fe="">Etiquetas</button>${etqs().map(e => `<button class="chip ${fet === e.n ? 'on' : ''}" data-fe="${esc(e.n)}"><i style="background:${e.c};width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px"></i>${esc(e.n)}<i>${chats().filter(c => (c.etq || []).includes(e.n)).length}</i></button>`).join('')}<button class="chip" id="wne">+ Etiqueta</button></div>
       ${dueHoy ? `<div class="card wa-due">📌 ${dueHoy} cliente${dueHoy > 1 ? 's' : ''} para dar seguimiento hoy</div>` : ''}
       ${L.length ? L.map(c => `<div class="wa-r ${c.id === sel ? 'on' : ''}" data-c="${c.id}">${av(c)}<div class="wa-rb"><div class="wa-rt"><b>${esc(c.nombre)}${c.tel ? ' <small class="wa-n">+' + esc(String(c.tel).replace(/\D/g, '')) + '</small>' : ''}</b><small>${c.ult ? hora(c.ult) : ''}</small></div><div class="wa-rp">${esc(prev(c))}</div><div class="wa-rg">${(c.etq || []).map(pill).join('')}${c.estado ? `<span class="tag">${ESTADOS[c.estado]}</span>` : ''}${c.tr ? `<span class="tag">${TR[c.tr]}</span>` : ''}${c.seg && c.seg <= hoyS && !['entregado', 'perdido'].includes(c.estado) ? '<span class="tag t-pendiente">Seguir</span>' : ''}</div></div></div>`).join('') : `<div class="card empty">${chats().length ? 'Ningún chat coincide.' : 'Aún no hay chats. Pulsa «+ Chat» cuando te escriba un cliente.'}</div>`}
@@ -148,7 +149,7 @@
       <div class="wa-hd"><button class="btn btn-sm wa-back" id="wback">←</button>${av(c)}<div class="wa-hb"><b>${esc(c.nombre)}</b><small>${esc((c.tel ? '+' + String(c.tel).replace(/\D/g, '') : 'sin celular') + (c.info ? ' · ' + c.info : ''))}${c.ciudad ? ' · ' + esc(c.ciudad) : ''}${c.producto ? ' · ' + esc(c.producto) : ''}</small></div><button class="btn btn-sm" id="ced">Editar</button></div>
       <div class="wa-est wa-etq">${etqs().map(e => `<button class="wa-et ${(c.etq || []).includes(e.n) ? 'on' : 'off'}" style="--c:${e.c}" data-et="${esc(e.n)}">${esc(e.n)}</button>`).join('')}</div>
       <div class="wa-est">${Object.entries(ESTADOS).map(([k, l]) => `<button class="chip ${c.estado === k ? 'on' : ''}" data-st="${k}">${l}</button>`).join('')}</div>
-      <div class="wa-msgs" id="wmsgs">${(c.msgs || []).length ? c.msgs.map((m, i) => `<div class="wa-b ${m.d}">${m.tipo && m.id ? medioHtml(m) : ''}${m.tipo && /^(📷 Foto|🎥 Video|🎤 Audio|📄 Documento|Sticker)$/.test(m.t) ? '' : `<span>${esc(m.t).replace(/\n/g, '<br>')}</span>`}<small>${hora(m.ts)}${m.d === 'out' ? ' <i class="wa-tk">✓✓</i>' : ''} <a data-dm="${i}" title="Quitar">✕</a></small></div>`).join('') : '<p class="note" style="text-align:center">Aún no hay mensajes. Escribe abajo, o pega lo que te escribió el cliente.</p>'}</div>
+      <div class="wa-msgs" id="wmsgs">${(c.msgs || []).length ? c.msgs.map((m, i) => `<div class="wa-b ${m.d}">${c.grupo && m.d === 'in' && m.nombre ? `<b class="wa-qn">${esc(m.nombre)}</b>` : ''}${m.tipo && m.id ? medioHtml(m) : ''}${m.tipo && /^(📷 Foto|🎥 Video|🎤 Audio|📄 Documento|Sticker)$/.test(m.t) ? '' : `<span>${esc(m.t).replace(/\n/g, '<br>')}</span>`}<small>${hora(m.ts)}${m.d === 'out' ? ' <i class="wa-tk">✓✓</i>' : ''} <a data-dm="${i}" title="Quitar">✕</a></small></div>`).join('') : '<p class="note" style="text-align:center">Aún no hay mensajes. Escribe abajo, o pega lo que te escribió el cliente.</p>'}</div>
       <div class="wa-in">
         <select id="wpl"><option value="">Mensaje listo…</option>${T.map(t => `<option value="${esc(t.id)}">${esc(t.t)}</option>`).join('')}</select>
         <textarea id="wtx" rows="3" placeholder="Escribe un mensaje"></textarea>

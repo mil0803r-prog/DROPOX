@@ -93,14 +93,18 @@ module.exports = async (req, res) => {
       const rc = await evo('POST', `/chat/findContacts/${INST}`, { where: {} }).catch(() => ({ j: [] }));
       const cont = {};
       (Array.isArray(rc.j) ? rc.j : []).forEach(k => { const id = k.remoteJid || k.id; if (id) cont[id] = k; });
+      const rg = await evo('GET', `/group/fetchAllGroups/${INST}?getParticipants=false`).catch(() => ({ j: [] }));
+      const grupos = {};
+      (Array.isArray(rg.j) ? rg.j : []).forEach(g => { if (g.id) grupos[g.id] = g; });
       const chats = arr.map(c => {
         const jid = c.remoteJid || c.id || '';
+        if (/@g\.us$/.test(jid)) { const g = grupos[jid] || {}; return { jid, tel: '', grupo: true, nombre: g.subject || c.name || c.pushName || 'Grupo', foto: g.pictureUrl || c.profilePicUrl || '', ult: ms(c.updatedAt ? Date.parse(c.updatedAt) : (c.lastMessage && c.lastMessage.messageTimestamp)), noLeidos: c.unreadMessages || 0 }; }
         const lm = c.lastMessage || {}, lk = lm.key || {};
         const alt = lk.remoteJidAlt || c.remoteJidAlt || lk.senderPn || '';
         const k = cont[jid] || cont[alt] || {};
         const nombre = k.pushName || k.name || c.pushName || c.name || (!lk.fromMe && lm.pushName) || '';
         return { jid, tel: telDe(jid) || telDe(alt), nombre, foto: k.profilePicUrl || c.profilePicUrl || '', ult: ms(c.updatedAt ? Date.parse(c.updatedAt) : lm.messageTimestamp), noLeidos: c.unreadMessages || 0 };
-      }).filter(c => c.jid && !/@g\.us$|@broadcast$|status@/.test(c.jid)).sort((a, c) => c.ult - a.ult).slice(0, 60);
+      }).filter(c => c.jid && !/@broadcast$|status@/.test(c.jid)).sort((a, c) => c.ult - a.ult).slice(0, 80);
       return res.json({ ok: true, chats });
     }
     if (b.accion === 'mensajes') {
