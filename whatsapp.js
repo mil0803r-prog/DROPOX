@@ -129,6 +129,55 @@
     if (con.qr) return `<div class="card wa-con"><b>Escanea este QR</b><p class="note" style="margin:6px 0">En tu celular: WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo.</p><img class="wa-qr" alt="QR de WhatsApp" src="${con.qr.startsWith('data:') ? con.qr : 'data:image/png;base64,' + con.qr}"><p class="note" style="margin:6px 0 0">Se renueva solo. Cuando lo escanees, esta pantalla cambia sola.</p><button class="btn btn-sm btn-del" id="wout">Cancelar y desvincular</button></div>`;
     return `<div class="card wa-con">⚪ <b>WhatsApp sin conectar</b> <small>${esc(con.error || (con.estado === 'close' ? 'Está desconectado: escanea el QR para volver a recibir los chats.' : 'Conéctalo para que los chats lleguen solos.'))}</small><span class="push"><button class="btn btn-sm btn-pri" id="wqr">${con.cargando ? 'Generando…' : 'Conectar con QR'}</button> <button class="btn btn-sm btn-del" id="wout">Desvincular</button></span></div>`;
   }
+  // ── Detectar los datos de pedido que el cliente escribió ──
+  function leer(txt) {
+    const L = String(txt).split(/\n+/).map(x => x.replace(/^\s*(?:\d+\s*[).:-]|[-•*])\s*/, '').trim()).filter(Boolean);
+    const d = { nombre: '', dni: '', cel: '', ciudad: '', cantidad: '' }, libres = [];
+    L.forEach(l => {
+      const m = l.match(/^([^:]{2,40}):\s*(.+)$/); const k = m ? m[1].toLowerCase() : '', v = m ? m[2].trim() : l;
+      if (/nombre/.test(k)) d.nombre = v;
+      else if (/dni|documento/.test(k)) d.dni = (v.match(/\d{8}/) || [''])[0];
+      else if (/cel|tel|n[uú]mero|whats/.test(k)) d.cel = (v.replace(/\D/g, '').match(/9\d{8}$/) || [''])[0];
+      else if (/agencia|ciudad|departamento|provincia|distrito|direcci|lugar/.test(k)) d.ciudad = d.ciudad ? d.ciudad + ', ' + v : v;
+      else if (/cantidad|unidades/.test(k)) d.cantidad = (v.match(/\d+/) || [''])[0];
+      else if (!m) libres.push(v);
+    });
+    libres.forEach(v => {
+      const dig = v.replace(/\D/g, '');
+      if (!d.dni && /^\d{8}$/.test(dig) && dig === v.replace(/\s/g, '')) d.dni = dig;
+      else if (!d.cel && /^9\d{8}$/.test(dig) && v.replace(/[\d\s+()-]/g, '') === '') d.cel = dig;
+      else if (!d.cantidad && /^\d{1,2}$/.test(v.trim())) d.cantidad = v.trim();
+      else if (!d.nombre && /^[A-Za-zÁÉÍÓÚÑáéíóúñ .'-]{4,}$/.test(v)) d.nombre = v;
+      else if (!d.ciudad && /[A-Za-zÁÉÍÓÚÑáéíóúñ]{3,}/.test(v)) d.ciudad = v;
+    });
+    d.puntos = ['nombre', 'dni', 'cel', 'ciudad'].filter(k => d[k]).length;
+    return d;
+  }
+  function detectar(c) {
+    const ins = (c.msgs || []).filter(m => m.d === 'in' && m.t && !m.tipo);
+    if (!ins.length) return null;
+    let mejor = null;
+    const prueba = t => { const d = leer(t); if (!mejor || d.puntos > mejor.puntos) mejor = d; };
+    ins.slice(-8).forEach(m => prueba(m.t));
+    prueba(ins.slice(-6).map(m => m.t).join('\n'));
+    return mejor && mejor.puntos >= 3 ? mejor : null;
+  }
+  const yaPedido = c => c.pedidoId && S.pedidos.some(p => p.id === c.pedidoId);
+  const listos = () => chats().map(c => ({ c, d: yaPedido(c) ? null : detectar(c) })).filter(x => x.d);
+  const nuevoPedido = (c, d, ex) => {
+    const of = window.Mensajes && Mensajes.dato ? Mensajes.dato('oferta') : '', precio = parseFloat((of.match(/[\d.]+/) || [0])[0]) || 0;
+    const id = uid();
+    S.pedidos.push({ id, fecha: hoy(), estado: 'pendiente', producto: (window.Mensajes && Mensajes.dato('producto')) || c.producto || 'Producto', cliente: d.nombre || c.nombre, telefono: d.cel || c.tel || '', ciudad: d.ciudad || c.ciudad || '', canal: 'WhatsApp', cantidad: +d.cantidad || 1, precio, costo: 0, flete: 0, otros: 0, dni: d.dni || '', ...(ex || {}) });
+    c.pedidoId = id; if (!c.estado || ['nuevo', 'interesado', 'esperando'].includes(c.estado)) c.estado = 'confirmado';
+    if (d.cel && !c.tel) c.tel = d.cel;
+  };
+  function revisar() {
+    const L = listos(); if (!L.length) return toast('No encontré chats con datos de pedido completos');
+    openForm('Pasar a Pedidos (' + L.length + ')', L.map(({ c, d }) => ({ k: 'c_' + c.id, t: 'check', def: true, l: `${d.nombre || c.nombre} · ${d.cel || c.tel || 'sin cel'} · ${d.ciudad || 'sin ciudad'} · x${d.cantidad || 1}${d.dni ? ' · DNI ' + d.dni : ''}` })), {}, v => {
+      let n = 0; L.forEach(({ c, d }) => { if (v['c_' + c.id]) { nuevoPedido(c, d); n++; } });
+      toast(n + ' pedido' + (n === 1 ? '' : 's') + ' creado' + (n === 1 ? '' : 's') + ' en Pedidos ✅');
+    });
+  }
   function lista(el) {
     const L = chats().filter(c => (!filtro || (filtro === '__g' ? c.grupo : c.estado === filtro)) && (!fet || (c.etq || []).includes(fet)) && (!q || [c.nombre, c.tel, c.ciudad, c.producto].join(' ').toLowerCase().includes(q)))
       .sort((a, b) => (b.ult || 0) - (a.ult || 0));
@@ -137,6 +186,7 @@
       <input class="search" id="wq" type="search" placeholder="Buscar nombre, celular, ciudad…" value="${esc(q)}">
       <div class="chips"><button class="chip ${filtro === '' ? 'on' : ''}" data-f="">Todos<i>${chats().length}</i></button><button class="chip ${filtro === '__g' ? 'on' : ''}" data-f="__g">Grupos<i>${chats().filter(c => c.grupo).length}</i></button>${Object.entries(ESTADOS).map(([k, l]) => `<button class="chip ${filtro === k ? 'on' : ''}" data-f="${k}">${l}<i>${chats().filter(c => c.estado === k).length}</i></button>`).join('')}</div>
       <div class="chips"><button class="chip ${fet === '' ? 'on' : ''}" data-fe="">Etiquetas</button>${etqs().map(e => `<button class="chip ${fet === e.n ? 'on' : ''}" data-fe="${esc(e.n)}"><i style="background:${e.c};width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px"></i>${esc(e.n)}<i>${chats().filter(c => (c.etq || []).includes(e.n)).length}</i></button>`).join('')}<button class="chip" id="wne">+ Etiqueta</button></div>
+      ${listos().length ? `<div class="card wa-due">📦 ${listos().length} chat${listos().length > 1 ? 's' : ''} con datos de pedido listos <button class="btn btn-sm btn-pri" id="wrev">Revisar y pasar a Pedidos</button></div>` : ''}
       ${dueHoy ? `<div class="card wa-due">📌 ${dueHoy} cliente${dueHoy > 1 ? 's' : ''} para dar seguimiento hoy</div>` : ''}
       ${L.length ? L.map(c => `<div class="wa-r ${c.id === sel ? 'on' : ''}" data-c="${c.id}">${av(c)}<div class="wa-rb"><div class="wa-rt"><b>${esc(c.nombre)}${c.tel ? ' <small class="wa-n">+' + esc(String(c.tel).replace(/\D/g, '')) + '</small>' : ''}</b><small>${c.ult ? hora(c.ult) : ''}</small></div><div class="wa-rp">${esc(prev(c))}</div><div class="wa-rg">${(c.etq || []).map(pill).join('')}${c.estado ? `<span class="tag">${ESTADOS[c.estado]}</span>` : ''}${c.tr ? `<span class="tag">${TR[c.tr]}</span>` : ''}${c.seg && c.seg <= hoyS && !['entregado', 'perdido'].includes(c.estado) ? '<span class="tag t-pendiente">Seguir</span>' : ''}</div></div></div>`).join('') : `<div class="card empty">${chats().length ? 'Ningún chat coincide.' : 'Aún no hay chats. Pulsa «+ Chat» cuando te escriba un cliente.'}</div>`}
     </div>`;
@@ -168,6 +218,7 @@
     <p class="note">Uso manual, igual que las etiquetas de WhatsApp Business: etiqueta a cada cliente aquí, copia el mensaje listo y pégalo en tu WhatsApp Business. No lee tu WhatsApp automáticamente. Las etiquetas también debes ponerlas allá si quieres verlas en la app.</p>`;
     const g = (i) => el.querySelector(i);
     if (borrador && g('#wtx')) g('#wtx').value = borrador;
+    if (g('#wrev')) g('#wrev').onclick = revisar;
     if (g('#wqr')) g('#wqr').onclick = pedirQr;
     if (g('#wsync')) g('#wsync').onclick = () => { sincronizar(true); render(); };
     if (g('#wdiag')) g('#wdiag').onclick = async () => { try { const d = await api('diag'); openInfo('<h2>Diagnóstico de WhatsApp</h2><p class="note">Copia este texto y envíaselo a Claude. No incluye nombres ni números.</p><textarea readonly rows="12" style="width:100%;font-family:monospace;font-size:12px">' + esc(JSON.stringify(d, null, 1)) + '</textarea>'); } catch (e) { toast(e.message); } };
@@ -214,7 +265,9 @@
       add('out', t); window.open('https://wa.me/' + n + '?text=' + encodeURIComponent(t), '_blank', 'noopener'); vista(el);
     };
     g('#wcli').onclick = () => openForm('Lo que escribió el cliente', [{ k: 't', l: 'Pega aquí su mensaje', t: 'area', rows: 4, full: 1, req: 1 }], {}, v => add('in', v.t.trim()));
-    const ped = g('#wped'); if (ped) ped.onclick = () => openForm('Pasar a Pedidos', [
+    const det = detectar(c);
+    const ped = g('#wped'); if (ped && det) ped.onclick = () => { nuevoPedido(c, det); Store.save(); toast('Pedido creado en Pedidos ✅ (con los datos que escribió el cliente)'); vista(el); };
+    else if (ped) ped.onclick = () => openForm('Pasar a Pedidos', [
       { k: 'producto', l: 'Producto', req: 1, full: 1, def: c.producto || '' }, { k: 'cantidad', l: 'Cantidad', t: 'number', def: 1 }, { k: 'precio', l: 'Precio venta unit. (S/)', t: 'number', def: 69 },
       { k: 'costo', l: 'Costo producto unit. (S/)', t: 'number' }, { k: 'flete', l: 'Flete (S/)', t: 'number' }], {}, v => {
       const id = uid(); S.pedidos.push({ id, fecha: hoy(), estado: 'pendiente', cliente: c.nombre, telefono: c.tel, ciudad: c.ciudad, canal: 'WhatsApp', otros: 0, ...v }); c.pedidoId = id;
