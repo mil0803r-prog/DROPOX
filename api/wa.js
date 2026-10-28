@@ -50,6 +50,15 @@ module.exports = async (req, res) => {
       return res.json({ ok: true, qr: img });
     }
     if (b.accion === 'salir') { await evo('DELETE', `/instance/logout/${INST}`); return res.json({ ok: true }); }
+    if (b.accion === 'diag') {
+      const rc = await evo('POST', `/chat/findChats/${INST}`, {}), rk = await evo('POST', `/chat/findContacts/${INST}`, { where: {} });
+      const ch = Array.isArray(rc.j) ? rc.j : [], ko = Array.isArray(rk.j) ? rk.j : [];
+      const tipo = j => (/@lid$/.test(j || '') ? 'lid' : /@s\.whatsapp\.net$/.test(j || '') ? 'numero' : /@g\.us$/.test(j || '') ? 'grupo' : 'otro');
+      return res.json({ ok: true, estadoChats: rc.status, estadoContactos: rk.status, chats: ch.length, contactos: ko.length, contactosConNombre: ko.filter(k => k.pushName || k.name).length,
+        chatsConNombre: ch.filter(c => c.pushName || c.name).length, tipos: ch.reduce((a, c) => { const t = tipo(c.remoteJid || c.id); a[t] = (a[t] || 0) + 1; return a; }, {}),
+        camposChat: ch[0] ? Object.keys(ch[0]) : [], camposContacto: ko[0] ? Object.keys(ko[0]) : [], camposUltimoMensaje: ch[0] && ch[0].lastMessage ? Object.keys(ch[0].lastMessage) : [],
+        camposClave: ch[0] && ch[0].lastMessage && ch[0].lastMessage.key ? Object.keys(ch[0].lastMessage.key) : [] });
+    }
     if (b.accion === 'chats') {
       const r = await evo('POST', `/chat/findChats/${INST}`, {});
       const arr = Array.isArray(r.j) ? r.j : [];
