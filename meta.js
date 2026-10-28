@@ -25,7 +25,7 @@ const Meta = (() => {
     const txtc = (x, n) => String(x == null ? '' : x).slice(0, n);
     const MK = ['gasto', 'impresiones', 'alcance', 'frecuencia', 'clics', 'clics_enlace', 'ctr_enlace', 'cpc_enlace', 'ctr', 'cpc', 'cpm', 'compras', 'valor_compras', 'roas', 'mensajes'];
     const nm = x => { x = x || {}; const o = {}; MK.forEach(k => { o[k] = N(x[k]); }); o.costo_compra = x.costo_compra == null ? null : N(x.costo_compra); o.costo_mensaje = x.costo_mensaje == null ? null : N(x.costo_mensaje); if (!o.roas) o.roas = null; return o; };
-    const ne = e => ({ id: txtc(e.id, 40), nombre: txtc(e.nombre || 'Sin nombre', 200), estado: txtc(e.estado, 30).toUpperCase(), objetivo: e.objetivo ? txtc(e.objetivo, 40) : null, optimizacion: e.optimizacion ? txtc(e.optimizacion, 40) : null, presupuesto_diario: e.presupuesto_diario == null ? null : N(e.presupuesto_diario), inicio: iso8(e.inicio), creado: iso8(e.creado), m: nm(e.m) });
+    const ne = e => ({ id: txtc(e.id, 40), nombre: txtc(e.nombre || 'Sin nombre', 200), estado: txtc(e.estado, 30).toUpperCase(), objetivo: e.objetivo ? txtc(e.objetivo, 40) : null, optimizacion: e.optimizacion ? txtc(e.optimizacion, 40) : null, presupuesto_diario: e.presupuesto_diario == null ? null : N(e.presupuesto_diario), inicio: iso8(e.inicio), creado: iso8(e.creado), m: nm(e.m), dias: (e.dias || []).slice(0, 200).map(z => ({ fecha: fecha(z.fecha), ...nm(z) })).filter(z => z.fecha) });
     const campanas = j.campanas.slice(0, 200).map(c => ({ ...ne(c), conjuntos: (c.conjuntos || []).slice(0, 200).map(s => ({ ...ne(s), anuncios: (s.anuncios || []).slice(0, 300).map(ne) })) }));
     const cu = j.cuenta || {};
     return { importado: true, fuente: txtc(j.fuente, 60), cuenta: { id: txtc(cu.id, 30), nombre: txtc(cu.nombre, 80), moneda: txtc(cu.moneda, 5) }, desde: fecha(j.desde), hasta: fecha(j.hasta), campanas, dias: (j.dias || []).slice(0, 400).map(d => ({ fecha: fecha(d.fecha), ...nm(d) })).filter(d => d.fecha), importado_en: new Date().toISOString() };
@@ -154,8 +154,26 @@ const Meta = (() => {
     return `<div class="tw"><table class="mt-tabla"><thead><tr><th>Fecha</th>${HEAD.map(h => `<th class="num">${h}</th>`).join('')}</tr></thead><tbody>${dias.map(d => `<tr><td><b>${f1(d.fecha)}</b></td>${celdas(d).map(v => `<td class="num">${v}</td>`).join('')}</tr>`).join('')}</tbody><tfoot><tr><td><b>Total</b></td>${totales(dias.map(d => ({ m: d }))).map(v => `<td class="num"><b>${v}</b></td>`).join('')}</tr></tfoot></table></div>`;
   }
 
+  // ───────── filtro por fechas (sobre los datos importados, usando el detalle por día de cada campaña, conjunto y anuncio) ─────────
+  function sumarM(ds) {
+    const t = k => ds.reduce((a, d) => a + N(d[k]), 0), g = t('gasto'), imp = t('impresiones'), al = t('alcance'), cl = t('clics'), lk = t('clics_enlace'), ms = t('mensajes'), co = t('compras'), vc = t('valor_compras');
+    return { gasto: g, impresiones: imp, alcance: al, frecuencia: al ? imp / al : 0, clics: cl, clics_enlace: lk, ctr_enlace: imp ? lk / imp * 100 : 0, cpc_enlace: lk ? g / lk : 0, ctr: imp ? cl / imp * 100 : 0, cpc: cl ? g / cl : 0, cpm: imp ? g / imp * 1000 : 0,
+      compras: co, valor_compras: vc, roas: g && vc ? vc / g : null, costo_compra: co ? g / co : null, mensajes: ms, costo_mensaje: ms ? g / ms : null };
+  }
+  const rangoFechas = A => { const c = S.config || {}; let d = c.metaDesde || A.desde, h = c.metaHasta || A.hasta; if (d < A.desde) d = A.desde; if (h > A.hasta) h = A.hasta; if (d > h) { const x = d; d = h; h = x; } return [d, h]; };
+  function filtrado(A) {
+    if (!A || !A.importado) return A;
+    const [d, h] = rangoFechas(A);
+    if (d <= A.desde && h >= A.hasta) return A;
+    const en = z => z.fecha >= d && z.fecha <= h;
+    const rec = e => (e.dias && e.dias.length ? { ...e, dias: e.dias.filter(en), m: sumarM(e.dias.filter(en)) } : e);
+    return { ...A, desde: d, hasta: h, recortado: true, dias: A.dias.filter(en),
+      campanas: A.campanas.map(ca => ({ ...rec(ca), conjuntos: ca.conjuntos.map(se => ({ ...rec(se), anuncios: se.anuncios.map(rec) })) })) };
+  }
+  const sumaDias = (A, delta) => { const x = new Date(A + 'T12:00:00'); x.setDate(x.getDate() + delta); return iso(x); };
+
   function html() {
-    const A = datos, dias = A.dias, [d0, h0] = rangoActual(), otro = clave !== d0 + '|' + h0 && !A.ejemplo && !A.importado;
+    const A = filtrado(datos), dias = A.dias, [d0, h0] = rangoActual(), otro = clave !== d0 + '|' + h0 && !A.ejemplo && !A.importado;
     const g = dias.reduce((s, d) => s + d.gasto, 0), c = dias.reduce((s, d) => s + d.compras, 0), v = dias.reduce((s, d) => s + d.valor_compras, 0), im = dias.reduce((s, d) => s + d.impresiones, 0), cl = dias.reduce((s, d) => s + d.clics_enlace, 0);
     const tile = (l, val, s = '') => `<div class="t"><small>${l}</small><b>${val}</b>${s ? `<em>${s}</em>` : ''}</div>`;
     const mx = Math.max(...dias.map(d => d.gasto), 0);
@@ -164,11 +182,17 @@ const Meta = (() => {
     const camps = A.campanas.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto);
     const arbol = camps.length ? camps.map(ca => nodo('campaign', ca, ca.conjuntos.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto).map(se => nodo('adset', se, se.anuncios.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto).map(ad => nodo('ad', ad, '')).join(''))).join(''))).join('') : '<div class="empty">No hay campañas con este filtro en el periodo.</div>';
     const pk = S.config.periodo;
+    const [fd, fh] = datos.importado ? rangoFechas(datos) : ['', ''];
+    const sel = (a, b) => (fd === a && fh === b ? 'on' : '');
+    const ctrlFechas = datos.importado ? `<div class="card mt-fil"><small class="cap">Filtrar por fechas</small><div class="mt-fechas"><label>Desde<input type="date" id="fdesde" value="${fd}" min="${datos.desde}" max="${datos.hasta}"></label><label>Hasta<input type="date" id="fhasta" value="${fh}" min="${datos.desde}" max="${datos.hasta}"></label></div>
+      <div class="chips" style="margin:6px 0 0"><button class="chip ${sel(datos.desde, datos.hasta)}" data-fr="todo">Todo</button><button class="chip ${sel(sumaDias(datos.hasta, -6), datos.hasta)}" data-fr="7">Últimos 7 días</button><button class="chip ${sel(datos.hasta, datos.hasta)}" data-fr="ult">Último día</button><button class="chip ${sel(sumaDias(hoy(), -1), sumaDias(hoy(), -1))}" data-fr="ayer">Ayer</button><button class="chip ${sel(hoy(), hoy())}" data-fr="hoy">Hoy</button></div>
+      <p class="sub" style="margin:8px 0 0">Mostrando <b>${f1(A.desde)}</b> al <b>${f1(A.hasta)}</b>${A.recortado ? ' · las cifras de campañas, conjuntos y anuncios se recalculan para estas fechas' : ''}. Hay datos entre ${f1(datos.desde)} y ${f1(datos.hasta)}.</p></div>` : '';
     return `${A.ejemplo ? '<div class="demo-bar"><span><b>Datos de ejemplo.</b> Así se verá tu cuenta cuando Meta esté conectado.</span></div>' : ''}
     ${A.importado ? `<div class="nota-pub">Datos traídos de Meta ${A.fuente ? '(' + esc(A.fuente) + ') ' : ''}el ${esc(new Date(A.importado_en).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }))}. Es una foto de ese momento: para ponerla al día pídele a Claude <b>actualiza</b> y pega lo nuevo abajo.</div>` : ''}
     <div class="acct"><i></i><span>${A.importado ? 'Importado desde Meta' : 'Automático desde Meta'}</span><b>${esc(A.cuenta.nombre || META_CUENTA.nombre)}</b><code>${esc(A.cuenta.id)}</code>${A.cuenta.moneda ? `<code>${esc(A.cuenta.moneda)}</code>` : ''}</div>
     ${otro ? `<div class="nota-pub">Estás viendo ${f1(A.desde)} al ${f1(A.hasta)}. Toca <b>Actualizar</b> para traer el periodo que elegiste.</div>` : ''}
-    <div class="card card-row per"><div><small class="cap">Periodo${hora && !A.ejemplo && !A.importado ? ' · actualizado ' + hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : ''}</small><b>${f1(A.desde)} al ${f1(A.hasta)}</b></div><select id="per">${Object.entries(PERIODOS).map(([k, l]) => `<option value="${k}" ${k === pk ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    ${ctrlFechas}
+    ${datos.importado ? '' : `<div class="card card-row per"><div><small class="cap">Periodo${hora && !A.ejemplo && !A.importado ? ' · actualizado ' + hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : ''}</small><b>${f1(A.desde)} al ${f1(A.hasta)}</b></div><select id="per">${Object.entries(PERIODOS).map(([k, l]) => `<option value="${k}" ${k === pk ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`}
     <div class="tiles">${tile('Importe gastado', money(g), `${dias.length} días`)}${tile('Compras', n0(c), 'según el píxel')}${tile('Costo por compra', c > 0 ? money(g / c) : '—')}${tile('ROAS de compras', g > 0 && v > 0 ? n2(v / g) + 'x' : '—', 'valor ÷ gasto')}${tile('CTR (enlace)', im > 0 ? n2(cl / im * 100) + '%' : '—')}${tile('CPM', im > 0 ? money(g / im * 1000) : '—')}</div>
     <div class="card"><h3>Gasto por día</h3><p class="sub">Cuenta completa en el periodo</p>${chart}</div>
     <div class="card"><h3>Campañas, conjuntos y anuncios</h3><p class="sub">Toca una campaña para ver sus conjuntos y anuncios. Las métricas son las de Meta.</p>
@@ -223,6 +247,11 @@ const Meta = (() => {
       try { aplicarImport(txt); if (recordar) { try { localStorage.setItem('dropox.metaclave', cl); } catch (e) { /* sin almacenamiento */ } } } catch (e) { msg.textContent = e.message; } };
     const del = $('#mimpdel'); if (del) del.onclick = () => ask('¿Borrar los datos importados de Meta?', () => { delete S.metaSnap; if (datos && datos.importado) datos = null; Store.save(); render(); }, 'Borrar');
     const bt = $('#mact'); if (bt) bt.onclick = () => { cargar(true); sync(); render(); };
+    const fijar = (d, h) => { S.config.metaDesde = d; S.config.metaHasta = h; Store.save(); render(); };
+    const fdI = $('#fdesde'), fhI = $('#fhasta');
+    if (fdI) fdI.onchange = () => fijar(fdI.value, fhI.value);
+    if (fhI) fhI.onchange = () => fijar(fdI.value, fhI.value);
+    el.querySelectorAll('[data-fr]').forEach(b => b.onclick = () => { const k = b.dataset.fr, D = datos; if (k === 'todo') fijar('', ''); else if (k === '7') fijar(sumaDias(D.hasta, -6), D.hasta); else if (k === 'ult') fijar(D.hasta, D.hasta); else if (k === 'ayer') fijar(sumaDias(hoy(), -1), sumaDias(hoy(), -1)); else fijar(hoy(), hoy()); });
     const per = $('#per'); if (per) per.onchange = e => { S.config.periodo = e.target.value; Store.save(); render(); };
     el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; render(); });
     el.querySelectorAll('[data-vm]').forEach(b => b.onclick = () => { vistaM = b.dataset.vm; render(); });
