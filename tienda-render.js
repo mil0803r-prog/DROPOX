@@ -62,7 +62,7 @@ a{color:inherit;text-decoration:none}img{max-width:100%;display:block}button{fon
 .pad>*{animation:up .5s ease both}.pad>:nth-child(2){animation-delay:.05s}.pad>:nth-child(3){animation-delay:.1s}.pad>:nth-child(4){animation-delay:.15s}
 .annbar{background:var(--tx);color:var(--bg);font-size:12.5px;font-weight:600;text-align:center;padding:8px 12px}
 .ann-row{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 10px}.ann-sep{opacity:.5}
-.mq{overflow:hidden;white-space:nowrap;text-align:left;padding:9px 0;letter-spacing:.04em;text-transform:uppercase}.mq-t{display:inline-flex;width:max-content;animation:mq 22s linear infinite}.mq-t span{display:inline-block;padding-right:34px}.mq-s{font-style:normal;margin-left:34px;opacity:.55}
+.annbar.mq{overflow:hidden;white-space:nowrap;text-align:left;padding:14px 0;font-size:19px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;line-height:1.2;border:0;display:block}.annbar.mq.oro{background:linear-gradient(110deg,#a8894a 0%,#c9a867 50%,#a8894a 100%);color:#1a1408}.mq-t{display:inline-flex;width:max-content;animation:mq 22s linear infinite}.mq-t span{display:inline-block;padding-right:90px}.mq-s{font-style:normal;margin-left:0;padding-right:90px;opacity:.55}
 @keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .tw{margin-top:10px;font-weight:800;font-size:23px;line-height:1.2}.tw-f{color:var(--tx)}.tw-l{color:var(--ac);min-height:1.25em}.tw-c{display:inline-block;width:2px;height:1em;margin-left:2px;vertical-align:-.12em;background:var(--ac);animation:tcur .8s steps(1) infinite}
 @keyframes tcur{50%{opacity:0}}
@@ -147,18 +147,21 @@ dialog::backdrop{background:#0009}dialog[open]{animation:pop .3s ease both}
   const stars = v => '★'.repeat(Math.round(n(v))) + '☆'.repeat(5 - Math.round(n(v)));
   function barra(cfg, opt) {
     const b = cfg.barra || {};
-    if (!b.activa || !(b.items || []).length) return '';
-    return `<div class="annbar" role="note"${ed(opt, 'g:portada:barra.items')}><div class="ann-row">${b.items.map(esc).join('<span class="ann-sep" aria-hidden="true">·</span>')}</div></div>`;
+    return b.activa ? barraGen(cfg, opt, b.items, 'g:portada:barra.items', b.movProd !== false) : '';
   }
-  function barraMov(cfg, opt) {
-    const b = cfg.barra || {}, pt = cfg.portada || {}, it = (b.items || []).filter(Boolean);
-    if (!b.activa || !it.length) return '';
-    if (pt.mov === false) return barra(cfg, opt);
-    const g = `<span>${[...it, ...it, ...it].map(esc).join('</span><span>')}</span>`, nn = x => Math.max(0, Number(x) || 0);
-    const st = [b.fondo && /^#[0-9a-f]{3,8}$/i.test(b.fondo) ? `background:${b.fondo}` : '', b.color && /^#[0-9a-f]{3,8}$/i.test(b.color) ? `color:${b.color}` : '', nn(pt.barraTam) ? `font-size:${Math.min(30, nn(pt.barraTam))}px` : ''].filter(Boolean).join(';');
-    const sim = String(pt.simbolo === undefined ? '\u2726' : pt.simbolo).slice(0, 4), vel = Math.min(120, Math.max(4, nn(pt.barraVel) || 22));
-    return `<div class="annbar mq" role="note"${st ? ` style="${esc(st)}"` : ''}${ed(opt, 'g:portada:barra.items')}><div class="mq-t" style="animation-duration:${vel}s" data-s="${esc(sim)}">${g.replace(/<\/span>/g, esc(sim) ? '<i class="mq-s">' + esc(sim) + '</i></span>' : '</span>')}${g.replace(/<\/span>/g, esc(sim) ? '<i class="mq-s">' + esc(sim) + '</i></span>' : '</span>')}</div></div>`;
+  // Barra superior. En movimiento (corre de lado a lado, dorada) en la portada y/o en los productos; se activa o apaga en «Barra superior».
+  function barraGen(cfg, opt, items, edk, mov) {
+    const b = cfg.barra || {}, pt = cfg.portada || {}, it = (items || []).filter(Boolean);
+    if (!it.length) return '';
+    if (!mov) return `<div class="annbar" role="note"${ed(opt, edk)}><div class="ann-row">${it.map(esc).join('<span class="ann-sep" aria-hidden="true">·</span>')}</div></div>`;
+    const nn = x => Math.max(0, Number(x) || 0), hex = x => x && /^#[0-9a-f]{3,8}$/i.test(x) ? x : '';
+    const oro = b.dorado !== false && !hex(b.fondo);
+    const st = [hex(b.fondo) ? `background:${b.fondo}` : '', hex(b.color) ? `color:${b.color}` : '', nn(pt.barraTam) ? `font-size:${Math.min(40, nn(pt.barraTam))}px` : ''].filter(Boolean).join(';');
+    const sim = String(pt.simbolo === undefined ? '' : pt.simbolo).slice(0, 4), vel = Math.min(120, Math.max(4, nn(pt.barraVel) || 22));
+    const sp = sim ? `<i class="mq-s">${esc(sim)}</i>` : '', g = `<span>${it.concat(it, it).map(x => esc(x) + sp).join('</span><span>')}</span>`;
+    return `<div class="annbar mq${oro ? ' oro' : ''}" role="note"${st ? ` style="${esc(st)}"` : ''}${ed(opt, edk)}><div class="mq-t" style="animation-duration:${vel}s">${g}${g}</div></div>`;
   }
+  const barraMov = (cfg, opt) => { const b = cfg.barra || {}; return b.activa ? barraGen(cfg, opt, b.items, 'g:portada:barra.items', b.movHome !== false) : ''; };
   function carrusel(cfg, opt, lista) {
     const pt = cfg.portada || {}, it = lista.filter(p => (p.imagenes || [])[0]);
     if (pt.carrusel === false || !it.length) return '';
@@ -297,10 +300,10 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     const vars = `:root{--pg:${fondo};--accent:${ac};--accent-text:#fff;--accent-soft:color-mix(in srgb,${ac} 7%,transparent);--accent-border:color-mix(in srgb,${ac} 22%,transparent);--accent-glow:color-mix(in srgb,${ac} 35%,transparent);--accent-halo:color-mix(in srgb,${ac} 18%,transparent);--price-c:${color(d.precio, '#16a34a')};--was-c:${color(d.tachado, '#e11d48')};--btn-bg:${bt};--btn-soft:color-mix(in srgb,${bt} 12%,transparent);--btn-line:color-mix(in srgb,${bt} 34%,transparent);--btn-glow:color-mix(in srgb,${bt} 35%,transparent);--offers-c:${ac};--offers-text:#fff;--offers-soft:color-mix(in srgb,${ac} 5%,transparent);--btn-radius:${Math.max(0, Math.min(28, n(d.radio) || 12))}px;--btn-text:${color(d.botonTxt, '#ffffff')};--form-bg:#fff;--form-input-bg:#fff;--form-input-border:#dddeee;--form-input-icon-bg:#F1F5F9;--form-focus-border:${ac};--font:'${fuente(d.fuente)}',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;--btn-shadow:0 6px 18px rgba(0,0,0,.16);--btn-pad:16px;--btn-font:17px;--btn-lbl:17px;--btn-pr:17px;--btn-width:100%;--ink-bar:${tx};--ink-bar-tx:${d.preset === 'oro' ? color(d.botonTxt, '#F4C468') : fondo}}`;
     const extra = `html,body{background:${fondo}}body{font-family:var(--font);color:${tx};line-height:1.5;-webkit-font-smoothing:antialiased;padding-bottom:0}.lk-rv,.sr{opacity:1}.js .lk-rv:not(.in),.js .sr:not(.in){opacity:0;transform:translateY(14px)}.lk-rv,.sr{transition:opacity .5s ease,transform .5s ease}.lk-rv.in,.sr.in{opacity:1;transform:none}`;
     const fnt = encodeURIComponent(fuente(d.fuente)).replace(/%20/g, '+');
-    const barraHtml = barraP.length ? `<div class="annbar" role="note"${ed(opt, 'p:basico:barra')}><div class="ann-row">${barraP.map(esc).join('<span class="ann-sep" aria-hidden="true">·</span>')}</div></div>` : barra(cfg, opt);
+    const barraHtml = barraP.length ? barraGen(cfg, opt, barraP, 'p:basico:barra', (cfg.barra || {}).movProd !== false) : barra(cfg, opt);
     const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>${esc(titulo)}</title><meta name="description" content="${esc(p.kicker || m.lema || titulo)}"><meta name="theme-color" content="${fondo}">${url(m.favicon || m.logo) ? `<link rel="icon" href="${url(m.favicon || m.logo)}">` : ''}${canon ? `<link rel="canonical" href="${esc(canon)}"><meta property="og:url" content="${esc(canon)}">` : ''}
 <meta property="og:type" content="product"><meta property="og:site_name" content="${esc(m.nombre)}"><meta property="og:title" content="${esc(titulo)}"><meta property="og:description" content="${esc(p.kicker || m.lema || titulo)}"><meta property="og:locale" content="${esc(pais.locale || 'es_PE')}">${imgs[0] ? `<meta property="og:image" content="${url(imgs[0])}"><meta name="twitter:image" content="${url(imgs[0])}">` : ''}<meta name="twitter:card" content="summary_large_image"><meta property="product:price:amount" content="${n(p.precio)}"><meta property="product:price:currency" content="${esc(pais.codigo || 'PEN')}">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${fnt}:wght@400;500;600;700;800;900&display=swap"><style>${base}\n${vars}\n${LUMY_CSS}\n${extra}</style></head><body class="has-lpf den-compact"><div class="wrap" id="app" role="main" data-hero="inmersivo">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${fnt}:wght@400;500;600;700;800;900&display=swap"><style>${base}\n${vars}\n${LUMY_CSS}\n${css0.filter(l => /^(\.annbar\.mq|@keyframes mq)/.test(l)).join('\n')}\n${extra}</style></head><body class="has-lpf den-compact"><div class="wrap" id="app" role="main" data-hero="inmersivo">
 ${barraHtml}
 <div class="buysection"><div class="hero-media"><div class="hero-imm">
 <div class="galshell${imgs.length > 1 ? ' gal-live' : ''}"><div class="gallery" id="offer">${imgs.map((i, k) => `<img${ed(opt, 'p:fotos:imagenes.' + imgIdx[k])} src="${url(i)}" alt="${esc(titulo)} ${k + 1}" ${k ? 'loading="lazy"' : 'loading="eager" fetchpriority="high"'} class="ld">`).join('')}</div>${imgs.length > 1 ? `<div class="gal-count" id="galCount" aria-hidden="true">1 / ${imgs.length}</div><button type="button" class="gal-arr gal-arr-l" id="galPrev" aria-label="Foto anterior">${SV.arrL}</button><button type="button" class="gal-arr gal-arr-r" id="galNext" aria-label="Foto siguiente">${SV.arrR}</button>` : ''}</div>
