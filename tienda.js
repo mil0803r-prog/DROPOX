@@ -117,10 +117,18 @@
     if (t.portada.fijo === undefined) t.portada.fijo = 'Regalos con significado,';
     if (!Array.isArray(t.portada.frases)) t.portada.frases = ['envío a todo el Perú', 'pagas al recibir', 'un detalle que enamora'];
   }
+  function migrarCar(t) {
+    if (t._car) return; t._car = true;
+    t.portada = t.portada || {};
+    if (t.portada.carrusel === undefined) t.portada.carrusel = true;
+    if (t.portada.carruselPrecio === undefined) t.portada.carruselPrecio = true;
+    if (t.portada.carruselSeg === undefined) t.portada.carruselSeg = 4;
+    if (t.portada.carruselTitulo === undefined) t.portada.carruselTitulo = 'Lo más pedido';
+  }
   function asegurar() {
     if (!Array.isArray(S.tiendas) || !S.tiendas.length) S.tiendas = [clon(window.TIENDA_BASE)];
     if (ti >= S.tiendas.length) ti = 0;
-    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); S.tiendas.forEach(asignarResenas); S.tiendas.forEach(migrarMov); restaurar();
+    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); S.tiendas.forEach(asignarResenas); S.tiendas.forEach(migrarMov); S.tiendas.forEach(migrarCar); restaurar();
     const t = S.tiendas[ti];
     if (pi >= (t.productos || []).length) pi = 0;
     return t;
@@ -338,6 +346,7 @@
         <div class="row">${f('portada.escVel', 'Velocidad al escribir (ms por letra, menos = más rápido)', { type: 'number' })}${f('portada.escTam', 'Tamaño de la frase (px)', { type: 'number' })}</div>${f('portada.escColor', 'Color de la frase escrita', { type: 'color' })}
         <div class="row">${f('portada.barraVel', 'Vuelta completa de la barra (segundos, más = más lenta)', { type: 'number' })}${f('portada.barraTam', 'Tamaño del texto de la barra (px)', { type: 'number' })}</div>
         <div class="row">${f('barra.fondo', 'Fondo de la barra', { type: 'color' })}${f('barra.color', 'Color del texto de la barra', { type: 'color' })}</div>${f('portada.simbolo', 'Símbolo entre mensajes (vacío = ninguno)')}`) +
+        card('Carrusel horizontal (solo en la página principal)', 'Los productos se deslizan de lado a lado con el dedo y también solos. Cada tarjeta lleva al producto.', `${f('portada.carrusel', 'Mostrar el carrusel', { check: 1 })}${f('portada.carruselTitulo', 'Título sobre el carrusel (opcional)')}<div class="row">${f('portada.carruselSeg', 'Cambia solo cada (segundos, 0 = no)', { type: 'number' })}${f('portada.carruselPrecio', 'Mostrar el precio', { check: 1 })}</div>`) +
         card('Cabecera de portada', '', `<div class="row">${f('portada.badge', 'Etiqueta (ej. Pago contraentrega)')}${f('portada.titulo', 'Título de la rejilla')}</div>${f('portada.confianza', 'Garantías (una por línea)', { kind: 'lines', rows: 4 })}`) +
         card('Promo por cantidad', 'La caja «Mientras más llevas, más ahorras». Si un producto no tiene precio de combo propio, este descuento arma el precio de 2 unidades.', `${f('promo.activa', 'Activar promo', { check: 1 })}${f('portada.mostrarPromo', 'Mostrar la caja en la portada', { check: 1 })}
         ${f('promo.titulo', 'Título')}<div class="row">${f('promo.cantidad', 'Cantidad mínima', { type: 'number' })}${f('promo.descuento', 'Descuento (%)', { type: 'number' })}</div>${f('promo.texto', 'Texto de apoyo')}`) +
