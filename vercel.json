@@ -26,6 +26,16 @@
   },
   "routes": [
     {
+      "src": "^/(robots\\.txt|sitemap\\.xml)$",
+      "has": [
+        {
+          "type": "host",
+          "value": "^(?!.*\\.vercel\\.app$)(?!localhost)(?!dropox\\.).+$"
+        }
+      ],
+      "dest": "/api/tienda?f=$1"
+    },
+    {
       "src": "^/(?!api/)([a-z0-9-]*)$",
       "has": [
         {
