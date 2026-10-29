@@ -62,7 +62,7 @@ a{color:inherit;text-decoration:none}img{max-width:100%;display:block}button{fon
 .pad>*{animation:up .5s ease both}.pad>:nth-child(2){animation-delay:.05s}.pad>:nth-child(3){animation-delay:.1s}.pad>:nth-child(4){animation-delay:.15s}
 .annbar{background:var(--tx);color:var(--bg);font-size:12.5px;font-weight:600;text-align:center;padding:8px 12px}
 .ann-row{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 10px}.ann-sep{opacity:.5}
-.mq{overflow:hidden;white-space:nowrap;text-align:left;padding:9px 0;letter-spacing:.04em;text-transform:uppercase}.mq-t{display:inline-flex;width:max-content;animation:mq 22s linear infinite}.mq-t span{display:inline-block;padding-right:34px}.mq-t span::after{content:"\\2726";margin-left:34px;opacity:.55}
+.mq{overflow:hidden;white-space:nowrap;text-align:left;padding:9px 0;letter-spacing:.04em;text-transform:uppercase}.mq-t{display:inline-flex;width:max-content;animation:mq 22s linear infinite}.mq-t span{display:inline-block;padding-right:34px}.mq-s{font-style:normal;margin-left:34px;opacity:.55}
 @keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .tw{margin-top:10px;font-weight:800;font-size:23px;line-height:1.2}.tw-f{color:var(--tx)}.tw-l{color:var(--ac);min-height:1.25em}.tw-c{display:inline-block;width:2px;height:1em;margin-left:2px;vertical-align:-.12em;background:var(--ac);animation:tcur .8s steps(1) infinite}
 @keyframes tcur{50%{opacity:0}}@media (prefers-reduced-motion:reduce){.mq-t{animation:none}.tw-c{animation:none}}
@@ -150,15 +150,18 @@ dialog::backdrop{background:#0009}dialog[open]{animation:pop .3s ease both}
     const b = cfg.barra || {}, pt = cfg.portada || {}, it = (b.items || []).filter(Boolean);
     if (!b.activa || !it.length) return '';
     if (pt.mov === false) return barra(cfg, opt);
-    const g = `<span>${[...it, ...it, ...it].map(esc).join('</span><span>')}</span>`;
-    return `<div class="annbar mq" role="note"${ed(opt, 'g:portada:barra.items')}><div class="mq-t">${g}${g}</div></div>`;
+    const g = `<span>${[...it, ...it, ...it].map(esc).join('</span><span>')}</span>`, nn = x => Math.max(0, Number(x) || 0);
+    const st = [b.fondo && /^#[0-9a-f]{3,8}$/i.test(b.fondo) ? `background:${b.fondo}` : '', b.color && /^#[0-9a-f]{3,8}$/i.test(b.color) ? `color:${b.color}` : '', nn(pt.barraTam) ? `font-size:${Math.min(30, nn(pt.barraTam))}px` : ''].filter(Boolean).join(';');
+    const sim = String(pt.simbolo === undefined ? '\u2726' : pt.simbolo).slice(0, 4), vel = Math.min(120, Math.max(4, nn(pt.barraVel) || 22));
+    return `<div class="annbar mq" role="note"${st ? ` style="${esc(st)}"` : ''}${ed(opt, 'g:portada:barra.items')}><div class="mq-t" style="animation-duration:${vel}s" data-s="${esc(sim)}">${g.replace(/<\/span>/g, esc(sim) ? '<i class="mq-s">' + esc(sim) + '</i></span>' : '</span>')}${g.replace(/<\/span>/g, esc(sim) ? '<i class="mq-s">' + esc(sim) + '</i></span>' : '</span>')}</div></div>`;
   }
   function escribe(cfg, opt) {
-    const pt = cfg.portada || {}, fr = (pt.frases || []).map(x => String(x).trim()).filter(Boolean);
+    const pt = cfg.portada || {}, fr = (pt.frases || []).map(x => String(x).trim()).filter(Boolean), nn = x => Math.max(0, Number(x) || 0);
     if (pt.mov === false || !fr.length) return '';
-    return `<div class="tw"${ed(opt, 'g:portada:portada.frases')}>${pt.fijo ? `<div class="tw-f">${esc(pt.fijo)}</div>` : ''}<div class="tw-l"><span id="twT" data-f="${esc(JSON.stringify(fr))}">${esc(fr[0])}</span><i class="tw-c"></i></div></div>`;
+    const col = pt.escColor && /^#[0-9a-f]{3,8}$/i.test(pt.escColor) ? `--ac:${pt.escColor};` : '', tam = nn(pt.escTam) ? `font-size:${Math.min(60, nn(pt.escTam))}px;` : '';
+    return `<div class="tw" style="${col}${tam}"${ed(opt, 'g:portada:portada.frases')}>${pt.fijo ? `<div class="tw-f">${esc(pt.fijo)}</div>` : ''}<div class="tw-l"><span id="twT" data-f="${esc(JSON.stringify(fr))}" data-v="${Math.min(300, Math.max(15, nn(pt.escVel) || 70))}">${esc(fr[0])}</span><i class="tw-c"></i></div></div>`;
   }
-  const TW_JS = "(function(){var e=document.getElementById('twT');if(!e)return;var f;try{f=JSON.parse(e.dataset.f)}catch(x){return}if(!f.length||(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches))return;var i=0,n=f[0].length,d=0;function t(){var w=f[i];if(!d){n++;e.textContent=w.slice(0,n);if(n>=w.length){d=1;return setTimeout(t,1700)}return setTimeout(t,70)}n--;e.textContent=w.slice(0,n);if(n<=0){d=0;i=(i+1)%f.length;return setTimeout(t,350)}setTimeout(t,35)}setTimeout(t,1700)})();";
+  const TW_JS = "(function(){var e=document.getElementById('twT');if(!e)return;var f;try{f=JSON.parse(e.dataset.f)}catch(x){return}if(!f.length||(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches))return;var i=0,n=f[0].length,d=0,v=+e.dataset.v||70;function t(){var w=f[i];if(!d){n++;e.textContent=w.slice(0,n);if(n>=w.length){d=1;return setTimeout(t,1700)}return setTimeout(t,v)}n--;e.textContent=w.slice(0,n);if(n<=0){d=0;i=(i+1)%f.length;return setTimeout(t,350)}setTimeout(t,v/2)}setTimeout(t,1700)})();";
   function pie(cfg, o) {
     const m = cfg.marca || {}, c = cfg.contacto || {};
     const pols = (cfg.politicas || []).filter(x => x && x[0]);
