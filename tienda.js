@@ -22,10 +22,19 @@
     if (t.marca) { t.marca.lema = fix(t.marca.lema); t.marca.descripcion = fix(t.marca.descripcion); }
   }
 
+  // Por ahora los pedidos llegan por WhatsApp al 970 189 535 (una sola vez a las tiendas ya guardadas; se cambia en Oferta y envío)
+  function migrarWa(t) {
+    if (t._wa) return;
+    t._wa = true;
+    if (!t.pedidoWa) t.pedidoWa = { activo: true, numero: '51970189535', mensaje: 'Hola, quiero hacer este pedido:' };
+    t.contacto = t.contacto || {};
+    if (!t.contacto.whatsapp) t.contacto.whatsapp = '51970189535';
+  }
+
   function asegurar() {
     if (!Array.isArray(S.tiendas) || !S.tiendas.length) S.tiendas = [clon(window.TIENDA_BASE)];
     if (ti >= S.tiendas.length) ti = 0;
-    S.tiendas.forEach(migrarSoles);
+    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa);
     const t = S.tiendas[ti];
     if (pi >= (t.productos || []).length) pi = 0;
     return t;
@@ -285,6 +294,7 @@
         ${f('envio.pasos', 'Pasos «Así llega tu pedido» — formato: Paso | Tiempo', { kind: 'pasos', rows: 4 })}
         ${f('confianzaProducto', 'Tres sellos bajo el precio (uno por línea)', { kind: 'lines', rows: 3 })}`) +
         card('Garantía y seguimiento (página de producto)', 'Lo que se ve en la tarjeta de garantía y en «Así llega tu pedido».', `${f('envio.garantiaTitulo', 'Título de la garantía')}<div class="row">${f('envio.pagos.titulo', 'Tarjeta de pagos: título')}${f('envio.pagos.extra', 'Detalle (ej. Atención personalizada)')}</div>${f('envio.pagos.metodo', 'Método de pago (ej. Contraentrega)')}${f('envio.sellosGarantia', 'Sellos de la garantía (uno por línea, máximo 2)', { kind: 'lines', rows: 2, full: 1 })}${f('envio.seguimiento', 'Etiqueta sobre «Así llega tu pedido»')}${f('envio.reaseguro', 'Frase del pie de página', { area: 1, rows: 2, full: 1 })}`) +
+        card('Cómo llegan los pedidos', 'El botón del formulario puede mandar el pedido por WhatsApp con un resumen (producto, cantidad, total y datos de entrega). Además, el pedido queda guardado en la pestaña Pedidos.', `${f('pedidoWa.activo', 'Pedir por WhatsApp (el botón dice «Pedir por WhatsApp»)', { check: 1 })}<div class="row">${f('pedidoWa.numero', 'Número de WhatsApp', { hint: 'Con código de país (51970189535). Si escribes 9 dígitos, se agrega el 51.' })}${f('pedidoWa.mensaje', 'Primera línea del mensaje')}</div>`) +
         card('Pedido contraentrega', 'La ventana de pedido ya trae: cantidad (1 o 2), nombre, apellido, teléfono, departamento (los 24 de Perú más el Callao), municipio, dirección completa, punto de referencia, resumen y total. El precio se recalcula en el servidor con tu configuración publicada y el pedido llega a la pestaña Pedidos.', '');
     },
     textos(t) {
