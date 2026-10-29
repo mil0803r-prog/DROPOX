@@ -184,7 +184,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     ${pm.activa && pt.mostrarPromo !== false ? `<div class="promo"${ed(opt, 'g:portada:promo.titulo')}><h2>${esc(pm.titulo)}</h2><div class="big">${esc(pm.cantidad)} o más · -${esc(pm.descuento)}%</div><p>${esc(pm.texto)}</p></div>` : ''}
     ${cats.length ? `<div class="cats" id="cats"><button class="on" data-c="">Todos</button>${cats.map(c => `<button data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : ''}
     <h2 class="sec">${esc(pt.titulo || 'Los más vendidos')}</h2>
-    <div class="grid" id="grid">${lista.map(card).join('')}</div>
+    <div class="grid" id="grid">${lista.length ? lista.map(card).join('') : '<p style="grid-column:1/-1;text-align:center;padding:30px 10px;opacity:.7">Pronto tendremos productos para ti.</p>'}</div>
     ${pie(cfg)}</div>
     <script>(function(){var c=document.getElementById('cats');if(!c)return;c.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;c.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('#grid .pc').forEach(function(a){a.style.display=!b.dataset.c||a.dataset.c===b.dataset.c?'':'none'})})})();</script>
     ${pixeles(cfg, 'home')}</body></html>`;
