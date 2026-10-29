@@ -8,7 +8,7 @@ const Nube = (() => {
   const OK = (cfg.permitidos || []).map(x => String(x).toLowerCase());
   const permitido = e => !OK.length || OK.includes(String(e || '').toLowerCase());
   const LK = 'dropox.nube.uid', DK = 'dropox.nube.sucio';
-  let sb, user, recuperando = false, timer, remotoVer = null, subiendo = false, pendiente = false, sincronizado = false;
+  let sb, user, recuperando = false, reintentos = 0, timer, remotoVer = null, subiendo = false, pendiente = false, sincronizado = false;
 
   const ls = {
     get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -107,22 +107,40 @@ const Nube = (() => {
 
   const tieneDatos = () => !S.demo && ((S.pedidos || []).length || (S.fijos || []).length || (S.ads || []).length);
 
+  const unir = (dest, src) => { try { return !!(window.Tienda && Tienda.fusionar && Tienda.fusionar(dest, src)); } catch (e) { return false; } };
+
   function adoptar(c, ver) {
     const b = DEFAULTS();
+    // lo que solo existe en este dispositivo (productos de la tienda) se suma, nunca se pierde
+    const extra = unir(c, S);
     S = { ...b, ...c, config: { ...b.config, ...(c.config || {}) } };
     try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
     remotoVer = ver;
     render();
+    if (extra) { ls.set(DK, '1'); setTimeout(push, 1500); }
   }
 
   async function subir() {
     if (!N.activo || !sincronizado) return;
     if (subiendo) { pendiente = true; return; }
-    subiendo = true;
-    const ts = new Date().toISOString();
-    const { error } = await sb.from('datos').upsert({ user_id: user.id, contenido: S, actualizado: ts });
-    if (error) { estado('Error al sincronizar'); }
-    else { remotoVer = ts; ls.del(DK); estado('Sincronizado'); }
+    subiendo = true; timer = null;
+    let error = null;
+    try {
+      // si otro dispositivo guardó mientras tanto, se unen sus productos antes de subir (no se pisa su trabajo)
+      const v = await sb.from('datos').select('actualizado').eq('user_id', user.id).maybeSingle();
+      if (v.data && remotoVer && v.data.actualizado !== remotoVer) {
+        const r = await sb.from('datos').select('contenido').eq('user_id', user.id).maybeSingle();
+        if (r.data && unir(S, r.data.contenido || {})) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} render(); }
+      }
+      const ts = new Date().toISOString();
+      const up = await sb.from('datos').upsert({ user_id: user.id, contenido: S, actualizado: ts });
+      error = up.error;
+      if (!error) { remotoVer = ts; ls.del(DK); estado('Sincronizado'); reintentos = 0; }
+    } catch (e) { error = e; }
+    if (error) {
+      estado('Error al sincronizar: ' + String(error.message || error).slice(0, 80) + ' · reintentando');
+      if (reintentos < 6) { reintentos++; clearTimeout(timer); timer = setTimeout(subir, Math.min(30000, 2000 * reintentos * reintentos)); }
+    }
     subiendo = false;
     if (pendiente) { pendiente = false; subir(); }
   }
