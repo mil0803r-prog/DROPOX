@@ -91,6 +91,13 @@
     return `<div class="field" ${o.full ? 'style="grid-column:1/-1"' : ''}><label for="${id}">${esc(label)}</label>${inp}${o.hint ? `<div class="note">${o.hint}</div>` : ''}${o.up ? `<div style="margin-top:6px">${upBtn(path)}</div>` : ''}</div>`;
   };
 
+  // Enlace propio de cada producto: con el dominio de la tienda (el www si existe); sin dominio, la dirección de prueba
+  const urlProducto = (t, p) => {
+    const ds = (t.dominios || []).map(d => String(d).toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()).filter(Boolean);
+    const d = ds.find(x => x.startsWith('www.')) || ds[0];
+    return d ? { url: `https://${d}/${p.slug}`, dominio: true } : { url: `${location.origin}/t/${t.slug}/${p.slug}`, dominio: false };
+  };
+  const copiar = async txt => { try { await navigator.clipboard.writeText(txt); } catch (e) { const a = document.createElement('textarea'); a.value = txt; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); } catch (x) {} a.remove(); } toast('Enlace copiado'); };
   const TIPO = { producto: ['Producto', 'Página de producto completa'], landing: ['Landing', 'Título, imagen y botón'], codigo: ['Código', 'Tu propio HTML'] };
   const nuevoProducto = tipo => {
     const b = { creado: new Date().toISOString(), slug: 'producto-' + Date.now().toString(36).slice(-4), nombre: 'Producto nuevo', titulo: 'Producto nuevo', kicker: '', etiqueta: '', imagenes: [], precio: 0, tachado: 0, combo2: 0, categoria: '', rating: 0, resenas: 0, vendidos: 0, masVendido: false, nuevo: true, activo: true, tipo, bloques: [], faq: [], resenasLista: [] };
@@ -174,6 +181,10 @@
         <div class="field"><select id="tnProd" style="width:100%">${ps.map((q, i) => `<option value="${i}" ${i === pi ? 'selected' : ''}>${q.activo === false ? '⏸ ' : ''}[${TIPO[q.tipo || 'producto'][0]}] ${esc(q.nombre)}</option>`).join('')}</select></div>
         <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnPDup">Duplicar</button><button class="btn" id="tnPUp">↑</button><button class="btn" id="tnPDn">↓</button><button class="btn btn-del" id="tnPDel">Eliminar</button><button class="btn btn-del" id="tnPZero">Dejar todo en cero</button></div>${ps.length ? '' : '<p class="note">No hay productos. Pulsa «+ Producto nuevo» y elige el tipo de página.</p>'}`);
       if (!p) return head;
+      const lk = urlProducto(t, p);
+      const enlace = `<div class="card tn-url"><div class="tn-urlt"><small class="cap">Enlace de este producto</small><a href="${esc(lk.url)}" target="_blank" rel="noopener">${esc(lk.url)}</a></div>
+        <div class="tn-act"><a class="btn btn-sm btn-pri" href="${esc(lk.url)}" target="_blank" rel="noopener">Ver producto ↗</a><button type="button" class="btn btn-sm" data-copy="${esc(lk.url)}">Copiar enlace</button></div>
+        <div class="note">${lk.dominio ? 'Usa el dominio de tu tienda. Funciona cuando la tienda está publicada: pulsa <b>Publicar</b> después de cambios.' : 'Todavía no tienes dominio en esta tienda: este es el enlace de prueba. Agrega tu dominio en la pestaña <b>Dominios</b> y el enlace cambia solo.'}</div></div>`;
       const chk = (path, label) => `<div class="field"><label class="chk"><input type="checkbox" data-p="${path}" data-k="check" ${getP(T(), path) !== false ? 'checked' : ''}> ${esc(label)}</label></div>`;
       const imgs = p.imagenes || [];
       const SP = sec('previa', '📱 Vista previa en celular', 'Así se ve este producto · se actualiza al cambiar algo', `<div class="tn-phone"><div class="tn-notch"></div><iframe id="tnFrP" title="Vista previa del producto" sandbox="allow-scripts allow-same-origin"></iframe></div>${GUIA_SW}<div class="tn-act" style="justify-content:center"><button class="btn btn-sm" id="tnCelRef">Actualizar</button><button class="btn btn-sm" id="tnVer">Pantalla completa</button></div>`);
@@ -220,15 +231,15 @@
             else c = `<label>Texto del botón</label><input data-p="${b}.x" type="text" value="${esc(it.x)}"><label>Qué hace</label><select data-p="${b}.accion" style="width:100%"><option value="formulario" ${it.accion !== 'whatsapp' ? 'selected' : ''}>Abrir el formulario de pedido</option><option value="whatsapp" ${it.accion === 'whatsapp' ? 'selected' : ''}>Ir a WhatsApp</option></select>${it.accion === 'whatsapp' ? `<label>Número de WhatsApp (vacío = el de contacto)</label><input data-p="${b}.wa" type="text" value="${esc(it.wa)}" placeholder="50212345678"><label>Mensaje</label><input data-p="${b}.msg" type="text" value="${esc(it.msg)}" placeholder="Hola, quiero pedir…">` : ''}`;
             return `<div class="tn-ri tn-col"><span class="tn-tag">${et}</span>${c}</div>`;
           }, 'sec-titulo', [['sec-titulo', 'Título'], ['sec-imagen', 'Imagen'], ['sec-boton', 'Botón'], ['sec-texto', 'Texto']])}`);
-        return head + `<div class="tn-secs">${SP + S1 + S2.replace('2 · Fotos', '2 · Foto de portada').replace(' · la primera es la principal', ' · la primera sale en la portada de la tienda') + S3.replace('3 · Precio', '3 · Precio (para el formulario)') + SL}</div>`;
+        return head + enlace + `<div class="tn-secs">${SP + S1 + S2.replace('2 · Fotos', '2 · Foto de portada').replace(' · la primera es la principal', ' · la primera sale en la portada de la tienda') + S3.replace('3 · Precio', '3 · Precio (para el formulario)') + SL}</div>`;
       }
       if (tipo === 'codigo') {
         const SC = sec('codigo', '4 · Tu código', 'HTML, CSS y JS propios', `
           <p class="note" style="margin:0 0 8px">Pega aquí lo que te hagan o lo que te arme yo. Puedes usar: <code>{{nombre}}</code> <code>{{precio}}</code> <code>{{tachado}}</code> <code>{{precio2}}</code> <code>{{ahorro}}</code> <code>{{descuento}}</code>. Cualquier elemento con <code>data-abrir</code> abre el formulario de pedido; un enlace con <code>data-wa</code> va a WhatsApp.</p>
           ${f(base + 'html', 'HTML', { area: 1, rows: 14, full: 1 })}${f(base + 'css', 'CSS (opcional)', { area: 1, rows: 6, full: 1 })}${f(base + 'js', 'JavaScript (opcional)', { area: 1, rows: 5, full: 1 })}`);
-        return head + `<div class="tn-secs">${SP + S1 + S2.replace('2 · Fotos', '2 · Foto de portada') + S3.replace('3 · Precio', '3 · Precio (para el formulario)') + SC}</div>`;
+        return head + enlace + `<div class="tn-secs">${SP + S1 + S2.replace('2 · Fotos', '2 · Foto de portada') + S3.replace('3 · Precio', '3 · Precio (para el formulario)') + SC}</div>`;
       }
-      return head + `<div class="tn-secs">${SP + S1 + S2 + S3 + S4 + S5 + S6 + S7}</div>`;
+      return head + enlace + `<div class="tn-secs">${SP + S1 + S2 + S3 + S4 + S5 + S6 + S7}</div>`;
     },
     pedido(t) {
       return card('Envío y garantía', 'Lo que se muestra en la página del producto y en el pedido.', `${f('envio.gratis', 'Envío gratis', { check: 1 })}<div class="row">${f('envio.costo', 'Costo de envío si no es gratis', { type: 'number' })}${f('envio.productoDias', 'Llegada en el producto (ej. 2 a 5 días)')}</div>
@@ -416,6 +427,7 @@
       Store.save(); render();
     });
     el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => pedirArchivos(b.dataset.up, b.dataset.upmodo));
+    el.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copiar(b.dataset.copy));
     on('#tnCelRef', pintarCelular);
     const gs = q('#tnGuia'); if (gs) gs.onchange = () => guia(gs.checked);
     on('#tnVer', () => { pagPrev = (T().productos[pi] || {}).slug || ''; tab = 'previa'; render(); scrollTo(0, 0); });
