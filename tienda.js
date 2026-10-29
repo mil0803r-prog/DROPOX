@@ -53,10 +53,51 @@
     if (nuevos) setTimeout(() => { try { Store.save(); } catch (e) {} }, 0);
   }
 
+
+  // ───────── Que ningún producto se pierda ─────────
+  // Cada producto se identifica por slug + fecha de creación. Al sincronizar con la nube se UNEN los productos de ambos lados
+  // (nunca se reemplaza uno por otro); los borrados se anotan en `borrados` para que no vuelvan.
+  const clave = q => (q.slug || '') + '|' + (q.creado || '');
+  function fusionar(dest, src) {
+    if (!dest || !src || !Array.isArray(src.tiendas)) return false;
+    if (!Array.isArray(dest.tiendas)) dest.tiendas = [];
+    let cambio = false;
+    const tb = [...new Set([...(dest.tiendasBorradas || []), ...(src.tiendasBorradas || [])])];
+    if (tb.length) dest.tiendasBorradas = tb;
+    src.tiendas.forEach(b => {
+      if (tb.includes(b.slug)) return;
+      const a = dest.tiendas.find(x => x.slug === b.slug);
+      if (!a) { dest.tiendas.push(JSON.parse(JSON.stringify(b))); cambio = true; return; }
+      const bor = Object.assign({}, b.borrados, a.borrados); if (Object.keys(bor).length) a.borrados = bor;
+      a.productos = a.productos || [];
+      const n0 = a.productos.length;
+      a.productos = a.productos.filter(q => !bor[clave(q)]);
+      if (a.productos.length !== n0) cambio = true;
+      const hay = new Set(a.productos.map(clave));
+      (b.productos || []).forEach(q => { const k = clave(q); if (!hay.has(k) && !bor[k]) { a.productos.push(JSON.parse(JSON.stringify(q))); hay.add(k); cambio = true; } });
+    });
+    return cambio;
+  }
+  const borrar = (t, q) => { t.borrados = t.borrados || {}; t.borrados[clave(q)] = new Date().toISOString(); };
+  // Copia de respaldo en el navegador (IndexedDB): aguanta mucho más que localStorage
+  const Resp = (() => {
+    let db = null, tm = null;
+    const abrir = () => db ? Promise.resolve(db) : new Promise((ok, no) => { try { const r = indexedDB.open('dropox-respaldo', 1); r.onupgradeneeded = () => r.result.createObjectStore('r'); r.onsuccess = () => { db = r.result; ok(db); }; r.onerror = () => no(r.error); } catch (e) { no(e); } });
+    const guardar = () => { clearTimeout(tm); tm = setTimeout(() => { abrir().then(d => d.transaction('r', 'readwrite').objectStore('r').put(JSON.stringify({ tiendas: S.tiendas, tiendasBorradas: S.tiendasBorradas || [] }), 'tiendas')).catch(() => {}); }, 400); };
+    const leer = () => abrir().then(d => new Promise(ok => { const r = d.transaction('r').objectStore('r').get('tiendas'); r.onsuccess = () => { try { ok(JSON.parse(r.result)); } catch (e) { ok(null); } }; r.onerror = () => ok(null); })).catch(() => null);
+    return { guardar, leer };
+  })();
+  let restaurado = false;
+  function restaurar() {
+    if (restaurado) return; restaurado = true;
+    Resp.leer().then(b => { if (b && fusionar(S, b)) { Store.save(); if (/^#tienda/.test(location.hash)) render(); toast('Se recuperaron productos de la copia de respaldo'); } });
+  }
+  addEventListener('dropox:listo', () => { restaurado = false; restaurar(); });
+
   function asegurar() {
     if (!Array.isArray(S.tiendas) || !S.tiendas.length) S.tiendas = [clon(window.TIENDA_BASE)];
     if (ti >= S.tiendas.length) ti = 0;
-    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar);
+    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); restaurar();
     const t = S.tiendas[ti];
     if (pi >= (t.productos || []).length) pi = 0;
     return t;
@@ -277,7 +318,7 @@
     },
     lista(t) {
       const ps = t.productos || [];
-      let h = card('Mis productos', ps.length ? ps.length + (ps.length === 1 ? ' producto' : ' productos') + ' · cada uno tiene su propia página y enlace.' : 'Todavía no hay productos.', `
+      let h = card('Mis productos', ps.length ? ps.length + (ps.length === 1 ? ' producto' : ' productos') + ' · cada uno tiene su propia página y enlace.' + (window.Nube && Nube.estado ? ' · ☁ ' + Nube.estado : '') : 'Todavía no hay productos.', `
         <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnImpUrl">⬇ Importar landing desde URL</button>${ps.length ? '<button class="btn btn-del" id="tnPZero">Dejar todo en cero</button>' : ''}</div>${ps.length ? '' : '<p class="note">Pulsa «+ Producto nuevo» y elige el tipo de página (producto, landing, código o la plantilla lista).</p>'}`);
       h += ps.map((q, i) => { const x = R().precios(t, q), lk = urlProducto(t, q); return `<div class="card tn-row">
         <div class="tn-rowi">${thumb((q.imagenes || [])[0])}<div class="tn-rowt"><b>${esc(q.nombre || 'Sin nombre')}</b><small>${TIPO[q.tipo || 'producto'][0]} · ${R().q(t, x.pr)}${x.c2 ? ' · 2 por ' + R().q(t, x.c2) : ''} · ${q.activo === false ? 'Oculto' : 'Visible'}${q.creado ? ' · ' + fechaCorta(q.creado) : ''}</small></div></div>
@@ -677,7 +718,7 @@
     on('#tnPub', () => publicar(true)); on('#tnPub2', () => publicar(true)); on('#tnDes', () => publicar(false));
     const sel = q('#tnSel'); if (sel) sel.onchange = () => { ti = +sel.value; pi = 0; lista = null; render(); };
     on('#tnDup', () => { const c = clon(T()); c.nombre += ' (copia)'; c.slug = slugify(c.slug + '-copia'); c.dominios = []; S.tiendas.push(c); ti = S.tiendas.length - 1; pi = 0; Store.save(); render(); toast('Tienda duplicada. Cambia su dirección y dominios.'); });
-    on('#tnDel', () => { if (S.tiendas.length < 2) return toast('Debe quedar al menos una tienda'); ask('Se elimina «' + T().nombre + '» de DROPOX (la publicada sigue en línea hasta despublicarla). ¿Continuar?', () => { S.tiendas.splice(ti, 1); ti = 0; pi = 0; Store.save(); render(); }, 'Eliminar'); });
+    on('#tnDel', () => { if (S.tiendas.length < 2) return toast('Debe quedar al menos una tienda'); ask('Se elimina «' + T().nombre + '» de DROPOX (la publicada sigue en línea hasta despublicarla). ¿Continuar?', () => { S.tiendasBorradas = [...(S.tiendasBorradas || []), T().slug]; S.tiendas.splice(ti, 1); ti = 0; pi = 0; Store.save(); render(); }, 'Eliminar'); });
     on('#tnExp', () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(T(), null, 1)], { type: 'application/json' })); a.download = 'tienda-' + T().slug + '.json'; a.click(); });
     on('#tnImp', () => q('#tnImpF').click());
     const imp = q('#tnImpF'); if (imp) imp.onchange = () => { const fl = imp.files[0]; if (!fl) return; fl.text().then(x => { try { const c = JSON.parse(x); if (!c.productos || !c.marca) throw 0; c.slug = slugify(c.slug || c.nombre) || 'tienda'; S.tiendas.push(c); ti = S.tiendas.length - 1; pi = 0; Store.save(); render(); toast('Tienda importada'); } catch (e) { toast('Archivo no válido'); } }); };
@@ -716,11 +757,11 @@
     on('#tnBack', () => { tab = 'lista'; render(); scrollTo(0, 0); });
     el.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { pi = +b.dataset.edit; tab = 'productos'; render(); scrollTo(0, 0); });
     el.querySelectorAll('[data-dup]').forEach(b => b.onclick = () => { const i = +b.dataset.dup, c = clon(arr()[i]), base = c.slug.replace(/-\d+$/, ''), usados = arr().map(z => z.slug); let n = 2; while (usados.includes(base + '-' + n)) n++; c.slug = base + '-' + n; c.nombre += ' (copia)'; c.creado = new Date().toISOString(); arr().splice(i + 1, 0, c); Store.save(); render(); toast('Producto duplicado'); });
-    el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const i = +b.dataset.del, q = arr()[i]; if (q) ask('¿Eliminar «' + q.nombre + '»? Esta acción no se puede deshacer.', () => { arr().splice(i, 1); Store.save(); render(); toast('Producto eliminado'); }, 'Eliminar'); });
+    el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const i = +b.dataset.del, q = arr()[i]; if (q) ask('¿Eliminar «' + q.nombre + '»? Esta acción no se puede deshacer.', () => { borrar(T(), q); arr().splice(i, 1); Store.save(); render(); toast('Producto eliminado'); }, 'Eliminar'); });
     el.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { const [i, d] = b.dataset.mv.split(':').map(Number), j = i + d; if (j < 0 || j >= arr().length) return; [arr()[i], arr()[j]] = [arr()[j], arr()[i]]; Store.save(); render(); });
     on('#tnPDn', () => { if (pi < arr().length - 1) { [arr()[pi + 1], arr()[pi]] = [arr()[pi], arr()[pi + 1]]; pi++; Store.save(); render(); } });
-    on('#tnPZero', () => ask('Se borran TODOS los productos de «' + T().nombre + '» (' + arr().length + '). La tienda publicada no cambia hasta que pulses Publicar. ¿Dejar todo en cero?', () => { T().productos = []; pi = 0; Store.save(); render(); toast('Productos en cero'); }, 'Borrar todos'));
-    on('#tnPDel', () => { const p = arr()[pi]; if (p) ask('¿Eliminar «' + p.nombre + '»? Esta acción no se puede deshacer.', () => { arr().splice(pi, 1); pi = 0; tab = 'lista'; Store.save(); render(); scrollTo(0, 0); toast('Producto eliminado'); }, 'Eliminar'); });
+    on('#tnPZero', () => ask('Se borran TODOS los productos de «' + T().nombre + '» (' + arr().length + '). La tienda publicada no cambia hasta que pulses Publicar. ¿Dejar todo en cero?', () => { arr().forEach(z => borrar(T(), z)); T().productos = []; pi = 0; Store.save(); render(); toast('Productos en cero'); }, 'Borrar todos'));
+    on('#tnPDel', () => { const p = arr()[pi]; if (p) ask('¿Eliminar «' + p.nombre + '»? Esta acción no se puede deshacer.', () => { borrar(T(), p); arr().splice(pi, 1); pi = 0; tab = 'lista'; Store.save(); render(); scrollTo(0, 0); toast('Producto eliminado'); }, 'Eliminar'); });
     on('#tnRef', () => { lista = null; render(); });
     el.querySelectorAll('[data-pasar]').forEach(b => b.onclick = () => pasar(b.dataset.pasar));
     const pg = q('#tnPg'); if (pg) pg.onchange = () => { pagPrev = pg.value; pintarPrevia(); };
@@ -732,6 +773,6 @@
   ['marca', 'portada', 'textos'].forEach(k => { const o = pantalla[k]; pantalla[k] = t => fonoHome() + o(t); });
   // Tocar «Mis productos» en el menú siempre lleva a la lista (aunque estés editando uno)
   const mt = document.getElementById('tabs'); if (mt) mt.addEventListener('click', e => { const l = e.target.closest && e.target.closest('a[data-v="tiendaprod"]'); if (l) tab = 'lista'; });
-  if (!Store.__tn) { const o = Store.save; Store.save = function () { const r = o.apply(this, arguments); try { if (/^#tienda/.test(location.hash) && !publicando) cambio(); } catch (e) {} return r; }; Store.__tn = true; }
-  window.Tienda = { vista, ir, guia };
+  if (!Store.__tn) { const o = Store.save; Store.save = function () { const r = o.apply(this, arguments); try { Resp.guardar(); } catch (e) {} try { if (/^#tienda/.test(location.hash) && !publicando) cambio(); } catch (e) {} return r; }; Store.__tn = true; }
+  window.Tienda = { vista, ir, guia, fusionar };
 })();
