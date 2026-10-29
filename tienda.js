@@ -6,6 +6,10 @@
   // Tres zonas: Ajustes (Landing / Tienda), Página principal y Mis productos (lista y editor de cada producto)
   const TABS_AJ = [['resumen', 'Resumen'], ['pedido', 'Oferta y envío'], ['rastreo', 'Pixeles y contacto'], ['dominios', 'Dominios'], ['pedidos', 'Pedidos'], ['previa', 'Vista previa']];
   const TABS_HOME = [['marca', 'Marca y diseño'], ['portada', 'Portada'], ['textos', 'Textos y políticas']];
+  const HASH = { ajustes: 'tienda', home: 'tiendahome', lista: 'tiendaprod' }, INICIO = { ajustes: 'resumen', home: 'marca', lista: 'lista' };
+  let zonaVista = 'ajustes';
+  // Cambia de pestaña; si esa pestaña es de otra sección del menú, navega a esa sección
+  const irTab = k => { tab = k; const z = grupoDe(k); if (z !== zonaVista) { go(HASH[z]); } else render(); scrollTo(0, 0); };
   const grupoDe = k => (TABS_HOME.some(x => x[0] === k) ? 'home' : (k === 'lista' || k === 'productos') ? 'lista' : 'ajustes');
   const TITULOS = { ajustes: ['Landing / Tienda', 'Ajustes de tu tienda: oferta y envío, pixeles, dominios y pedidos.'], home: ['Página principal', 'El inicio de tu tienda: marca, portada y textos. Aquí no se editan los productos.'], lista: ['Mis productos', 'Todos los productos de tu tienda. Edita, duplica, mira o elimina cada uno.'] };
   let tab = 'resumen', ti = 0, pi = 0, pagPrev = '', anchoPrev = 420, lista = null, errLista = '';
@@ -413,9 +417,9 @@
   }
   function ir(spec) {
     const [k, sec, campo] = String(spec).split(':');
-    if (k === 'v') { const i = T().productos.findIndex(q => q.slug === sec); if (i >= 0) { pi = i; tab = 'productos'; render(); scrollTo(0, 0); } return; }
-    if (k === 'g') { tab = sec; render(); setTimeout(() => enfocar(campo), 80); return; }
-    if (tab === 'previa') { const i = T().productos.findIndex(q => q.slug === pagPrev); if (i >= 0) pi = i; tab = 'productos'; abiertas.add(sec); render(); setTimeout(() => enfocar('productos.' + pi + '.' + campo), 100); return; }
+    if (k === 'v') { const i = T().productos.findIndex(q => q.slug === sec); if (i >= 0) { pi = i; irTab('productos'); } return; }
+    if (k === 'g') { irTab(sec); setTimeout(() => enfocar(campo), 120); return; }
+    if (tab === 'previa') { const i = T().productos.findIndex(q => q.slug === pagPrev); if (i >= 0) pi = i; abiertas.add(sec); irTab('productos'); setTimeout(() => enfocar('productos.' + pi + '.' + campo), 140); return; }
     abiertas.add(sec);
     const d = document.querySelector('[data-sec="' + sec + '"]');
     if (d && !d.open) d.open = true;
@@ -481,8 +485,9 @@
   }
 
   // ───────── Vista ─────────
-  function vista(el) {
+  function vista(el, zona) {
     const t = asegurar();
+    if (zona) { zonaVista = zona; if (grupoDe(tab) !== zona) tab = INICIO[zona]; }
     if (!R()) { el.innerHTML = secH('tienda', 'Landing / Tienda', 'No se cargó el motor de la tienda.'); return; }
     if (tab === 'productos' && !(t.productos || [])[pi]) tab = 'lista';
     const g = grupoDe(tab), tabs = g === 'home' ? TABS_HOME : g === 'ajustes' ? TABS_AJ : null;
@@ -551,7 +556,7 @@
     const au = q('#tnAuto'); if (au) au.onchange = () => { T().autoPublicar = au.checked; Store.save(); if (au.checked) { sucio = true; clearTimeout(tmrAuto); tmrAuto = setTimeout(() => publicar(true), 600); toast('Guardado automático activado: tus cambios se publican solos'); } else toast('Guardado automático apagado: publica con el botón'); pintarEstado(); };
     on('#tnCelRef', pintarCelular);
     const gs = q('#tnGuia'); if (gs) gs.onchange = () => guia(gs.checked);
-    on('#tnVer', () => { pagPrev = (T().productos[pi] || {}).slug || ''; tab = 'previa'; render(); scrollTo(0, 0); });
+    on('#tnVer', () => { pagPrev = (T().productos[pi] || {}).slug || ''; irTab('previa'); });
     const ps = q('#tnProd'); if (ps) ps.onchange = () => { pi = +ps.value; render(); };
     const arr = () => T().productos;
     on('#tnPNew', () => elegirTipo(tp => { arr().push(tp.startsWith('plantilla-') ? desdePlantilla(tp.slice(10)) : nuevoProducto(tp)); pi = arr().length - 1; tab = 'productos'; abiertas.add('basico'); Store.save(); render(); scrollTo(0, 0); }));
@@ -573,10 +578,8 @@
   // Subsecciones del menú: cada producto creado queda listado debajo de «Landing / Tienda»
   const fechaCorta = iso => { try { return new Date(iso).toLocaleDateString('es', { day: 'numeric', month: 'short' }); } catch (e) { return ''; } };
   ['marca', 'portada', 'textos'].forEach(k => { const o = pantalla[k]; pantalla[k] = t => fonoHome() + o(t); });
-  // Menú: dos subsecciones bajo «Landing / Tienda»
-  const subitems = () => { try { const n = (asegurar().productos || []).length; return [{ id: 'home', nombre: 'Página principal', detalle: 'Inicio de la tienda' }, { id: 'lista', nombre: 'Mis productos', detalle: n + (n === 1 ? ' producto' : ' productos') }]; } catch (e) { return []; } };
-  const actual = () => { const g = grupoDe(tab); return g === 'ajustes' ? '' : g; };
-  const abrir = id => { tab = id === 'home' ? 'marca' : 'lista'; };
+  // Tocar «Mis productos» en el menú siempre lleva a la lista (aunque estés editando uno)
+  const mt = document.getElementById('tabs'); if (mt) mt.addEventListener('click', e => { const l = e.target.closest && e.target.closest('a[data-v="tiendaprod"]'); if (l) tab = 'lista'; });
   if (!Store.__tn) { const o = Store.save; Store.save = function () { const r = o.apply(this, arguments); try { if (/^#tienda/.test(location.hash) && !publicando) cambio(); } catch (e) {} return r; }; Store.__tn = true; }
-  window.Tienda = { vista, ir, guia, subitems, actual, abrir };
+  window.Tienda = { vista, ir, guia };
 })();
