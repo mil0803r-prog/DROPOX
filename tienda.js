@@ -64,6 +64,7 @@
     d.showModal();
   }
   const abiertas = new Set(['previa', 'basico']);
+  const GUIA_SW = `<label class="chk tn-guia"><input type="checkbox" id="tnGuia" ${window.__tnGuia !== false ? 'checked' : ''}> Guía: tocar una parte para editarla</label>`;
   const sec = (k, titulo, sub, body) => `<details class="tn-sec" data-sec="${k}" ${abiertas.has(k) ? 'open' : ''}><summary><b>${titulo}</b><small>${esc(sub || '')}</small></summary><div class="tn-secb">${body}</div></details>`;
   const thumb = u => /^https:\/\//.test(u || '') ? `<img class="tn-th" src="${esc(u)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : '<div class="tn-th tn-nth">sin foto</div>';
   const FACT = { 'sec-titulo': () => ({ tipo: 'titulo', x: '' }), 'sec-texto': () => ({ tipo: 'texto', x: '' }), 'sec-imagen': () => ({ tipo: 'imagen', img: '' }), 'sec-boton': () => ({ tipo: 'boton', x: 'Quiero el mío', accion: 'formulario', wa: '', msg: '' }), imagen: () => '', bloque: () => ({ t: '', x: '', img: '' }), resena: () => ({ n: '', c: '', e: 5, t: '' }), faq: () => ['', ''] };
@@ -127,7 +128,7 @@
       if (!p) return head;
       const chk = (path, label) => `<div class="field"><label class="chk"><input type="checkbox" data-p="${path}" data-k="check" ${getP(T(), path) !== false ? 'checked' : ''}> ${esc(label)}</label></div>`;
       const imgs = p.imagenes || [];
-      const SP = sec('previa', '📱 Vista previa en celular', 'Así se ve este producto · se actualiza al cambiar algo', `<div class="tn-phone"><div class="tn-notch"></div><iframe id="tnFrP" title="Vista previa del producto" sandbox="allow-scripts allow-same-origin"></iframe></div><div class="tn-act" style="justify-content:center"><button class="btn btn-sm" id="tnCelRef">Actualizar</button><button class="btn btn-sm" id="tnVer">Pantalla completa</button></div>`);
+      const SP = sec('previa', '📱 Vista previa en celular', 'Así se ve este producto · se actualiza al cambiar algo', `<div class="tn-phone"><div class="tn-notch"></div><iframe id="tnFrP" title="Vista previa del producto" sandbox="allow-scripts allow-same-origin"></iframe></div>${GUIA_SW}<div class="tn-act" style="justify-content:center"><button class="btn btn-sm" id="tnCelRef">Actualizar</button><button class="btn btn-sm" id="tnVer">Pantalla completa</button></div>`);
       const tipoSel = `<div class="field"><label>Tipo de página</label><select data-p="${base}tipo" style="width:100%">${Object.entries(TIPO).map(([k, v]) => `<option value="${k}" ${(p.tipo || 'producto') === k ? 'selected' : ''}>${v[0]} — ${v[1]}</option>`).join('')}</select></div>`;
       const S1 = sec('basico', '1 · Datos básicos', 'Nombre, dirección, tipo de página', `
         ${tipoSel}${f(base + 'activo', 'Visible en la tienda', { check: 1 })}
@@ -214,7 +215,7 @@
       const ps = R().activos(t);
       return card('Vista previa', 'Así se ve en el celular. Los cambios se reflejan al instante.', `<div class="tn-act"><select id="tnPg" style="width:auto"><option value="">Portada</option>${ps.map(p => `<option value="${esc(p.slug)}" ${p.slug === pagPrev ? 'selected' : ''}>${esc(p.nombre)}</option>`).join('')}</select>
         <div class="seg"><button data-w="420" class="${anchoPrev === 420 ? 'on' : ''}">Celular</button><button data-w="820" class="${anchoPrev === 820 ? 'on' : ''}">Pantalla</button></div></div>
-        <div class="tn-fr"><iframe id="tnFr" style="width:${anchoPrev}px;max-width:100%" title="Vista previa" sandbox="allow-scripts allow-same-origin"></iframe></div>`);
+        ${GUIA_SW}<div class="tn-fr"><iframe id="tnFr" style="width:${anchoPrev}px;max-width:100%" title="Vista previa" sandbox="allow-scripts allow-same-origin"></iframe></div>`);
     },
   };
 
@@ -239,6 +240,30 @@
     if (!R().slugOk(p.slug)) { fr.srcdoc = '<body style="font-family:system-ui;padding:30px;text-align:center">La dirección (slug) no es válida: usa minúsculas, números y guiones.</body>'; return; }
     fr.onload = () => { try { const w = fr.contentWindow; w.scrollTo(0, scrollCel); w.addEventListener('scroll', () => { scrollCel = w.scrollY; }, { passive: true }); fr.contentDocument.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (a && /^\//.test(a.getAttribute('href'))) e.preventDefault(); }); } catch (x) {} };
     fr.srcdoc = R().renderizar(t2, p.slug, { base: '', preview: true, slugTienda: t.slug }).html;
+  }
+
+
+  // Guía de toque: desde la vista previa se salta a la sección y al campo que controla esa parte
+  function enfocar(path) {
+    let el = document.querySelector('[data-p="' + path + '"]');
+    if (!el) { const m = path.match(/^(productos\.\d+\.[a-zA-Z0-9]+)/); if (m) el = document.querySelector('[data-p^="' + m[1] + '"]'); }
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    try { el.focus({ preventScroll: true }); } catch (e) {}
+    const caja = el.closest('.field, .tn-item') || el; caja.classList.add('tn-flash'); setTimeout(() => caja.classList.remove('tn-flash'), 1700);
+  }
+  function ir(spec) {
+    const [k, sec, campo] = String(spec).split(':');
+    if (k === 'g') { tab = sec; render(); setTimeout(() => enfocar(campo), 80); return; }
+    if (tab === 'previa') { const i = T().productos.findIndex(q => q.slug === pagPrev); if (i >= 0) pi = i; tab = 'productos'; abiertas.add(sec); render(); setTimeout(() => enfocar('productos.' + pi + '.' + campo), 100); return; }
+    abiertas.add(sec);
+    const d = document.querySelector('[data-sec="' + sec + '"]');
+    if (d && !d.open) d.open = true;
+    setTimeout(() => enfocar('productos.' + pi + '.' + campo), 60);
+  }
+  function guia(on) {
+    window.__tnGuia = on;
+    document.querySelectorAll('iframe').forEach(f => { try { f.contentDocument.documentElement.classList.toggle('guia', on); } catch (e) {} });
   }
 
   // ───────── Nube ─────────
@@ -322,6 +347,7 @@
       Store.save(); render();
     });
     on('#tnCelRef', pintarCelular);
+    const gs = q('#tnGuia'); if (gs) gs.onchange = () => guia(gs.checked);
     on('#tnVer', () => { pagPrev = (T().productos[pi] || {}).slug || ''; tab = 'previa'; render(); scrollTo(0, 0); });
     const ps = q('#tnProd'); if (ps) ps.onchange = () => { pi = +ps.value; render(); };
     const arr = () => T().productos;
@@ -336,5 +362,5 @@
     el.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { anchoPrev = +b.dataset.w; render(); });
   }
 
-  window.Tienda = { vista };
+  window.Tienda = { vista, ir, guia };
 })();
