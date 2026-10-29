@@ -230,18 +230,27 @@
 
   // Vista previa en celular del producto que se está editando (se repinta con cada cambio y conserva el scroll)
   let scrollCel = 0, slugCel = '';
-  function pintarCelular() {
+  let htmlCel = '', tmrCel = 0;
+  const pintarCelularYa = () => {
+    clearTimeout(tmrCel);
     const fr = document.getElementById('tnFrP'), d = document.querySelector('[data-sec=previa]');
     if (!fr || !d || !d.open) return;
     const t = T(), p = (t.productos || [])[pi];
     if (!p) return;
-    if (p.slug !== slugCel) { scrollCel = 0; slugCel = p.slug; }
-    const t2 = Object.assign({}, t, { productos: t.productos.map((q, i) => (i === pi ? Object.assign({}, q, { activo: true }) : q)) });
-    if (!R().slugOk(p.slug)) { fr.srcdoc = '<body style="font-family:system-ui;padding:30px;text-align:center">La dirección (slug) no es válida: usa minúsculas, números y guiones.</body>'; return; }
+    if (p.slug !== slugCel) { scrollCel = 0; slugCel = p.slug; htmlCel = ''; }
+    let html;
+    if (!R().slugOk(p.slug)) html = '<body style="font-family:system-ui;padding:30px;text-align:center">La dirección (slug) no es válida: usa minúsculas, números y guiones.</body>';
+    else {
+      const t2 = Object.assign({}, t, { productos: t.productos.map((q, i) => (i === pi ? Object.assign({}, q, { activo: true }) : q)) });
+      html = R().renderizar(t2, p.slug, { base: '', preview: true, slugTienda: t.slug }).html;
+    }
+    if (html === htmlCel && fr.srcdoc) return; // nada cambió: no se recarga el celular
+    htmlCel = html;
     fr.onload = () => { try { const w = fr.contentWindow; w.scrollTo(0, scrollCel); w.addEventListener('scroll', () => { scrollCel = w.scrollY; }, { passive: true }); fr.contentDocument.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (a && /^\//.test(a.getAttribute('href'))) e.preventDefault(); }); } catch (x) {} };
-    fr.srcdoc = R().renderizar(t2, p.slug, { base: '', preview: true, slugTienda: t.slug }).html;
-  }
-
+    fr.srcdoc = html;
+  };
+  // pintar: de inmediato al abrir; con una pequeña pausa mientras se escribe
+  const pintarCelular = (ya = true) => { if (ya) { pintarCelularYa(); return; } clearTimeout(tmrCel); tmrCel = setTimeout(pintarCelularYa, 450); };
 
   // Guía de toque: desde la vista previa se salta a la sección y al campo que controla esa parte
   function enfocar(path) {
@@ -324,11 +333,19 @@
     const q = s => el.querySelector(s), on = (s, fn) => { const b = q(s); if (b) b.onclick = fn; };
     el.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; if (tab === 'pedidos') lista = null; render(); scrollTo(0, 0); });
     let tmr;
-    el.querySelectorAll('[data-p]').forEach(i => i.onchange = () => {
-      const t = T(), k = i.dataset.k, v = k === 'check' ? i.checked : k === 'num' ? num(i.value) : KIND[k] ? KIND[k].inn(i.value) : i.value;
-      if (/(^|\.)slug$/.test(i.dataset.p)) { i.value = slugify(i.value) || 'producto'; setP(t, i.dataset.p, i.value); }
-      else setP(t, i.dataset.p, v);
-      Store.save(); clearTimeout(tmr); tmr = setTimeout(() => { if (tab === 'productos' || tab === 'marca') render(); }, 0);
+    // Solo se reconstruye el panel cuando el cambio altera otras partes (precio, tipo, fotos, nombre…); el resto solo actualiza el celular
+    const ESTRUCT = /(^|\.)(tipo|accion|nombre|slug|activo|precio|tachado|combo2|imagenes(\.\d+)?|img)$/;
+    const valor = i => { const k = i.dataset.k; return k === 'check' ? i.checked : k === 'num' ? num(i.value) : KIND[k] ? KIND[k].inn(i.value) : i.value; };
+    el.querySelectorAll('[data-p]').forEach(i => {
+      if (i.tagName === 'INPUT' && i.type === 'text' || i.tagName === 'TEXTAREA') i.oninput = () => { const k = i.dataset.k; if (k || /(^|\.)slug$/.test(i.dataset.p)) return; setP(T(), i.dataset.p, i.value); if (tab === 'productos') pintarCelular(false); };
+      i.onchange = () => {
+        const t = T();
+        if (/(^|\.)slug$/.test(i.dataset.p)) { i.value = slugify(i.value) || 'producto'; setP(t, i.dataset.p, i.value); }
+        else setP(t, i.dataset.p, valor(i));
+        Store.save();
+        if (ESTRUCT.test(i.dataset.p)) render();
+        else if (tab === 'productos') pintarCelular(false);
+      };
     });
     el.querySelectorAll('[data-pre]').forEach(b => b.onclick = () => { Object.assign(T().diseno, R().PRESETS[b.dataset.pre], { preset: b.dataset.pre }); Store.save(); render(); toast('Estilo aplicado'); });
     on('#tnPub', () => publicar(true)); on('#tnPub2', () => publicar(true)); on('#tnDes', () => publicar(false));
