@@ -241,7 +241,19 @@ const Nube = (() => {
   }
 
   const token = async () => { const { data } = await sb.auth.getSession(); return data.session ? data.session.access_token : null; };
-  Object.assign(N, { push, cardHtml, bind, init, token });
+  // Diagnóstico y recuperación (los usa «Recuperar productos» en Mis productos)
+  async function leerNube() {
+    if (!sb || !user) return { error: 'Sin sesión en la nube' };
+    const r = await sb.from('datos').select('contenido,actualizado').eq('user_id', user.id).maybeSingle();
+    return r.error ? { error: r.error.message } : { contenido: r.data ? r.data.contenido : null };
+  }
+  async function subirYa() {
+    if (!N.activo || !sincronizado) return 'Sin conexión con tu cuenta';
+    clearTimeout(timer); timer = null; reintentos = 0;
+    await subir();
+    return ls.get(DK) === '1' ? N.estado : '';
+  }
+  Object.assign(N, { push, cardHtml, bind, init, token, leerNube, subirYa });
   return N;
 })();
 window.Nube = Nube;
