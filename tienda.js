@@ -63,7 +63,7 @@
     $('#tpNo').onclick = () => d.close();
     d.showModal();
   }
-  const abiertas = new Set(['basico']);
+  const abiertas = new Set(['previa', 'basico']);
   const sec = (k, titulo, sub, body) => `<details class="tn-sec" data-sec="${k}" ${abiertas.has(k) ? 'open' : ''}><summary><b>${titulo}</b><small>${esc(sub || '')}</small></summary><div class="tn-secb">${body}</div></details>`;
   const thumb = u => /^https:\/\//.test(u || '') ? `<img class="tn-th" src="${esc(u)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : '<div class="tn-th tn-nth">sin foto</div>';
   const FACT = { 'sec-titulo': () => ({ tipo: 'titulo', x: '' }), 'sec-texto': () => ({ tipo: 'texto', x: '' }), 'sec-imagen': () => ({ tipo: 'imagen', img: '' }), 'sec-boton': () => ({ tipo: 'boton', x: 'Quiero el mío', accion: 'formulario', wa: '', msg: '' }), imagen: () => '', bloque: () => ({ t: '', x: '', img: '' }), resena: () => ({ n: '', c: '', e: 5, t: '' }), faq: () => ['', ''] };
@@ -123,10 +123,11 @@
       const x = p ? R().precios(t, p) : null;
       const head = card('Productos', 'Elige un producto y edítalo sección por sección. Cada uno tiene su página: tudominio.com/<dirección>.', `
         <div class="field"><select id="tnProd" style="width:100%">${ps.map((q, i) => `<option value="${i}" ${i === pi ? 'selected' : ''}>${q.activo === false ? '⏸ ' : ''}[${TIPO[q.tipo || 'producto'][0]}] ${esc(q.nombre)}</option>`).join('')}</select></div>
-        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnPDup">Duplicar</button><button class="btn" id="tnPUp">↑</button><button class="btn" id="tnPDn">↓</button><button class="btn btn-del" id="tnPDel">Eliminar</button>${p ? `<button class="btn" id="tnVer">Ver cómo queda</button>` : ''}</div>`);
+        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnPDup">Duplicar</button><button class="btn" id="tnPUp">↑</button><button class="btn" id="tnPDn">↓</button><button class="btn btn-del" id="tnPDel">Eliminar</button></div>`);
       if (!p) return head;
       const chk = (path, label) => `<div class="field"><label class="chk"><input type="checkbox" data-p="${path}" data-k="check" ${getP(T(), path) !== false ? 'checked' : ''}> ${esc(label)}</label></div>`;
       const imgs = p.imagenes || [];
+      const SP = sec('previa', '📱 Vista previa en celular', 'Así se ve este producto · se actualiza al cambiar algo', `<div class="tn-phone"><div class="tn-notch"></div><iframe id="tnFrP" title="Vista previa del producto" sandbox="allow-scripts allow-same-origin"></iframe></div><div class="tn-act" style="justify-content:center"><button class="btn btn-sm" id="tnCelRef">Actualizar</button><button class="btn btn-sm" id="tnVer">Pantalla completa</button></div>`);
       const tipoSel = `<div class="field"><label>Tipo de página</label><select data-p="${base}tipo" style="width:100%">${Object.entries(TIPO).map(([k, v]) => `<option value="${k}" ${(p.tipo || 'producto') === k ? 'selected' : ''}>${v[0]} — ${v[1]}</option>`).join('')}</select></div>`;
       const S1 = sec('basico', '1 · Datos básicos', 'Nombre, dirección, tipo de página', `
         ${tipoSel}${f(base + 'activo', 'Visible en la tienda', { check: 1 })}
@@ -169,15 +170,15 @@
             else c = `<label>Texto del botón</label><input data-p="${b}.x" type="text" value="${esc(it.x)}"><label>Qué hace</label><select data-p="${b}.accion" style="width:100%"><option value="formulario" ${it.accion !== 'whatsapp' ? 'selected' : ''}>Abrir el formulario de pedido</option><option value="whatsapp" ${it.accion === 'whatsapp' ? 'selected' : ''}>Ir a WhatsApp</option></select>${it.accion === 'whatsapp' ? `<label>Número de WhatsApp (vacío = el de contacto)</label><input data-p="${b}.wa" type="text" value="${esc(it.wa)}" placeholder="50212345678"><label>Mensaje</label><input data-p="${b}.msg" type="text" value="${esc(it.msg)}" placeholder="Hola, quiero pedir…">` : ''}`;
             return `<div class="tn-ri tn-col"><span class="tn-tag">${et}</span>${c}</div>`;
           }, 'sec-titulo', [['sec-titulo', 'Título'], ['sec-imagen', 'Imagen'], ['sec-boton', 'Botón'], ['sec-texto', 'Texto']])}`);
-        return head + `<div class="tn-secs">${S1 + S2.replace('2 · Fotos', '2 · Foto de portada').replace(' · la primera es la principal', ' · la primera sale en la portada de la tienda') + S3.replace('3 · Precio', '3 · Precio (para el formulario)') + SL}</div>`;
+        return head + `<div class="tn-secs">${SP + S1 + S2.replace('2 · Fotos', '2 · Foto de portada').replace(' · la primera es la principal', ' · la primera sale en la portada de la tienda') + S3.replace('3 · Precio', '3 · Precio (para el formulario)') + SL}</div>`;
       }
       if (tipo === 'codigo') {
         const SC = sec('codigo', '4 · Tu código', 'HTML, CSS y JS propios', `
           <p class="note" style="margin:0 0 8px">Pega aquí lo que te hagan o lo que te arme yo. Puedes usar: <code>{{nombre}}</code> <code>{{precio}}</code> <code>{{tachado}}</code> <code>{{precio2}}</code> <code>{{ahorro}}</code> <code>{{descuento}}</code>. Cualquier elemento con <code>data-abrir</code> abre el formulario de pedido; un enlace con <code>data-wa</code> va a WhatsApp.</p>
           ${f(base + 'html', 'HTML', { area: 1, rows: 14, full: 1 })}${f(base + 'css', 'CSS (opcional)', { area: 1, rows: 6, full: 1 })}${f(base + 'js', 'JavaScript (opcional)', { area: 1, rows: 5, full: 1 })}`);
-        return head + `<div class="tn-secs">${S1 + S2.replace('2 · Fotos', '2 · Foto de portada') + S3.replace('3 · Precio', '3 · Precio (para el formulario)') + SC}</div>`;
+        return head + `<div class="tn-secs">${SP + S1 + S2.replace('2 · Fotos', '2 · Foto de portada') + S3.replace('3 · Precio', '3 · Precio (para el formulario)') + SC}</div>`;
       }
-      return head + `<div class="tn-secs">${S1 + S2 + S3 + S4 + S5 + S6 + S7}</div>`;
+      return head + `<div class="tn-secs">${SP + S1 + S2 + S3 + S4 + S5 + S6 + S7}</div>`;
     },
     pedido(t) {
       return card('Envío y garantía', 'Lo que se muestra en la página del producto y en el pedido.', `${f('envio.gratis', 'Envío gratis', { check: 1 })}<div class="row">${f('envio.costo', 'Costo de envío si no es gratis', { type: 'number' })}${f('envio.productoDias', 'Llegada en el producto (ej. 2 a 5 días)')}</div>
@@ -223,6 +224,21 @@
     fr.onload = () => { try { fr.contentDocument.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (!a) return; const h = a.getAttribute('href'); if (!/^\//.test(h)) return; e.preventDefault(); pagPrev = h === '/' || h === '' ? '' : h.replace(/^\/+/, ''); const pg = document.getElementById('tnPg'); if (pg) pg.value = pagPrev; pintarPrevia(); }); } catch (x) {} };
     fr.srcdoc = R().renderizar(t, ok ? pagPrev : '', { base: '', preview: true, slugTienda: t.slug }).html;
     fr.style.height = Math.round(innerHeight * 0.75) + 'px';
+  }
+
+
+  // Vista previa en celular del producto que se está editando (se repinta con cada cambio y conserva el scroll)
+  let scrollCel = 0, slugCel = '';
+  function pintarCelular() {
+    const fr = document.getElementById('tnFrP'), d = document.querySelector('[data-sec=previa]');
+    if (!fr || !d || !d.open) return;
+    const t = T(), p = (t.productos || [])[pi];
+    if (!p) return;
+    if (p.slug !== slugCel) { scrollCel = 0; slugCel = p.slug; }
+    const t2 = Object.assign({}, t, { productos: t.productos.map((q, i) => (i === pi ? Object.assign({}, q, { activo: true }) : q)) });
+    if (!R().slugOk(p.slug)) { fr.srcdoc = '<body style="font-family:system-ui;padding:30px;text-align:center">La dirección (slug) no es válida: usa minúsculas, números y guiones.</body>'; return; }
+    fr.onload = () => { try { const w = fr.contentWindow; w.scrollTo(0, scrollCel); w.addEventListener('scroll', () => { scrollCel = w.scrollY; }, { passive: true }); fr.contentDocument.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (a && /^\//.test(a.getAttribute('href'))) e.preventDefault(); }); } catch (x) {} };
+    fr.srcdoc = R().renderizar(t2, p.slug, { base: '', preview: true, slugTienda: t.slug }).html;
   }
 
   // ───────── Nube ─────────
@@ -271,6 +287,7 @@
       <div class="tn-tabs" role="tablist">${TABS.map(([k, l]) => `<button type="button" class="${k === tab ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('')}</div>
       <div class="tn-body">${pantalla[tab](t)}</div>`;
     if (tab === 'previa') pintarPrevia();
+    if (tab === 'productos') pintarCelular();
     if (tab === 'pedidos' && lista === null) cargarPedidos();
     enlazar(el);
   }
@@ -293,7 +310,7 @@
     on('#tnExp', () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(T(), null, 1)], { type: 'application/json' })); a.download = 'tienda-' + T().slug + '.json'; a.click(); });
     on('#tnImp', () => q('#tnImpF').click());
     const imp = q('#tnImpF'); if (imp) imp.onchange = () => { const fl = imp.files[0]; if (!fl) return; fl.text().then(x => { try { const c = JSON.parse(x); if (!c.productos || !c.marca) throw 0; c.slug = slugify(c.slug || c.nombre) || 'tienda'; S.tiendas.push(c); ti = S.tiendas.length - 1; pi = 0; Store.save(); render(); toast('Tienda importada'); } catch (e) { toast('Archivo no válido'); } }); };
-    el.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.sec) { d.open ? abiertas.add(d.dataset.sec) : abiertas.delete(d.dataset.sec); } }, true);
+    el.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.sec) { d.open ? abiertas.add(d.dataset.sec) : abiertas.delete(d.dataset.sec); if (d.dataset.sec === 'previa') { const fr = document.getElementById('tnFrP'); if (fr && d.open && !fr.srcdoc) pintarCelular(); } } }, true);
     el.querySelectorAll('[data-ra]').forEach(b => b.onclick = () => {
       const arr = getP(T(), b.dataset.rp), i = +b.dataset.ri, a = b.dataset.ra;
       if (!Array.isArray(arr)) setP(T(), b.dataset.rp, []);
@@ -304,6 +321,7 @@
       else if (a === 'dn' && i < L.length - 1) [L[i + 1], L[i]] = [L[i], L[i + 1]];
       Store.save(); render();
     });
+    on('#tnCelRef', pintarCelular);
     on('#tnVer', () => { pagPrev = (T().productos[pi] || {}).slug || ''; tab = 'previa'; render(); scrollTo(0, 0); });
     const ps = q('#tnProd'); if (ps) ps.onchange = () => { pi = +ps.value; render(); };
     const arr = () => T().productos;
