@@ -109,10 +109,18 @@
     setTimeout(() => { try { Store.save(); } catch (e) {} }, 0);
   }
 
+  // Una sola vez: la portada recibe la barra en movimiento y el texto que se escribe solo (se pueden apagar en «Página principal»)
+  function migrarMov(t) {
+    if (t._mov) return; t._mov = true;
+    t.portada = t.portada || {};
+    if (t.portada.mov === undefined) t.portada.mov = true;
+    if (t.portada.fijo === undefined) t.portada.fijo = 'Regalos con significado,';
+    if (!Array.isArray(t.portada.frases)) t.portada.frases = ['envío a todo el Perú', 'pagas al recibir', 'un detalle que enamora'];
+  }
   function asegurar() {
     if (!Array.isArray(S.tiendas) || !S.tiendas.length) S.tiendas = [clon(window.TIENDA_BASE)];
     if (ti >= S.tiendas.length) ti = 0;
-    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); S.tiendas.forEach(asignarResenas); restaurar();
+    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); S.tiendas.forEach(asignarResenas); S.tiendas.forEach(migrarMov); restaurar();
     const t = S.tiendas[ti];
     if (pi >= (t.productos || []).length) pi = 0;
     return t;
@@ -326,6 +334,7 @@
     },
     portada(t) {
       return card('Barra superior', 'Una frase por línea.', `${f('barra.activa', 'Mostrar barra', { check: 1 })}${f('barra.items', 'Mensajes', { kind: 'lines', rows: 4 })}`) +
+        card('Movimiento (solo en la página principal)', 'La barra superior corre de lado a lado y debajo del nombre se escribe una frase que va cambiando. Los productos no se mueven.', `${f('portada.mov', 'Activar movimiento', { check: 1 })}${f('portada.fijo', 'Texto fijo (queda quieto)')}${f('portada.frases', 'Frases que se escriben solas (una por línea)', { kind: 'lines', rows: 4 })}`) +
         card('Cabecera de portada', '', `<div class="row">${f('portada.badge', 'Etiqueta (ej. Pago contraentrega)')}${f('portada.titulo', 'Título de la rejilla')}</div>${f('portada.confianza', 'Garantías (una por línea)', { kind: 'lines', rows: 4 })}`) +
         card('Promo por cantidad', 'La caja «Mientras más llevas, más ahorras». Si un producto no tiene precio de combo propio, este descuento arma el precio de 2 unidades.', `${f('promo.activa', 'Activar promo', { check: 1 })}${f('portada.mostrarPromo', 'Mostrar la caja en la portada', { check: 1 })}
         ${f('promo.titulo', 'Título')}<div class="row">${f('promo.cantidad', 'Cantidad mínima', { type: 'number' })}${f('promo.descuento', 'Descuento (%)', { type: 'number' })}</div>${f('promo.texto', 'Texto de apoyo')}`) +

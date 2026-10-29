@@ -41,6 +41,13 @@ window.TIENDA_BASE = {
   "tel": "51"
  },
  "portada": {
+  "mov": true,
+  "fijo": "Regalos con significado,",
+  "frases": [
+   "envío a todo el Perú",
+   "pagas al recibir",
+   "un detalle que enamora"
+  ],
   "badge": "Pago contraentrega",
   "confianza": [
    "Pagas al recibir",
