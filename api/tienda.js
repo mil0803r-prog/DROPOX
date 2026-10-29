@@ -26,6 +26,15 @@ module.exports = async (req, res) => {
     }
     if (!fila) { res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8'); res.setHeader('Cache-Control', 'no-store'); return res.send(pagina('Tienda no encontrada', 'Este dominio todavía no está conectado a una tienda.')); }
     slugTienda = slugTienda || fila.slug;
+    // robots.txt y sitemap.xml propios de la tienda (Meta, Google y otros rastreadores los piden)
+    if (q.f === 'robots.txt' || q.f === 'sitemap.xml') {
+      const origen = `https://${host}`;
+      res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=300');
+      if (q.f === 'robots.txt') { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.send(`User-agent: *\nAllow: /\n\nSitemap: ${origen}/sitemap.xml\n`); }
+      const urls = ['/'].concat(R.activos(Object.assign({}, fila.config, { slug: fila.slug })).map(p => '/' + p.slug));
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      return res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(u => `<url><loc>${origen}${u}</loc></url>`).join('\n')}\n</urlset>\n`);
+    }
     const out = R.renderizar(Object.assign({}, fila.config, { slug: fila.slug }), ruta, { base, slugTienda, canon: host && !q.t ? `https://${host}${ruta ? '/' + ruta : '/'}` : '' });
     res.status(out.status);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
