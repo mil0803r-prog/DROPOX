@@ -46,7 +46,7 @@
 
   const TIPO = { producto: ['Producto', 'Página de producto completa'], landing: ['Landing', 'Título, imagen y botón'], codigo: ['Código', 'Tu propio HTML'] };
   const nuevoProducto = tipo => {
-    const b = { slug: 'producto-' + Date.now().toString(36).slice(-4), nombre: 'Producto nuevo', titulo: 'Producto nuevo', kicker: '', etiqueta: '', imagenes: [], precio: 0, tachado: 0, combo2: 0, categoria: '', rating: 0, resenas: 0, vendidos: 0, masVendido: false, nuevo: true, activo: true, tipo, bloques: [], faq: [], resenasLista: [] };
+    const b = { creado: new Date().toISOString(), slug: 'producto-' + Date.now().toString(36).slice(-4), nombre: 'Producto nuevo', titulo: 'Producto nuevo', kicker: '', etiqueta: '', imagenes: [], precio: 0, tachado: 0, combo2: 0, categoria: '', rating: 0, resenas: 0, vendidos: 0, masVendido: false, nuevo: true, activo: true, tipo, bloques: [], faq: [], resenasLista: [] };
     if (tipo === 'landing') b.secciones = [{ tipo: 'titulo', x: 'Escribe aquí el título' }, { tipo: 'imagen', img: '' }, { tipo: 'boton', x: 'Quiero el mío', accion: 'formulario', wa: '', msg: '' }, { tipo: 'imagen', img: '' }, { tipo: 'boton', x: 'Pedir por WhatsApp', accion: 'whatsapp', wa: '', msg: '' }];
     if (tipo === 'codigo') Object.assign(b, { html: '<section style="padding:24px 16px;text-align:center">\n  <h1>{{nombre}}</h1>\n  <p style="font-size:28px;font-weight:800">{{precio}}</p>\n  <button class="cta" data-abrir>Quiero el mío</button>\n  <p><a data-wa href="#">Escríbenos por WhatsApp</a></p>\n</section>', css: '', js: '' });
     return b;
@@ -315,7 +315,10 @@
     if (tab === 'productos') pintarCelular();
     if (tab === 'pedidos' && lista === null) cargarPedidos();
     enlazar(el);
+    if (pendienteNuevo) { pendienteNuevo = false; q0(el); }
   }
+
+  function q0(el) { const b = el.querySelector('#tnPNew'); if (b) b.click(); }
 
   function enlazar(el) {
     const q = s => el.querySelector(s), on = (s, fn) => { const b = q(s); if (b) b.onclick = fn; };
@@ -363,5 +366,12 @@
     el.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { anchoPrev = +b.dataset.w; render(); });
   }
 
-  window.Tienda = { vista, ir, guia };
+  // Subsecciones del menú: cada producto creado queda listado debajo de «Landing / Tienda»
+  const fechaCorta = iso => { try { return new Date(iso).toLocaleDateString('es', { day: 'numeric', month: 'short' }); } catch (e) { return ''; } };
+  const subitems = () => { try { return asegurar().productos.map((p, i) => ({ i, nombre: (p.activo === false ? '⏸ ' : '') + (p.nombre || 'Sin nombre'), tipo: TIPO[p.tipo || 'producto'][0], creado: p.creado ? fechaCorta(p.creado) : '' })); } catch (e) { return []; } };
+  const actual = () => (tab === 'productos' ? pi : -1);
+  let pendienteNuevo = false;
+  const abrirProducto = i => { tab = 'productos'; pi = i; };
+  const nuevo = () => { tab = 'productos'; pendienteNuevo = true; };
+  window.Tienda = { vista, ir, guia, subitems, actual, abrirProducto, nuevo };
 })();

@@ -543,3 +543,9 @@ dialog h2{margin:0 0 14px;font-size:19px}
 
 .tn-guia{margin:2px 0 10px;justify-content:center;font-size:13px}
 .tn-flash{animation:tnf 1.7s ease}@keyframes tnf{0%,70%{box-shadow:0 0 0 4px #8b5cf6aa;border-radius:12px}100%{box-shadow:0 0 0 0 transparent}}
+
+/* Subsecciones del menú: productos de la tienda */
+.tabs a.msub{display:none}
+@media (min-width:700px){.tabs a.msub{display:flex;margin:-2px 0 0 26px;padding:7px 12px;font-size:13px;gap:6px;border-radius:11px;color:var(--mut);align-items:baseline}.tabs a.msub .lg{display:inline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.tabs a.msub small{font-size:10.5px;opacity:.75}.tabs a.msub.on{color:var(--acc2)}.tabs a.msub-new{color:var(--acc2);font-weight:700}}
+.tabs.open a.msub{display:flex;margin:-2px 0 0 26px;padding:8px 12px;font-size:13px;gap:6px;border-radius:11px;color:var(--mut);align-items:baseline}.tabs.open a.msub .lg{display:inline}.tabs.open a.msub small{font-size:10.5px;opacity:.75}.tabs.open a.msub.on{color:var(--acc2)}.tabs.open a.msub-new{color:var(--acc2);font-weight:700}
+.tabs a.msub,.tabs.open a.msub{flex-direction:column;align-items:flex-start;gap:0}.tabs a.msub .lg,.tabs.open a.msub .lg{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tabs a.msub small,.tabs.open a.msub small{display:block;line-height:1.1}
