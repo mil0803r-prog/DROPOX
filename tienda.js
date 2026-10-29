@@ -32,6 +32,53 @@
     resenas: { out: a => unir(a, ['n', 'c', 'e', 't']), inn: t => partir(t, 4).map(r => ({ n: r[0], c: r[1], e: Math.max(1, Math.min(5, parseInt(r[2]) || 5)), t: r[3] })) },
   };
 
+
+  // ───────── Subir imágenes del dispositivo (Supabase Storage, bucket público «tienda») ─────────
+  const BUCKET = 'tienda', MAX_LADO = 1600;
+  async function comprimir(file) {
+    if (file.type === 'image/gif' && file.size < 3e6) return file;
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const k = Math.min(1, MAX_LADO / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, 'image/webp', 0.86));
+    return blob && blob.type === 'image/webp' ? blob : await new Promise(r => c.toBlob(r, 'image/jpeg', 0.86));
+  }
+  async function subirImagen(file) {
+    if (!/^image\//.test(file.type)) throw new Error('«' + file.name + '» no es una imagen.');
+    const tk = window.Nube && (await Nube.token());
+    if (!tk) throw new Error('Inicia sesión para subir fotos.');
+    const blob = await comprimir(file);
+    if (blob.size > 6e6) throw new Error('La foto pesa demasiado (máximo 6 MB).');
+    const ext = blob.type === 'image/webp' ? 'webp' : blob.type === 'image/gif' ? 'gif' : 'jpg';
+    const nombre = `${T().slug}/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.${ext}`, c = window.DROPOX_CFG;
+    const r = await fetch(`${c.url}/storage/v1/object/${BUCKET}/${nombre}`, { method: 'POST', headers: { apikey: c.key, Authorization: 'Bearer ' + tk, 'Content-Type': blob.type, 'Cache-Control': 'max-age=31536000' }, body: blob });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(/bucket|not found|row-level/i.test(e.message || e.error || '') ? 'Falta crear el almacén de fotos: ejecuta en Supabase el SQL de «Subir fotos».' : (e.message || 'No se pudo subir (' + r.status + ')')); }
+    return `${c.url}/storage/v1/object/public/${BUCKET}/${nombre}`;
+  }
+  let subiendoA = null;
+  function pedirArchivos(path, modo) {
+    let inp = document.getElementById('tnFile');
+    if (!inp) {
+      inp = document.createElement('input'); inp.type = 'file'; inp.id = 'tnFile'; inp.accept = 'image/*'; inp.hidden = true; document.body.appendChild(inp);
+      inp.onchange = async () => {
+        const files = [...inp.files], a = subiendoA; inp.value = '';
+        if (!files.length || !a) return;
+        let n = 0;
+        for (const f of files) {
+          toast('Subiendo ' + (++n) + ' de ' + files.length + '…');
+          try {
+            const u = await subirImagen(f);
+            if (a.modo === 'push') { const L = getP(T(), a.path); if (Array.isArray(L)) L.push(u); else setP(T(), a.path, [u]); } else setP(T(), a.path, u);
+          } catch (e) { toast(e.message); Store.save(); render(); return; }
+        }
+        Store.save(); render(); toast(files.length > 1 ? 'Fotos subidas ✓' : 'Foto subida ✓');
+      };
+    }
+    subiendoA = { path, modo }; inp.multiple = modo === 'push'; inp.click();
+  }
+  const upBtn = (path, modo, txt) => `<button type="button" class="btn btn-sm tn-up" data-up="${path}" data-upmodo="${modo || 'set'}">📷 ${txt || 'Subir del dispositivo'}</button>`;
+
   // Campos
   const f = (path, label, o = {}) => {
     const v = getP(T(), path), id = 'tn_' + path.replace(/\./g, '_');
@@ -41,7 +88,7 @@
     else if (o.area) inp = `<textarea data-p="${path}" rows="${o.rows || 3}" id="${id}">${esc(v)}</textarea>`;
     else if (o.opts) inp = `<select data-p="${path}" id="${id}" style="width:100%">${o.opts.map(x => `<option ${x == v ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`;
     else inp = `<input data-p="${path}" ${o.type === 'number' ? 'data-k="num" type="number" step="any" inputmode="decimal"' : o.type === 'color' ? 'type="color" style="padding:3px;height:44px"' : 'type="text"'} value="${esc(v ?? '')}" id="${id}" ${o.ph ? `placeholder="${esc(o.ph)}"` : ''}>`;
-    return `<div class="field" ${o.full ? 'style="grid-column:1/-1"' : ''}><label for="${id}">${esc(label)}</label>${inp}${o.hint ? `<div class="note">${o.hint}</div>` : ''}</div>`;
+    return `<div class="field" ${o.full ? 'style="grid-column:1/-1"' : ''}><label for="${id}">${esc(label)}</label>${inp}${o.hint ? `<div class="note">${o.hint}</div>` : ''}${o.up ? `<div style="margin-top:6px">${upBtn(path)}</div>` : ''}</div>`;
   };
 
   const TIPO = { producto: ['Producto', 'Página de producto completa'], landing: ['Landing', 'Título, imagen y botón'], codigo: ['Código', 'Tu propio HTML'] };
@@ -63,6 +110,7 @@
     $('#tpNo').onclick = () => d.close();
     d.showModal();
   }
+  /*UP*/
   const abiertas = new Set(['previa', 'basico']);
   const GUIA_SW = `<label class="chk tn-guia"><input type="checkbox" id="tnGuia" ${window.__tnGuia !== false ? 'checked' : ''}> Guía: tocar una parte para editarla</label>`;
   const sec = (k, titulo, sub, body) => `<details class="tn-sec" data-sec="${k}" ${abiertas.has(k) ? 'open' : ''}><summary><b>${titulo}</b><small>${esc(sub || '')}</small></summary><div class="tn-secb">${body}</div></details>`;
@@ -101,7 +149,7 @@
       return card('Marca', 'Nombre, logo y textos de compartir (WhatsApp, Facebook).', `<div class="row">${f('nombre', 'Nombre interno de la tienda')}${f('slug', 'Dirección de prueba (/t/…)', { hint: 'Solo letras minúsculas, números y guiones.' })}</div>
         <div class="row">${f('marca.nombre', 'Nombre que ve el cliente')}${f('marca.lema', 'Lema')}</div>
         ${f('marca.descripcion', 'Descripción para buscadores y compartir', { area: 1, full: 1 })}
-        ${f('marca.logo', 'Logo (enlace https de la imagen)')}${f('marca.favicon', 'Ícono de la pestaña (enlace)')}${f('marca.og', 'Imagen al compartir el enlace (enlace)')}
+        ${f('marca.logo', 'Logo (enlace o subir del dispositivo)', { up: 1 })}${f('marca.favicon', 'Ícono de la pestaña', { up: 1 })}${f('marca.og', 'Imagen al compartir el enlace', { up: 1 })}
         ${f('marca.verificada', 'Mostrar «Tienda verificada»', { check: 1 })}`) +
         card('Estilo', 'Empieza con un estilo y ajusta los colores.', `<div class="tn-act">${Object.keys(pre).map(k => `<button class="btn" data-pre="${k}">${{ classic: 'Millora clásico (crema y dorado)', tienda: 'Millora tienda (Baloo 2)', rosa: 'Rosa y vino', oscuro: 'Oscuro' }[k]}</button>`).join('')}</div>
         <div class="row">${f('diseno.fuente', 'Tipografía (Google Fonts)', { opts: ['Playfair Display', 'Baloo 2', 'Nunito', 'Inter', 'Poppins', 'Montserrat', 'Lora', 'DM Sans', 'Plus Jakarta Sans'] })}${f('diseno.radio', 'Redondeo de bordes (px)', { type: 'number' })}</div>
@@ -139,6 +187,7 @@
         <div class="row">${f(base + 'masVendido', 'Marcar «Más vendido»', { check: 1 })}${f(base + 'nuevo', 'Marcar «Nuevo»', { check: 1 })}</div>`);
       const S2 = sec('fotos', '2 · Fotos', imgs.length + ' foto(s) · la primera es la principal', `
         ${rep(base + 'imagenes', imgs, (u, b) => `<div class="tn-ri">${thumb(u)}<div style="flex:1;min-width:0"><input data-p="${b}" type="text" value="${esc(u)}" placeholder="https://… enlace de la foto"></div></div>`, 'imagen', 'Agregar foto')}
+        <div style="margin-top:8px">${upBtn(base + 'imagenes', 'push', 'Subir fotos del dispositivo')}</div>
         <details class="tn-mini"><summary>Pegar varias a la vez</summary>${f(base + 'imagenes', 'Un enlace por línea', { kind: 'lines', rows: 5, full: 1 })}</details>`);
       const S3 = sec('precio', '3 · Precio y oferta', x.pct1 ? `−${x.pct1}% · ahorro ${R().q(t, x.ahorro1)}` : 'Precio de venta', `
         <div class="row">${f(base + 'precio', 'Precio de venta', { type: 'number' })}${f(base + 'tachado', 'Precio antes (tachado, opcional)', { type: 'number' })}</div>
@@ -146,7 +195,7 @@
         <div class="tn-calc"><span>1 unidad: <b>${R().q(t, x.pr)}</b>${x.ahorro1 ? ` · ahorras ${R().q(t, x.ahorro1)} (−${x.pct1}%)` : ''}</span>${x.c2 ? `<span>2 unidades: <b>${R().q(t, x.c2)}</b> · ${R().q(t, x.c2 / 2)} c/u · ahorras ${R().q(t, x.base2 - x.c2)}</span>` : '<span>Sin oferta de 2 unidades</span>'}</div>`);
       const S4 = sec('contenido', '4 · Bloques de contenido', (p.bloques || []).length + ' bloque(s) con foto', `
         <p class="note" style="margin:0 0 8px">Cada bloque es un título, un texto y una foto, en el orden que se ven en la página.</p>
-        ${rep(base + 'bloques', p.bloques || [], (bl, b, i) => `<div class="tn-ri tn-col"><div class="tn-ri">${thumb(bl.img)}<div style="flex:1;min-width:0"><label>Título</label><input data-p="${b}.t" type="text" value="${esc(bl.t)}"></div></div><label>Texto</label><textarea data-p="${b}.x" rows="3">${esc(bl.x)}</textarea><label>Foto (enlace)</label><input data-p="${b}.img" type="text" value="${esc(bl.img)}" placeholder="https://…"></div>`, 'bloque', 'Agregar bloque')}`);
+        ${rep(base + 'bloques', p.bloques || [], (bl, b, i) => `<div class="tn-ri tn-col"><div class="tn-ri">${thumb(bl.img)}<div style="flex:1;min-width:0"><label>Título</label><input data-p="${b}.t" type="text" value="${esc(bl.t)}"></div></div><label>Texto</label><textarea data-p="${b}.x" rows="3">${esc(bl.x)}</textarea><label>Foto (enlace)</label><input data-p="${b}.img" type="text" value="${esc(bl.img)}" placeholder="https://…"><div style="margin-top:6px">${upBtn(b + '.img')}</div></div>`, 'bloque', 'Agregar bloque')}`);
       const S5 = sec('resenas', '5 · Valoración y reseñas', (p.resenasLista || []).length + ' reseña(s)', `
         ${chk(base + 'mostrar.resenas', 'Mostrar las reseñas en la página')}
         <div class="row">${f(base + 'rating', 'Estrellas (0 a 5)', { type: 'number' })}${f(base + 'resenas', 'Número de reseñas', { type: 'number' })}</div>
@@ -167,7 +216,7 @@
             let c = '';
             if (it.tipo === 'titulo') c = `<label>Título</label><input data-p="${b}.x" type="text" value="${esc(it.x)}">`;
             else if (it.tipo === 'texto') c = `<label>Texto</label><textarea data-p="${b}.x" rows="3">${esc(it.x)}</textarea>`;
-            else if (it.tipo === 'imagen') c = `<div class="tn-ri">${thumb(it.img)}<div style="flex:1;min-width:0"><label>Imagen (enlace)</label><input data-p="${b}.img" type="text" value="${esc(it.img)}" placeholder="https://…"></div></div>`;
+            else if (it.tipo === 'imagen') c = `<div class="tn-ri">${thumb(it.img)}<div style="flex:1;min-width:0"><label>Imagen (enlace)</label><input data-p="${b}.img" type="text" value="${esc(it.img)}" placeholder="https://…"><div style="margin-top:6px">${upBtn(b + '.img')}</div></div></div>`;
             else c = `<label>Texto del botón</label><input data-p="${b}.x" type="text" value="${esc(it.x)}"><label>Qué hace</label><select data-p="${b}.accion" style="width:100%"><option value="formulario" ${it.accion !== 'whatsapp' ? 'selected' : ''}>Abrir el formulario de pedido</option><option value="whatsapp" ${it.accion === 'whatsapp' ? 'selected' : ''}>Ir a WhatsApp</option></select>${it.accion === 'whatsapp' ? `<label>Número de WhatsApp (vacío = el de contacto)</label><input data-p="${b}.wa" type="text" value="${esc(it.wa)}" placeholder="50212345678"><label>Mensaje</label><input data-p="${b}.msg" type="text" value="${esc(it.msg)}" placeholder="Hola, quiero pedir…">` : ''}`;
             return `<div class="tn-ri tn-col"><span class="tn-tag">${et}</span>${c}</div>`;
           }, 'sec-titulo', [['sec-titulo', 'Título'], ['sec-imagen', 'Imagen'], ['sec-boton', 'Botón'], ['sec-texto', 'Texto']])}`);
@@ -366,6 +415,7 @@
       else if (a === 'dn' && i < L.length - 1) [L[i + 1], L[i]] = [L[i], L[i + 1]];
       Store.save(); render();
     });
+    el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => pedirArchivos(b.dataset.up, b.dataset.upmodo));
     on('#tnCelRef', pintarCelular);
     const gs = q('#tnGuia'); if (gs) gs.onchange = () => guia(gs.checked);
     on('#tnVer', () => { pagPrev = (T().productos[pi] || {}).slug || ''; tab = 'previa'; render(); scrollTo(0, 0); });
