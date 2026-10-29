@@ -125,10 +125,17 @@
     if (t.portada.carruselSeg === undefined) t.portada.carruselSeg = 4;
     if (t.portada.carruselTitulo === undefined) t.portada.carruselTitulo = 'Lo más pedido';
   }
+  function migrarBarra(t) {
+    if (t._bar) return; t._bar = true;
+    t.barra = t.barra || {};
+    if (t.barra.movHome === undefined) t.barra.movHome = true;
+    if (t.barra.movProd === undefined) t.barra.movProd = true;
+    if (t.barra.dorado === undefined) t.barra.dorado = true;
+  }
   function asegurar() {
     if (!Array.isArray(S.tiendas) || !S.tiendas.length) S.tiendas = [clon(window.TIENDA_BASE)];
     if (ti >= S.tiendas.length) ti = 0;
-    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); S.tiendas.forEach(asignarResenas); S.tiendas.forEach(migrarMov); S.tiendas.forEach(migrarCar); restaurar();
+    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); S.tiendas.forEach(asignarResenas); S.tiendas.forEach(migrarMov); S.tiendas.forEach(migrarCar); S.tiendas.forEach(migrarBarra); restaurar();
     const t = S.tiendas[ti];
     if (pi >= (t.productos || []).length) pi = 0;
     return t;
@@ -341,8 +348,8 @@
         card('País y moneda', 'Todo va en soles (S/ · PEN) con pago contraentrega.', `<div class="row">${f('pais.pais', 'País')}${f('pais.moneda', 'Símbolo de moneda')}</div><div class="row">${f('pais.codigo', 'Código (GTQ)')}${f('pais.locale', 'Idioma (es_GT)')}</div>`);
     },
     portada(t) {
-      return card('Barra superior', 'Una frase por línea.', `${f('barra.activa', 'Mostrar barra', { check: 1 })}${f('barra.items', 'Mensajes', { kind: 'lines', rows: 4 })}`) +
-        card('Movimiento (solo en la página principal)', 'La barra superior corre de lado a lado y debajo del nombre se escribe una frase que va cambiando. Los productos no se mueven.', `${f('portada.mov', 'Activar movimiento', { check: 1 })}${f('portada.fijo', 'Texto fijo (queda quieto)')}${f('portada.frases', 'Frases que se escriben solas (una por línea)', { kind: 'lines', rows: 4 })}
+      return card('Barra superior', 'Una frase por línea.', `${f('barra.activa', 'Mostrar barra', { check: 1 })}${f('barra.items', 'Mensajes', { kind: 'lines', rows: 4 })}<div class="row">${f('barra.movHome', 'Barra en movimiento en la página principal', { check: 1 })}${f('barra.movProd', 'Barra en movimiento en las páginas de producto', { check: 1 })}</div>${f('barra.dorado', 'Fondo dorado degradado (si pones un color de fondo, se usa ese)', { check: 1 })}`) +
+        card('Movimiento (solo en la página principal)', 'La barra superior corre de lado a lado y debajo del nombre se escribe una frase que va cambiando. Los productos no se mueven.', `${f('portada.mov', 'Activar la frase que se escribe sola', { check: 1 })}${f('portada.fijo', 'Texto fijo (queda quieto)')}${f('portada.frases', 'Frases que se escriben solas (una por línea)', { kind: 'lines', rows: 4 })}
         <div class="row">${f('portada.escVel', 'Velocidad al escribir (ms por letra, menos = más rápido)', { type: 'number' })}${f('portada.escTam', 'Tamaño de la frase (px)', { type: 'number' })}</div>${f('portada.escColor', 'Color de la frase escrita', { type: 'color' })}
         <div class="row">${f('portada.barraVel', 'Vuelta completa de la barra (segundos, más = más lenta)', { type: 'number' })}${f('portada.barraTam', 'Tamaño del texto de la barra (px)', { type: 'number' })}</div>
         <div class="row">${f('barra.fondo', 'Fondo de la barra', { type: 'color' })}${f('barra.color', 'Color del texto de la barra', { type: 'color' })}</div>${f('portada.simbolo', 'Símbolo entre mensajes (vacío = ninguno)')}`) +
