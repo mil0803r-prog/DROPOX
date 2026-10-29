@@ -43,6 +43,12 @@
     else inp = `<input data-p="${path}" ${o.type === 'number' ? 'data-k="num" type="number" step="any" inputmode="decimal"' : o.type === 'color' ? 'type="color" style="padding:3px;height:44px"' : 'type="text"'} value="${esc(v ?? '')}" id="${id}" ${o.ph ? `placeholder="${esc(o.ph)}"` : ''}>`;
     return `<div class="field" ${o.full ? 'style="grid-column:1/-1"' : ''}><label for="${id}">${esc(label)}</label>${inp}${o.hint ? `<div class="note">${o.hint}</div>` : ''}</div>`;
   };
+  const abiertas = new Set(['basico']);
+  const sec = (k, titulo, sub, body) => `<details class="tn-sec" data-sec="${k}" ${abiertas.has(k) ? 'open' : ''}><summary><b>${titulo}</b><small>${esc(sub || '')}</small></summary><div class="tn-secb">${body}</div></details>`;
+  const thumb = u => /^https:\/\//.test(u || '') ? `<img class="tn-th" src="${esc(u)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : '<div class="tn-th tn-nth">sin foto</div>';
+  const FACT = { imagen: () => '', bloque: () => ({ t: '', x: '', img: '' }), resena: () => ({ n: '', c: '', e: 5, t: '' }), faq: () => ['', ''] };
+  // Lista editable: cada elemento con subir, bajar y quitar; abajo el botón para agregar
+  const rep = (path, arr, tpl, kind, etiq) => `<div class="tn-rep">${arr.map((it, i) => `<div class="tn-item"><div class="tn-ctl"><b>${i + 1}</b><button type="button" class="btn btn-sm" data-ra="up" data-rp="${path}" data-ri="${i}" aria-label="Subir">↑</button><button type="button" class="btn btn-sm" data-ra="dn" data-rp="${path}" data-ri="${i}" aria-label="Bajar">↓</button><button type="button" class="btn btn-sm btn-del" data-ra="del" data-rp="${path}" data-ri="${i}" aria-label="Quitar">✕</button></div><div class="tn-itb">${tpl(it, path + '.' + i, i)}</div></div>`).join('')}<button type="button" class="btn btn-sm btn-pri" data-ra="add" data-rk="${kind}" data-rp="${path}">+ ${etiq}</button></div>`;
   const card = (t, sub, body) => `<div class="card"><h3>${t}</h3>${sub ? `<p class="sub">${sub}</p>` : ''}${body}</div>`;
 
   // ───────── Pestañas ─────────
@@ -95,24 +101,41 @@
     productos(t) {
       const ps = t.productos || [], p = ps[pi], base = `productos.${pi}.`;
       const x = p ? R().precios(t, p) : null;
-      return card('Productos', 'Elige un producto para editarlo. Cada uno tiene su página propia: tudominio.com/<dirección>.', `
+      const head = card('Productos', 'Elige un producto y edítalo sección por sección. Cada uno tiene su página: tudominio.com/<dirección>.', `
         <div class="field"><select id="tnProd" style="width:100%">${ps.map((q, i) => `<option value="${i}" ${i === pi ? 'selected' : ''}>${q.activo === false ? '⏸ ' : ''}${esc(q.nombre)}</option>`).join('')}</select></div>
-        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnPDup">Duplicar</button><button class="btn" id="tnPUp">↑</button><button class="btn" id="tnPDn">↓</button><button class="btn btn-del" id="tnPDel">Eliminar</button></div>`) +
-        (!p ? '' : card('Datos del producto', x.pct1 ? `Descuento: −${x.pct1}% · ahorro ${R().q(t, x.ahorro1)}${x.c2 ? ` · 2 unidades: ${R().q(t, x.c2)} (${R().q(t, x.c2 / 2)} c/u)` : ''}` : '', `
+        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnPDup">Duplicar</button><button class="btn" id="tnPUp">↑</button><button class="btn" id="tnPDn">↓</button><button class="btn btn-del" id="tnPDel">Eliminar</button>${p ? `<button class="btn" id="tnVer">Ver cómo queda</button>` : ''}</div>`);
+      if (!p) return head;
+      const chk = (path, label) => `<div class="field"><label class="chk"><input type="checkbox" data-p="${path}" data-k="check" ${getP(T(), path) !== false ? 'checked' : ''}> ${esc(label)}</label></div>`;
+      const imgs = p.imagenes || [];
+      const S1 = sec('basico', '1 · Datos básicos', 'Nombre, dirección, etiquetas', `
         ${f(base + 'activo', 'Visible en la tienda', { check: 1 })}
         <div class="row">${f(base + 'nombre', 'Nombre en la rejilla')}${f(base + 'slug', 'Dirección (slug)', { hint: 'Ej.: collar-saturno → tudominio.com/collar-saturno' })}</div>
         ${f(base + 'titulo', 'Título de la página del producto', { full: 1 })}
         <div class="row">${f(base + 'etiqueta', 'Etiqueta (ej. JOYERÍA ÚNICA)')}${f(base + 'kicker', 'Frase corta sobre el título')}</div>
-        <div class="row">${f(base + 'categoria', 'Categoría', { opts: ['', ...(t.categorias || [])] })}${f(base + 'precio', 'Precio de venta', { type: 'number' })}</div>
-        <div class="row">${f(base + 'tachado', 'Precio antes (tachado, opcional)', { type: 'number' })}${f(base + 'combo2', 'Precio por 2 unidades (0 = usar promo)', { type: 'number' })}</div>
+        ${f(base + 'categoria', 'Categoría', { opts: ['', ...(t.categorias || [])] })}
+        <div class="row">${f(base + 'masVendido', 'Marcar «Más vendido»', { check: 1 })}${f(base + 'nuevo', 'Marcar «Nuevo»', { check: 1 })}</div>`);
+      const S2 = sec('fotos', '2 · Fotos', imgs.length + ' foto(s) · la primera es la principal', `
+        ${rep(base + 'imagenes', imgs, (u, b) => `<div class="tn-ri">${thumb(u)}<div style="flex:1;min-width:0"><input data-p="${b}" type="text" value="${esc(u)}" placeholder="https://… enlace de la foto"></div></div>`, 'imagen', 'Agregar foto')}
+        <details class="tn-mini"><summary>Pegar varias a la vez</summary>${f(base + 'imagenes', 'Un enlace por línea', { kind: 'lines', rows: 5, full: 1 })}</details>`);
+      const S3 = sec('precio', '3 · Precio y oferta', x.pct1 ? `−${x.pct1}% · ahorro ${R().q(t, x.ahorro1)}` : 'Precio de venta', `
+        <div class="row">${f(base + 'precio', 'Precio de venta', { type: 'number' })}${f(base + 'tachado', 'Precio antes (tachado, opcional)', { type: 'number' })}</div>
+        ${f(base + 'combo2', 'Precio por 2 unidades (0 = usar el descuento de la promo)', { type: 'number', full: 1 })}
+        <div class="tn-calc"><span>1 unidad: <b>${R().q(t, x.pr)}</b>${x.ahorro1 ? ` · ahorras ${R().q(t, x.ahorro1)} (−${x.pct1}%)` : ''}</span>${x.c2 ? `<span>2 unidades: <b>${R().q(t, x.c2)}</b> · ${R().q(t, x.c2 / 2)} c/u · ahorras ${R().q(t, x.base2 - x.c2)}</span>` : '<span>Sin oferta de 2 unidades</span>'}</div>`);
+      const S4 = sec('contenido', '4 · Bloques de contenido', (p.bloques || []).length + ' bloque(s) con foto', `
+        <p class="note" style="margin:0 0 8px">Cada bloque es un título, un texto y una foto, en el orden que se ven en la página.</p>
+        ${rep(base + 'bloques', p.bloques || [], (bl, b, i) => `<div class="tn-ri tn-col"><div class="tn-ri">${thumb(bl.img)}<div style="flex:1;min-width:0"><label>Título</label><input data-p="${b}.t" type="text" value="${esc(bl.t)}"></div></div><label>Texto</label><textarea data-p="${b}.x" rows="3">${esc(bl.x)}</textarea><label>Foto (enlace)</label><input data-p="${b}.img" type="text" value="${esc(bl.img)}" placeholder="https://…"></div>`, 'bloque', 'Agregar bloque')}`);
+      const S5 = sec('resenas', '5 · Valoración y reseñas', (p.resenasLista || []).length + ' reseña(s)', `
+        ${chk(base + 'mostrar.resenas', 'Mostrar las reseñas en la página')}
         <div class="row">${f(base + 'rating', 'Estrellas (0 a 5)', { type: 'number' })}${f(base + 'resenas', 'Número de reseñas', { type: 'number' })}</div>
-        <div class="row">${f(base + 'vendidos', 'Vendidos (+N)', { type: 'number' })}<div></div></div>
-        ${f(base + 'masVendido', 'Marcar «Más vendido»', { check: 1 })}${f(base + 'nuevo', 'Marcar «Nuevo»', { check: 1 })}
-        ${f(base + 'imagenes', 'Imágenes (un enlace https por línea; la primera es la principal)', { kind: 'lines', rows: 6, full: 1 })}`) +
-        card('Contenido de la página', 'Una línea por bloque. Separa con | los campos.', `
-        ${f(base + 'bloques', 'Bloques con foto — formato: Título | Texto | enlace de imagen', { kind: 'bloques', rows: 8, full: 1 })}
-        ${f(base + 'faq', 'Preguntas de este producto — formato: Pregunta | Respuesta', { kind: 'pairs', rows: 4, full: 1 })}
-        ${f(base + 'resenasLista', 'Reseñas — formato: Nombre | Ciudad | Estrellas | Comentario', { kind: 'resenas', rows: 6, full: 1 })}`));
+        ${f(base + 'vendidos', 'Vendidos (+N, se ve en la portada)', { type: 'number' })}
+        ${rep(base + 'resenasLista', p.resenasLista || [], (r, b) => `<div class="tn-ri tn-col"><div class="row"><div><label>Nombre</label><input data-p="${b}.n" type="text" value="${esc(r.n)}"></div><div><label>Ciudad</label><input data-p="${b}.c" type="text" value="${esc(r.c)}"></div></div><div class="row"><div><label>Estrellas (1 a 5)</label><input data-p="${b}.e" data-k="num" type="number" min="1" max="5" value="${esc(r.e)}"></div><div></div></div><label>Comentario</label><textarea data-p="${b}.t" rows="2">${esc(r.t)}</textarea></div>`, 'resena', 'Agregar reseña')}`);
+      const S6 = sec('preguntas', '6 · Preguntas frecuentes del producto', (p.faq || []).length + ' pregunta(s) · además de las generales', `
+        ${chk(base + 'mostrar.faq', 'Mostrar las preguntas en la página')}
+        ${rep(base + 'faq', p.faq || [], (q, b) => `<div class="tn-ri tn-col"><label>Pregunta</label><input data-p="${b}.0" type="text" value="${esc(q[0])}"><label>Respuesta</label><textarea data-p="${b}.1" rows="2">${esc(q[1])}</textarea></div>`, 'faq', 'Agregar pregunta')}`);
+      const S7 = sec('mostrar', '7 · Qué se muestra en esta página', 'Garantía, pasos de entrega y sellos', `
+        ${chk(base + 'mostrar.confianza', 'Sellos de confianza bajo el precio')}${chk(base + 'mostrar.garantia', 'Garantía de satisfacción')}${chk(base + 'mostrar.pasos', 'Pasos «Así llega tu pedido»')}
+        <p class="note">El texto de la garantía, los pasos y los sellos se editan en la pestaña <b>Oferta y envío</b> y valen para todos los productos.</p>`);
+      return head + `<div class="tn-secs">${S1 + S2 + S3 + S4 + S5 + S6 + S7}</div>`;
     },
     pedido(t) {
       return card('Envío y garantía', 'Lo que se muestra en la página del producto y en el pedido.', `${f('envio.gratis', 'Envío gratis', { check: 1 })}<div class="row">${f('envio.costo', 'Costo de envío si no es gratis', { type: 'number' })}${f('envio.productoDias', 'Llegada en el producto (ej. 2 a 5 días)')}</div>
@@ -228,6 +251,18 @@
     on('#tnExp', () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(T(), null, 1)], { type: 'application/json' })); a.download = 'tienda-' + T().slug + '.json'; a.click(); });
     on('#tnImp', () => q('#tnImpF').click());
     const imp = q('#tnImpF'); if (imp) imp.onchange = () => { const fl = imp.files[0]; if (!fl) return; fl.text().then(x => { try { const c = JSON.parse(x); if (!c.productos || !c.marca) throw 0; c.slug = slugify(c.slug || c.nombre) || 'tienda'; S.tiendas.push(c); ti = S.tiendas.length - 1; pi = 0; Store.save(); render(); toast('Tienda importada'); } catch (e) { toast('Archivo no válido'); } }); };
+    el.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.sec) { d.open ? abiertas.add(d.dataset.sec) : abiertas.delete(d.dataset.sec); } }, true);
+    el.querySelectorAll('[data-ra]').forEach(b => b.onclick = () => {
+      const arr = getP(T(), b.dataset.rp), i = +b.dataset.ri, a = b.dataset.ra;
+      if (!Array.isArray(arr)) setP(T(), b.dataset.rp, []);
+      const L = getP(T(), b.dataset.rp);
+      if (a === 'add') L.push(FACT[b.dataset.rk]());
+      else if (a === 'del') L.splice(i, 1);
+      else if (a === 'up' && i > 0) [L[i - 1], L[i]] = [L[i], L[i - 1]];
+      else if (a === 'dn' && i < L.length - 1) [L[i + 1], L[i]] = [L[i], L[i + 1]];
+      Store.save(); render();
+    });
+    on('#tnVer', () => { pagPrev = (T().productos[pi] || {}).slug || ''; tab = 'previa'; render(); scrollTo(0, 0); });
     const ps = q('#tnProd'); if (ps) ps.onchange = () => { pi = +ps.value; render(); };
     const arr = () => T().productos;
     on('#tnPNew', () => { arr().push({ slug: 'producto-' + (arr().length + 1), nombre: 'Producto nuevo', titulo: 'Producto nuevo', kicker: '', etiqueta: '', imagenes: [], precio: 0, tachado: 0, combo2: 0, categoria: '', rating: 0, resenas: 0, vendidos: 0, masVendido: false, nuevo: true, activo: true, bloques: [], faq: [], resenasLista: [] }); pi = arr().length - 1; Store.save(); render(); });
