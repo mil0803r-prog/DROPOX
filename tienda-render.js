@@ -135,11 +135,11 @@ dialog::backdrop{background:#0009}dialog[open]{animation:pop .3s ease both}
     if (!b.activa || !(b.items || []).length) return '';
     return `<div class="annbar" role="note"><div class="ann-row">${b.items.map(esc).join('<span class="ann-sep" aria-hidden="true">·</span>')}</div></div>`;
   }
-  function pie(cfg) {
+  function pie(cfg, o) {
     const m = cfg.marca || {}, c = cfg.contacto || {};
     const pols = (cfg.politicas || []).filter(x => x && x[0]);
     const pagina = cfg._slugTienda ? '/t/' + esc(cfg._slugTienda) : '';
-    return `<div class="acc">${(cfg.faq || []).length ? `<h2>Preguntas frecuentes</h2>${cfg.faq.map(x => `<details><summary>${esc(x[0])}</summary><div class="tx">${esc(x[1])}</div></details>`).join('')}` : ''}
+    return `<div class="acc">${(!o || o.faq !== false) && (cfg.faq || []).length ? `<h2>Preguntas frecuentes</h2>${cfg.faq.map(x => `<details><summary>${esc(x[0])}</summary><div class="tx">${esc(x[1])}</div></details>`).join('')}` : ''}
     ${pols.map(x => `<details><summary>${esc(x[0])}</summary><div class="tx">${esc(x[1])}</div></details>`).join('')}</div>
     <footer>${c.whatsapp ? `<p><a href="https://wa.me/${esc(String(c.whatsapp).replace(/\D/g, ''))}" rel="noopener">WhatsApp: ${esc(c.whatsapp)}</a></p>` : ''}${c.email ? `<p>${esc(c.email)}</p>` : ''}<p>© ${new Date().getFullYear()} ${esc(m.nombre)} · <a href="${pagina || '/'}">Inicio</a></p></footer>`;
   }
@@ -188,6 +188,34 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     ${pixeles(cfg, 'home')}</body></html>`;
   }
 
+  // Ventana de pedido contraentrega (la misma para producto, landing y código)
+  function pedidoHtml(cfg, x) {
+    return `<dialog id="ped"><div class="ped" id="pedBody">
+      <button class="x" type="button" id="pedX" aria-label="Cerrar">×</button><h2>Completa tu pedido</h2><p class="sub">Pagas en efectivo al recibir. Confirmamos por WhatsApp antes del envío.</p>
+      <form id="pedF" novalidate autocomplete="on">
+        <div class="hp"><label>No llenar<input name="web" tabindex="-1" autocomplete="off"></label></div>
+        ${x.c2 ? `<label>Cantidad</label><select name="qty" id="qty"><option value="1">1 unidad · ${q(cfg, x.pr)}</option><option value="2">2 unidades · ${q(cfg, x.c2)}</option></select>` : '<input type="hidden" name="qty" id="qty" value="1">'}
+        <div class="two"><div><label>Nombre</label><input name="nombre" autocomplete="given-name" required></div><div><label>Apellido</label><input name="apellido" autocomplete="family-name"></div></div>
+        <label>Teléfono (WhatsApp)</label><input name="telefono" type="tel" inputmode="tel" autocomplete="tel" required>
+        <div class="two"><div><label>Departamento</label><select name="departamento" required><option value="">Elige…</option>${DEPTOS.map(d => `<option>${d}</option>`).join('')}</select></div><div><label>Municipio / ciudad</label><input name="ciudad" required></div></div>
+        <label>Dirección completa</label><input name="direccion" autocomplete="street-address" required>
+        <label>Punto de referencia</label><input name="referencia" placeholder="Ej.: frente a la tienda, casa blanca">
+        <p class="aviso">Escribe tu dirección completa y un punto de referencia para que tu pedido llegue sin problemas.</p>
+        <div class="resu"><div><span>Producto</span><span id="rP"></span></div><div><span>Envío</span><span id="rE"></span></div><div class="tt"><span>Total a pagar al recibir</span><span id="rT"></span></div></div>
+        <div class="err" id="pedErr" role="alert"></div><button class="go" id="pedGo" type="submit">Confirmar pedido</button>
+      </form></div></dialog>`;
+  }
+  function waLink(cfg, p, numero, msg) {
+    const tel = String(numero || (cfg.contacto || {}).whatsapp || '').replace(/\D/g, '');
+    if (!tel) return '';
+    return 'https://wa.me/' + tel + '?text=' + encodeURIComponent(msg || ('Hola, quiero pedir: ' + p.nombre));
+  }
+  function scriptsPedido(cfg, p, x, imgs, opt) {
+    const e = cfg.envio || {}, pais = cfg.pais || {};
+    const datos = { t: cfg._slugTienda || '', p: p.slug, pr: x.pr, c2: x.c2, env: e.gratis === false ? n(e.costo) : 0, mon: pais.moneda || 'Q', cod: pais.codigo || 'GTQ', prev: !!opt.preview, nom: p.nombre, img: imgs[0] || '', wa: waLink(cfg, p, '', '') };
+    return `<script>window.__T=${JSON.stringify(datos).replace(/</g, '\\u003c')};</script><script>${clienteProducto()}</script>`;
+  }
+
   // ───────── Producto ─────────
   function producto(cfg, p, opt) {
     const m = cfg.marca || {}, e = cfg.envio || {}, pais = cfg.pais || {}, x = precios(cfg, p), imgs = (p.imagenes || []).filter(i => url(i));
@@ -197,7 +225,6 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     const sh = k => !(p.mostrar && p.mostrar[k] === false);
     const trust = sh('confianza') ? (cfg.confianzaProducto || []).filter(Boolean) : [];
     const pasos = (e.pasos || []).filter(s => s && s[0]);
-    const datos = { t: cfg._slugTienda || '', p: p.slug, pr: x.pr, c2: x.c2, env: e.gratis === false ? n(e.costo) : 0, mon: pais.moneda || 'Q', cod: pais.codigo || 'GTQ', prev: !!opt.preview, nom: p.nombre, img: imgs[0] || '' };
     const bundle = (qn, label, now, was, pct, extra) => `<label class="bo${qn === 1 ? ' sel' : ''}" data-q="${qn}"><input type="radio" name="b" value="${qn}"${qn === 1 ? ' checked' : ''}>${qn === 2 ? '<span class="bb">2x DESCUENTO</span>' : ''}${imgs[0] ? `<img src="${url(imgs[0])}" alt="" width="48" height="48">` : ''}<div class="bi"><div class="bl">${label}</div>${pct ? `<span class="bp">-${pct}%</span>` : ''}${extra || ''}</div><div class="br">${was > now ? `<s>${q(cfg, was)}</s>` : ''}<b>${q(cfg, now)}</b>${was > now ? `<span>Ahorras ${q(cfg, was - now)}</span>` : ''}</div></label>`;
     const canon = opt.canon;
     return `<!doctype html><html lang="es"><head>${head(cfg, titulo, p.kicker || m.lema || titulo, imgs[0], canon, 'product', p)}</head><body><div class="wrap" id="app">
@@ -223,23 +250,42 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     <div style="height:10px"></div>${pie(cfg).replace(/<div class="acc">[\s\S]*?<\/div>(?=\s*<footer)/, `<div class="acc">${(cfg.politicas || []).filter(z => z && z[0]).map(z => `<details><summary>${esc(z[0])}</summary><div class="tx">${esc(z[1])}</div></details>`).join('')}</div>`)}
     </div>
     <div class="sticky"><div class="in"><div class="pp">${x.tach ? `<s>${q(cfg, x.tach)}</s>` : ''}<b>${q(cfg, x.pr)}</b></div><button type="button" data-abrir>Pedir ahora · pago al recibir</button></div></div>
-    <dialog id="ped"><div class="ped" id="pedBody">
-      <button class="x" type="button" id="pedX" aria-label="Cerrar">×</button><h2>Completa tu pedido</h2><p class="sub">Pagas en efectivo al recibir. Confirmamos por WhatsApp antes del envío.</p>
-      <form id="pedF" novalidate autocomplete="on">
-        <div class="hp"><label>No llenar<input name="web" tabindex="-1" autocomplete="off"></label></div>
-        ${x.c2 ? `<label>Cantidad</label><select name="qty" id="qty"><option value="1">1 unidad · ${q(cfg, x.pr)}</option><option value="2">2 unidades · ${q(cfg, x.c2)}</option></select>` : '<input type="hidden" name="qty" id="qty" value="1">'}
-        <div class="two"><div><label>Nombre</label><input name="nombre" autocomplete="given-name" required></div><div><label>Apellido</label><input name="apellido" autocomplete="family-name"></div></div>
-        <label>Teléfono (WhatsApp)</label><input name="telefono" type="tel" inputmode="tel" autocomplete="tel" required>
-        <div class="two"><div><label>Departamento</label><select name="departamento" required><option value="">Elige…</option>${DEPTOS.map(d => `<option>${d}</option>`).join('')}</select></div><div><label>Municipio / ciudad</label><input name="ciudad" required></div></div>
-        <label>Dirección completa</label><input name="direccion" autocomplete="street-address" required>
-        <label>Punto de referencia</label><input name="referencia" placeholder="Ej.: frente a la tienda, casa blanca">
-        <p class="aviso">Escribe tu dirección completa y un punto de referencia para que tu pedido llegue sin problemas.</p>
-        <div class="resu"><div><span>Producto</span><span id="rP"></span></div><div><span>Envío</span><span id="rE"></span></div><div class="tt"><span>Total a pagar al recibir</span><span id="rT"></span></div></div>
-        <div class="err" id="pedErr" role="alert"></div><button class="go" id="pedGo" type="submit">Confirmar pedido</button>
-      </form></div></dialog>
-    <script>window.__T=${JSON.stringify(datos).replace(/</g, '\\u003c')};</script>
-    <script>${clienteProducto()}</script>
+    ${pedidoHtml(cfg, x)}
+    ${scriptsPedido(cfg, p, x, imgs, opt)}
     ${pixeles(cfg, 'producto', p)}</body></html>`;
+  }
+
+  // ───────── Landing: título · imagen · botón · imagen · botón … ─────────
+  function landing(cfg, p, opt) {
+    const m = cfg.marca || {}, x = precios(cfg, p), imgs = (p.imagenes || []).filter(i => url(i));
+    const sec = (p.secciones || []).filter(Boolean);
+    let primero = true;
+    const html = sec.map(s => {
+      if (s.tipo === 'titulo') { const h = primero ? 'h1' : 'h2'; primero = false; return `<section class="blk lp-t"><${h}>${esc(s.x)}</${h}></section>`; }
+      if (s.tipo === 'texto') return `<section class="blk"><p>${esc(s.x)}</p></section>`;
+      if (s.tipo === 'imagen') return url(s.img) ? `<img class="lp-i" src="${url(s.img)}" alt="${esc(s.alt || p.nombre)}" loading="lazy">` : '';
+      if (s.tipo === 'boton') {
+        const wa = s.accion === 'whatsapp' ? waLink(cfg, p, s.wa, s.msg) : '';
+        return wa ? `<a class="cta lp-b" href="${esc(wa)}" target="_blank" rel="noopener">${esc(s.x || 'Escríbenos por WhatsApp')}</a>` : `<button class="cta lp-b" type="button" data-abrir>${esc(s.x || 'Quiero el mío')}</button>`;
+      }
+      return '';
+    }).join('');
+    return `<!doctype html><html lang="es"><head>${head(cfg, p.titulo || p.nombre, p.kicker || m.lema || p.nombre, imgs[0], opt.canon, 'product', p)}<style>.lp-i{width:100%;display:block;margin:14px 0 0}.lp-b{margin-top:14px;margin-bottom:6px;text-align:center;text-decoration:none}.lp-t h1,.lp-t h2{font-size:26px}</style></head><body><div class="wrap" id="app">
+    ${barra(cfg)}${html}<div style="height:16px"></div>${pie(cfg, { faq: false })}</div>
+    ${pedidoHtml(cfg, x)}${scriptsPedido(cfg, p, x, imgs, opt)}${pixeles(cfg, 'producto', p)}</body></html>`;
+  }
+
+  // ───────── Código: HTML, CSS y JS propios (con {{precio}}, {{nombre}}…) ─────────
+  function codigo(cfg, p, opt) {
+    const m = cfg.marca || {}, x = precios(cfg, p), imgs = (p.imagenes || []).filter(i => url(i));
+    const vars = { precio: q(cfg, x.pr), tachado: x.tach ? q(cfg, x.tach) : '', precio2: x.c2 ? q(cfg, x.c2) : '', ahorro: x.ahorro1 ? q(cfg, x.ahorro1) : '', descuento: x.pct1 ? x.pct1 + '%' : '', nombre: esc(p.nombre), whatsapp: waLink(cfg, p, '', '') };
+    const sub = t => String(t || '').replace(/\{\{\s*([a-z0-9]+)\s*\}\}/gi, (a, k) => (k in vars ? vars[k] : a));
+    const wa = vars.whatsapp;
+    return `<!doctype html><html lang="es"><head>${head(cfg, p.titulo || p.nombre, p.kicker || m.lema || p.nombre, imgs[0], opt.canon, 'product', p)}<style>${String(p.css || '').replace(/<\/style/gi, '<\\/style')}</style></head><body><div class="wrap" id="app">
+    ${barra(cfg)}<div class="cod">${sub(p.html)}</div>${pie(cfg, { faq: false })}</div>
+    ${pedidoHtml(cfg, x)}${scriptsPedido(cfg, p, x, imgs, opt)}
+    <script>[].forEach.call(document.querySelectorAll('[data-wa]'),function(a){var w=window.__T.wa;if(w){a.href=w;a.target='_blank';a.rel='noopener'}else{a.addEventListener('click',function(e){e.preventDefault();var b=document.querySelector('[data-abrir]');if(b)b.click()})}});</script>
+    ${p.js ? `<script>${String(p.js).replace(/<\/script/gi, '<\\/script')}</script>` : ''}${pixeles(cfg, 'producto', p)}</body></html>`;
   }
 
   // JS de la página de producto (galería, ofertas, ventana de pedido y envío)
@@ -277,7 +323,8 @@ $('#pedBody').innerHTML='<div class="ok"><div class="ck">✓</div><h2>¡Pedido c
     if (!ruta) return { status: 200, html: portada(cfg, opt) };
     const p = activos(cfg).find(x => x.slug === ruta);
     if (!p) return { status: 404, html: `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>No encontrado</title><body style="font-family:system-ui;text-align:center;padding:60px 20px"><h1>Producto no encontrado</h1><p><a href="${esc(opt.base || '')}/">Volver a la tienda</a></p></body>` };
-    return { status: 200, html: producto(cfg, p, opt) };
+    const t = p.tipo === 'landing' ? landing : p.tipo === 'codigo' ? codigo : producto;
+    return { status: 200, html: t(cfg, p, opt) };
   }
   const api = { renderizar, precios, activos, PRESETS, DEPTOS, slugOk, q };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TiendaRender = api;
