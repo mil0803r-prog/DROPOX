@@ -10,6 +10,8 @@
   const color = (c, d) => /^#[0-9a-f]{3,8}$/i.test(String(c || '')) ? c : d;
   const fuente = f => String(f || '').replace(/[^A-Za-z0-9 ]/g, '').slice(0, 40) || 'Inter';
   const id = v => String(v || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
+  // En la vista previa cada parte lleva data-ed="tipo:sección:campo" para que al tocarla se abra su sección en el editor
+  const ed = (opt, spec) => (opt && opt.preview ? ' data-ed="' + spec + '"' : '');
   const slugOk = s => /^[a-z0-9][a-z0-9-]{0,80}$/.test(String(s || ''));
 
   const DEPTOS = ['Alta Verapaz', 'Baja Verapaz', 'Chimaltenango', 'Chiquimula', 'El Progreso', 'Escuintla', 'Guatemala', 'Huehuetenango', 'Izabal', 'Jalapa', 'Jutiapa', 'Petén', 'Quetzaltenango', 'Quiché', 'Retalhuleu', 'Sacatepéquez', 'San Marcos', 'Santa Rosa', 'Sololá', 'Suchitepéquez', 'Totonicapán', 'Zacapa'];
@@ -130,10 +132,10 @@ dialog::backdrop{background:#0009}dialog[open]{animation:pop .3s ease both}
 
   // ───────── Piezas ─────────
   const stars = v => '★'.repeat(Math.round(n(v))) + '☆'.repeat(5 - Math.round(n(v)));
-  function barra(cfg) {
+  function barra(cfg, opt) {
     const b = cfg.barra || {};
     if (!b.activa || !(b.items || []).length) return '';
-    return `<div class="annbar" role="note"><div class="ann-row">${b.items.map(esc).join('<span class="ann-sep" aria-hidden="true">·</span>')}</div></div>`;
+    return `<div class="annbar" role="note"${ed(opt, 'g:portada:barra.items')}><div class="ann-row">${b.items.map(esc).join('<span class="ann-sep" aria-hidden="true">·</span>')}</div></div>`;
   }
   function pie(cfg, o) {
     const m = cfg.marca || {}, c = cfg.contacto || {};
@@ -141,7 +143,7 @@ dialog::backdrop{background:#0009}dialog[open]{animation:pop .3s ease both}
     const pagina = cfg._slugTienda ? '/t/' + esc(cfg._slugTienda) : '';
     return `<div class="acc">${(!o || o.faq !== false) && (cfg.faq || []).length ? `<h2>Preguntas frecuentes</h2>${cfg.faq.map(x => `<details><summary>${esc(x[0])}</summary><div class="tx">${esc(x[1])}</div></details>`).join('')}` : ''}
     ${pols.map(x => `<details><summary>${esc(x[0])}</summary><div class="tx">${esc(x[1])}</div></details>`).join('')}</div>
-    <footer>${c.whatsapp ? `<p><a href="https://wa.me/${esc(String(c.whatsapp).replace(/\D/g, ''))}" rel="noopener">WhatsApp: ${esc(c.whatsapp)}</a></p>` : ''}${c.email ? `<p>${esc(c.email)}</p>` : ''}<p>© ${new Date().getFullYear()} ${esc(m.nombre)} · <a href="${pagina || '/'}">Inicio</a></p></footer>`;
+    <footer${o && o.ed ? ' data-ed="g:rastreo:contacto.whatsapp"' : ''}>${c.whatsapp ? `<p><a href="https://wa.me/${esc(String(c.whatsapp).replace(/\D/g, ''))}" rel="noopener">WhatsApp: ${esc(c.whatsapp)}</a></p>` : ''}${c.email ? `<p>${esc(c.email)}</p>` : ''}<p>© ${new Date().getFullYear()} ${esc(m.nombre)} · <a href="${pagina || '/'}">Inicio</a></p></footer>`;
   }
   function pixeles(cfg, pagina, prod) {
     const p = cfg.pixeles || {}, meta = id(p.meta), tt = id(p.tiktok), ga = id(p.ga), cl = id(p.clarity);
@@ -176,10 +178,10 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
       <span class="vo">Ver oferta</span></div></a>`;
     };
     return `<!doctype html><html lang="es"><head>${head(cfg, m.nombre, m.descripcion || m.lema, m.og || m.logo, opt.canon, 'website')}</head><body><div class="wrap" id="app">
-    ${barra(cfg)}
-    <div class="hero-s">${m.verificada ? '<span class="vf">✓ Tienda verificada</span>' : ''}${m.logo ? `<img class="lg" src="${url(m.logo)}" alt="${esc(m.nombre)}">` : ''}<h1>${esc(m.nombre)}</h1>${pt.badge ? `<div style="margin-top:8px"><span class="pill">${esc(pt.badge)}</span></div>` : ''}${m.lema ? `<p class="lm">${esc(m.lema)}</p>` : ''}
+    ${barra(cfg, opt)}
+    <div class="hero-s"${ed(opt, 'g:marca:marca.nombre')}>${m.verificada ? '<span class="vf">✓ Tienda verificada</span>' : ''}${m.logo ? `<img class="lg" src="${url(m.logo)}" alt="${esc(m.nombre)}">` : ''}<h1>${esc(m.nombre)}</h1>${pt.badge ? `<div style="margin-top:8px"><span class="pill">${esc(pt.badge)}</span></div>` : ''}${m.lema ? `<p class="lm">${esc(m.lema)}</p>` : ''}
     <div class="chips">${(pt.confianza || []).map(x => `<span><i>✓</i>${esc(x)}</span>`).join('')}</div></div>
-    ${pm.activa && pt.mostrarPromo !== false ? `<div class="promo"><h2>${esc(pm.titulo)}</h2><div class="big">${esc(pm.cantidad)} o más · -${esc(pm.descuento)}%</div><p>${esc(pm.texto)}</p></div>` : ''}
+    ${pm.activa && pt.mostrarPromo !== false ? `<div class="promo"${ed(opt, 'g:portada:promo.titulo')}><h2>${esc(pm.titulo)}</h2><div class="big">${esc(pm.cantidad)} o más · -${esc(pm.descuento)}%</div><p>${esc(pm.texto)}</p></div>` : ''}
     ${cats.length ? `<div class="cats" id="cats"><button class="on" data-c="">Todos</button>${cats.map(c => `<button data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : ''}
     <h2 class="sec">${esc(pt.titulo || 'Los más vendidos')}</h2>
     <div class="grid" id="grid">${lista.map(card).join('')}</div>
@@ -223,33 +225,34 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     const prom = n(p.resenas) ? n(p.rating) : rs.length ? rs.reduce((s, r) => s + n(r.e), 0) / rs.length : 0;
     const totalRes = n(p.resenas) || rs.length;
     const sh = k => !(p.mostrar && p.mostrar[k] === false);
+    const imgIdx = (p.imagenes || []).map((i, k) => (url(i) ? k : -1)).filter(k => k >= 0);
     const trust = sh('confianza') ? (cfg.confianzaProducto || []).filter(Boolean) : [];
     const pasos = (e.pasos || []).filter(s => s && s[0]);
     const bundle = (qn, label, now, was, pct, extra) => `<label class="bo${qn === 1 ? ' sel' : ''}" data-q="${qn}"><input type="radio" name="b" value="${qn}"${qn === 1 ? ' checked' : ''}>${qn === 2 ? '<span class="bb">2x DESCUENTO</span>' : ''}${imgs[0] ? `<img src="${url(imgs[0])}" alt="" width="48" height="48">` : ''}<div class="bi"><div class="bl">${label}</div>${pct ? `<span class="bp">-${pct}%</span>` : ''}${extra || ''}</div><div class="br">${was > now ? `<s>${q(cfg, was)}</s>` : ''}<b>${q(cfg, now)}</b>${was > now ? `<span>Ahorras ${q(cfg, was - now)}</span>` : ''}</div></label>`;
     const canon = opt.canon;
     return `<!doctype html><html lang="es"><head>${head(cfg, titulo, p.kicker || m.lema || titulo, imgs[0], canon, 'product', p)}</head><body><div class="wrap" id="app">
-    ${barra(cfg)}
-    <div class="top"><a href="${cfg._base || '/'}/">${m.logo ? `<img src="${url(m.logo)}" alt="${esc(m.nombre)}">` : `<b>${esc(m.nombre)}</b>`}</a>${m.verificada ? '<span class="vf">✓ Verificada</span>' : ''}</div>
-    ${imgs.length ? `<div class="gs"><div class="gal" id="gal">${imgs.map((i, k) => `<img src="${url(i)}" alt="${esc(titulo)} ${k + 1}" ${k ? 'loading="lazy"' : 'fetchpriority="high"'}>`).join('')}</div>${imgs.length > 1 ? `<div class="gc" id="gc">1 / ${imgs.length}</div>` : ''}</div>
+    ${barra(cfg, opt)}
+    <div class="top"${ed(opt, 'g:marca:marca.logo')}><a href="${cfg._base || '/'}/">${m.logo ? `<img src="${url(m.logo)}" alt="${esc(m.nombre)}">` : `<b>${esc(m.nombre)}</b>`}</a>${m.verificada ? '<span class="vf">✓ Verificada</span>' : ''}</div>
+    ${imgs.length ? `<div class="gs"><div class="gal" id="gal">${imgs.map((i, k) => `<img${ed(opt, 'p:fotos:imagenes.' + imgIdx[k])} src="${url(i)}" alt="${esc(titulo)} ${k + 1}" ${k ? 'loading="lazy"' : 'fetchpriority="high"'}>`).join('')}</div>${imgs.length > 1 ? `<div class="gc" id="gc">1 / ${imgs.length}</div>` : ''}</div>
     ${imgs.length > 1 ? `<div class="th" id="th">${imgs.map((i, k) => `<button type="button" class="${k ? '' : 'on'}" data-i="${k}" aria-label="Ver imagen ${k + 1}"><img src="${url(i)}" alt=""></button>`).join('')}</div>` : ''}` : ''}
-    <div class="cap">${p.etiqueta ? `<span class="pill">${esc(p.etiqueta)}</span>` : ''}${p.kicker ? `<div class="kick">${esc(p.kicker)}</div>` : ''}<h1>${esc(titulo)}</h1>
-    <div class="rate"><span class="s">${stars(prom)}</span> <b>${prom.toFixed(1)}/5</b> <span class="m">(${totalRes} reseñas)</span></div></div>
-    ${cfg.promo && cfg.promo.activa ? `<div class="ofbox">Precio de lanzamiento disponible</div>` : ''}
-    <div class="badges">${[(pais.pais ? 'Pago contraentrega' : ''), (e.gratis === false ? '' : 'Envío gratis'), 'Calidad certificada'].filter(Boolean).map(b => `<span class="badge"><i>✓</i>${esc(b)}</span>`).join('')}</div>
-    <div class="price"><span>${q(cfg, x.pr)}</span><small>${esc(pais.codigo || 'GTQ')}</small>${x.tach ? `<s>${q(cfg, x.tach)}</s><span class="sb">-${x.pct1}%</span>` : ''}</div>
-    ${x.ahorro1 ? `<div class="save">Estás ahorrando <b>${q(cfg, x.ahorro1)}</b></div>` : ''}
-    <div class="ship">🚚 Llega en ${esc(e.productoDias || e.dias || '3 a 7 días')} a tu ciudad</div>
-    ${trust.length ? `<div class="trust">${trust.map(t => `<div>${esc(t)}</div>`).join('')}</div>` : ''}
-    <div class="bund" id="bund">${bundle(1, 'Compra 1 unidad', x.pr, x.tach, x.pct1)}${x.c2 ? bundle(2, 'Llévate dos y comparte uno', x.c2, x.base2, pctOff(x.base2, x.c2), `<div class="bu">${x.tach ? `<s>${q(cfg, x.tach)}</s> ` : ''}c/u ${q(cfg, x.c2 / 2)}</div>`) : ''}</div>
+    <div class="cap">${p.etiqueta ? `<span class="pill"${ed(opt, 'p:basico:etiqueta')}>${esc(p.etiqueta)}</span>` : ''}${p.kicker ? `<div class="kick"${ed(opt, 'p:basico:kicker')}>${esc(p.kicker)}</div>` : ''}<h1${ed(opt, 'p:basico:titulo')}>${esc(titulo)}</h1>
+    <div class="rate"${ed(opt, 'p:resenas:rating')}><span class="s">${stars(prom)}</span> <b>${prom.toFixed(1)}/5</b> <span class="m">(${totalRes} reseñas)</span></div></div>
+    ${cfg.promo && cfg.promo.activa ? `<div class="ofbox"${ed(opt, 'g:portada:promo.activa')}>Precio de lanzamiento disponible</div>` : ''}
+    <div class="badges"${ed(opt, 'g:pedido:envio.gratis')}>${[(pais.pais ? 'Pago contraentrega' : ''), (e.gratis === false ? '' : 'Envío gratis'), 'Calidad certificada'].filter(Boolean).map(b => `<span class="badge"><i>✓</i>${esc(b)}</span>`).join('')}</div>
+    <div class="price"${ed(opt, 'p:precio:precio')}><span>${q(cfg, x.pr)}</span><small>${esc(pais.codigo || 'GTQ')}</small>${x.tach ? `<s>${q(cfg, x.tach)}</s><span class="sb">-${x.pct1}%</span>` : ''}</div>
+    ${x.ahorro1 ? `<div class="save"${ed(opt, 'p:precio:tachado')}>Estás ahorrando <b>${q(cfg, x.ahorro1)}</b></div>` : ''}
+    <div class="ship"${ed(opt, 'g:pedido:envio.productoDias')}>🚚 Llega en ${esc(e.productoDias || e.dias || '3 a 7 días')} a tu ciudad</div>
+    ${trust.length ? `<div class="trust"${ed(opt, 'g:pedido:confianzaProducto')}>${trust.map(t => `<div>${esc(t)}</div>`).join('')}</div>` : ''}
+    <div class="bund" id="bund"${ed(opt, 'p:precio:combo2')}>${bundle(1, 'Compra 1 unidad', x.pr, x.tach, x.pct1)}${x.c2 ? bundle(2, 'Llévate dos y comparte uno', x.c2, x.base2, pctOff(x.base2, x.c2), `<div class="bu">${x.tach ? `<s>${q(cfg, x.tach)}</s> ` : ''}c/u ${q(cfg, x.c2 / 2)}</div>`) : ''}</div>
     <button class="cta" type="button" data-abrir>Quiero el mío</button>
-    ${e.garantia && sh('garantia') ? `<div class="gar"><div class="gi">🛡️</div><div><b>Garantía de satisfacción</b><p>${esc(e.garantia)}</p></div></div>` : ''}
-    ${pasos.length && sh('pasos') ? `<div class="steps"><h3>Así llega tu pedido</h3>${pasos.map((s, k) => `<div class="stp"><i>${String(k + 1).padStart(2, '0')}</i><span>${esc(s[0])}</span><em>${esc(s[1])}</em></div>`).join('')}<p style="font-size:13px;margin-top:8px;opacity:.8">Al confirmar tu pedido te damos tu link de rastreo. Llega a tu puerta y pagas al recibir, sin compromisos.</p></div>` : ''}
-    ${(p.bloques || []).filter(b => b && (b.t || b.x || b.img)).map(b => `<section class="blk">${b.t ? `<h2>${esc(b.t)}</h2>` : ''}${b.x ? `<p>${esc(b.x)}</p>` : ''}${url(b.img) ? `<img src="${url(b.img)}" alt="${esc(b.t)}" loading="lazy">` : ''}</section>`).join('')}
-    ${sh('faq') && ((p.faq || []).length || (cfg.faq || []).length) ? `<div class="acc"><h2>Preguntas frecuentes</h2>${[...(p.faq || []), ...(cfg.faq || [])].map(f => `<details><summary>${esc(f[0])}</summary><div class="tx">${esc(f[1])}</div></details>`).join('')}</div>` : ''}
-    ${rs.length && sh('resenas') ? `<div class="revs"><h2>Lo que dicen quienes ya lo recibieron</h2><div class="sc"><b>${prom.toFixed(1)}</b> <span class="s" style="color:#f59e0b">${stars(prom)}</span><br>${totalRes} reseñas verificadas</div>${rs.map(r => `<div class="rv"><span class="s">${stars(r.e)}</span> <span class="vb">Comprador verificado</span><p>${esc(r.t)}</p><small><b>${esc(r.n)}</b>${r.c ? ' · ' + esc(r.c) : ''}</small></div>`).join('')}</div>` : ''}
-    <div style="height:10px"></div>${pie(cfg).replace(/<div class="acc">[\s\S]*?<\/div>(?=\s*<footer)/, `<div class="acc">${(cfg.politicas || []).filter(z => z && z[0]).map(z => `<details><summary>${esc(z[0])}</summary><div class="tx">${esc(z[1])}</div></details>`).join('')}</div>`)}
+    ${e.garantia && sh('garantia') ? `<div class="gar"${ed(opt, 'g:pedido:envio.garantia')}><div class="gi">🛡️</div><div><b>Garantía de satisfacción</b><p>${esc(e.garantia)}</p></div></div>` : ''}
+    ${pasos.length && sh('pasos') ? `<div class="steps"${ed(opt, 'g:pedido:envio.pasos')}><h3>Así llega tu pedido</h3>${pasos.map((s, k) => `<div class="stp"><i>${String(k + 1).padStart(2, '0')}</i><span>${esc(s[0])}</span><em>${esc(s[1])}</em></div>`).join('')}<p style="font-size:13px;margin-top:8px;opacity:.8">Al confirmar tu pedido te damos tu link de rastreo. Llega a tu puerta y pagas al recibir, sin compromisos.</p></div>` : ''}
+    ${(p.bloques || []).map((b, bi) => [b, bi]).filter(([b]) => b && (b.t || b.x || b.img)).map(([b, bi]) => `<section class="blk"${ed(opt, 'p:contenido:bloques.' + bi + '.t')}>${b.t ? `<h2>${esc(b.t)}</h2>` : ''}${b.x ? `<p>${esc(b.x)}</p>` : ''}${url(b.img) ? `<img src="${url(b.img)}" alt="${esc(b.t)}" loading="lazy">` : ''}</section>`).join('')}
+    ${sh('faq') && ((p.faq || []).length || (cfg.faq || []).length) ? `<div class="acc"><h2>Preguntas frecuentes</h2>${[...(p.faq || []), ...(cfg.faq || [])].map((f, fk) => `<details${ed(opt, fk < (p.faq || []).length ? 'p:preguntas:faq.' + fk + '.0' : 'g:textos:faq')}><summary>${esc(f[0])}</summary><div class="tx">${esc(f[1])}</div></details>`).join('')}</div>` : ''}
+    ${rs.length && sh('resenas') ? `<div class="revs"${ed(opt, 'p:resenas:resenasLista.0.t')}><h2>Lo que dicen quienes ya lo recibieron</h2><div class="sc"><b>${prom.toFixed(1)}</b> <span class="s" style="color:#f59e0b">${stars(prom)}</span><br>${totalRes} reseñas verificadas</div>${rs.map((r, rk) => `<div class="rv"${ed(opt, 'p:resenas:resenasLista.' + rk + '.t')}><span class="s">${stars(r.e)}</span> <span class="vb">Comprador verificado</span><p>${esc(r.t)}</p><small><b>${esc(r.n)}</b>${r.c ? ' · ' + esc(r.c) : ''}</small></div>`).join('')}</div>` : ''}
+    <div style="height:10px"></div>${pie(cfg, { ed: opt.preview }).replace(/<div class="acc">[\s\S]*?<\/div>(?=\s*<footer)/, `<div class="acc"${ed(opt, 'g:textos:politicas')}>${(cfg.politicas || []).filter(z => z && z[0]).map(z => `<details><summary>${esc(z[0])}</summary><div class="tx">${esc(z[1])}</div></details>`).join('')}</div>`)}
     </div>
-    <div class="sticky"><div class="in"><div class="pp">${x.tach ? `<s>${q(cfg, x.tach)}</s>` : ''}<b>${q(cfg, x.pr)}</b></div><button type="button" data-abrir>Pedir ahora · pago al recibir</button></div></div>
+    <div class="sticky"${ed(opt, 'p:precio:precio')}><div class="in"><div class="pp">${x.tach ? `<s>${q(cfg, x.tach)}</s>` : ''}<b>${q(cfg, x.pr)}</b></div><button type="button" data-abrir>Pedir ahora · pago al recibir</button></div></div>
     ${pedidoHtml(cfg, x)}
     ${scriptsPedido(cfg, p, x, imgs, opt)}
     ${pixeles(cfg, 'producto', p)}</body></html>`;
@@ -258,20 +261,20 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
   // ───────── Landing: título · imagen · botón · imagen · botón … ─────────
   function landing(cfg, p, opt) {
     const m = cfg.marca || {}, x = precios(cfg, p), imgs = (p.imagenes || []).filter(i => url(i));
-    const sec = (p.secciones || []).filter(Boolean);
+    const sec = (p.secciones || []).map((s, i) => s && Object.assign({}, s, { _i: i })).filter(Boolean);
     let primero = true;
     const html = sec.map(s => {
-      if (s.tipo === 'titulo') { const h = primero ? 'h1' : 'h2'; primero = false; return `<section class="blk lp-t"><${h}>${esc(s.x)}</${h}></section>`; }
-      if (s.tipo === 'texto') return `<section class="blk"><p>${esc(s.x)}</p></section>`;
-      if (s.tipo === 'imagen') return url(s.img) ? `<img class="lp-i" src="${url(s.img)}" alt="${esc(s.alt || p.nombre)}" loading="lazy">` : '';
+      if (s.tipo === 'titulo') { const h = primero ? 'h1' : 'h2'; primero = false; return `<section class="blk lp-t"${ed(opt, 'p:secciones:secciones.' + s._i + '.x')}><${h}>${esc(s.x)}</${h}></section>`; }
+      if (s.tipo === 'texto') return `<section class="blk"${ed(opt, 'p:secciones:secciones.' + s._i + '.x')}><p>${esc(s.x)}</p></section>`;
+      if (s.tipo === 'imagen') return url(s.img) ? `<img class="lp-i"${ed(opt, 'p:secciones:secciones.' + s._i + '.img')} src="${url(s.img)}" alt="${esc(s.alt || p.nombre)}" loading="lazy">` : '';
       if (s.tipo === 'boton') {
         const wa = s.accion === 'whatsapp' ? waLink(cfg, p, s.wa, s.msg) : '';
-        return wa ? `<a class="cta lp-b" href="${esc(wa)}" target="_blank" rel="noopener">${esc(s.x || 'Escríbenos por WhatsApp')}</a>` : `<button class="cta lp-b" type="button" data-abrir>${esc(s.x || 'Quiero el mío')}</button>`;
+        return wa ? `<a class="cta lp-b"${ed(opt, 'p:secciones:secciones.' + s._i + '.x')} href="${esc(wa)}" target="_blank" rel="noopener">${esc(s.x || 'Escríbenos por WhatsApp')}</a>` : `<button class="cta lp-b"${ed(opt, 'p:secciones:secciones.' + s._i + '.x')} type="button" data-abrir>${esc(s.x || 'Quiero el mío')}</button>`;
       }
       return '';
     }).join('');
     return `<!doctype html><html lang="es"><head>${head(cfg, p.titulo || p.nombre, p.kicker || m.lema || p.nombre, imgs[0], opt.canon, 'product', p)}<style>.lp-i{width:100%;display:block;margin:14px 0 0}.lp-b{margin-top:14px;margin-bottom:6px;text-align:center;text-decoration:none}.lp-t h1,.lp-t h2{font-size:26px}</style></head><body><div class="wrap" id="app">
-    ${barra(cfg)}${html}<div style="height:16px"></div>${pie(cfg, { faq: false })}</div>
+    ${barra(cfg, opt)}${html}<div style="height:16px"></div>${pie(cfg, { faq: false })}</div>
     ${pedidoHtml(cfg, x)}${scriptsPedido(cfg, p, x, imgs, opt)}${pixeles(cfg, 'producto', p)}</body></html>`;
   }
 
@@ -282,7 +285,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     const sub = t => String(t || '').replace(/\{\{\s*([a-z0-9]+)\s*\}\}/gi, (a, k) => (k in vars ? vars[k] : a));
     const wa = vars.whatsapp;
     return `<!doctype html><html lang="es"><head>${head(cfg, p.titulo || p.nombre, p.kicker || m.lema || p.nombre, imgs[0], opt.canon, 'product', p)}<style>${String(p.css || '').replace(/<\/style/gi, '<\\/style')}</style></head><body><div class="wrap" id="app">
-    ${barra(cfg)}<div class="cod">${sub(p.html)}</div>${pie(cfg, { faq: false })}</div>
+    ${barra(cfg, opt)}<div class="cod"${ed(opt, 'p:codigo:html')}>${sub(p.html)}</div>${pie(cfg, { faq: false })}</div>
     ${pedidoHtml(cfg, x)}${scriptsPedido(cfg, p, x, imgs, opt)}
     <script>[].forEach.call(document.querySelectorAll('[data-wa]'),function(a){var w=window.__T.wa;if(w){a.href=w;a.target='_blank';a.rel='noopener'}else{a.addEventListener('click',function(e){e.preventDefault();var b=document.querySelector('[data-abrir]');if(b)b.click()})}});</script>
     ${p.js ? `<script>${String(p.js).replace(/<\/script/gi, '<\\/script')}</script>` : ''}${pixeles(cfg, 'producto', p)}</body></html>`;
@@ -315,16 +318,20 @@ $('#pedBody').innerHTML='<div class="ok"><div class="ck">✓</div><h2>¡Pedido c
   }
 
   // ───────── Entrada principal ─────────
+  // Guía de toque (solo vista previa): al tocar una parte, el editor abre la sección que la controla
+  const GUIA = `<style>html.guia [data-ed]{cursor:pointer}html.guia [data-ed]:hover{outline:2px dashed #7c3aed;outline-offset:2px;border-radius:6px}</style><script>(function(){function g(){try{return window.parent.__tnGuia!==false}catch(x){return false}}var d=document,h=d.documentElement;if(g())h.classList.add('guia');var tip=d.createElement('div');tip.style.cssText='position:fixed;z-index:99;left:8px;right:8px;bottom:8px;background:#4c1d95;color:#fff;font:600 12px system-ui;padding:7px 10px;border-radius:10px;opacity:0;pointer-events:none;transition:.15s;text-align:center';tip.textContent='Toca para editar esto';d.body.appendChild(tip);d.addEventListener('mouseover',function(e){var t=e.target.closest&&e.target.closest('[data-ed]');tip.style.opacity=t&&g()?1:0});d.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('[data-ed]');if(!t||!g())return;e.preventDefault();e.stopPropagation();try{window.parent.Tienda.ir(t.getAttribute('data-ed'))}catch(x){}},true)})();</script>`;
+  const conGuia = (html, opt) => (opt && opt.preview ? html.replace('</body>', GUIA + '</body>') : html);
+
   // ruta: '' (portada) o el slug de un producto. opt: { base, preview, canon }
   function renderizar(cfg, ruta, opt) {
     opt = opt || {};
     cfg = Object.assign({}, cfg, { _base: opt.base || '', _slugTienda: opt.slugTienda || cfg.slug || '' });
     ruta = String(ruta || '').replace(/^\/+|\/+$/g, '');
-    if (!ruta) return { status: 200, html: portada(cfg, opt) };
+    if (!ruta) return { status: 200, html: conGuia(portada(cfg, opt), opt) };
     const p = activos(cfg).find(x => x.slug === ruta);
     if (!p) return { status: 404, html: `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>No encontrado</title><body style="font-family:system-ui;text-align:center;padding:60px 20px"><h1>Producto no encontrado</h1><p><a href="${esc(opt.base || '')}/">Volver a la tienda</a></p></body>` };
     const t = p.tipo === 'landing' ? landing : p.tipo === 'codigo' ? codigo : producto;
-    return { status: 200, html: t(cfg, p, opt) };
+    return { status: 200, html: conGuia(t(cfg, p, opt), opt) };
   }
   const api = { renderizar, precios, activos, PRESETS, DEPTOS, slugOk, q };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TiendaRender = api;
