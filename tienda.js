@@ -135,10 +135,16 @@
     if (t.barra.movProd === undefined) t.barra.movProd = true;
     if (t.barra.dorado === undefined) t.barra.dorado = true;
   }
+  function migrarInf(t) {
+    if (t._inf) return; t._inf = true;
+    t.barraInf = Object.assign({ activa: true, items: ['Pago contraentrega', 'Compra protegida', 'Atención por WhatsApp'], movHome: true, movProd: true, dorado: true, vel: 22, tam: 0, simbolo: '', dir: 'izq' }, t.barraInf || {});
+    t.barra = t.barra || {}; if (!t.barra.dir) t.barra.dir = 'izq';
+    if (!t.portada) t.portada = {}; if (t.portada.barraVel === undefined) t.portada.barraVel = 22;
+  }
   function asegurar() {
     if (!Array.isArray(S.tiendas) || !S.tiendas.length) S.tiendas = [clon(window.TIENDA_BASE)];
     if (ti >= S.tiendas.length) ti = 0;
-    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); S.tiendas.forEach(asignarResenas); S.tiendas.forEach(migrarMov); S.tiendas.forEach(migrarCar); S.tiendas.forEach(migrarBarra); restaurar();
+    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); S.tiendas.forEach(asignarResenas); S.tiendas.forEach(migrarMov); S.tiendas.forEach(migrarCar); S.tiendas.forEach(migrarBarra); S.tiendas.forEach(migrarInf); restaurar();
     const t = S.tiendas[ti];
     if (pi >= (t.productos || []).length) pi = 0;
     return t;
@@ -351,11 +357,18 @@
         card('País y moneda', 'Todo va en soles (S/ · PEN) con pago contraentrega.', `<div class="row">${f('pais.pais', 'País')}${f('pais.moneda', 'Símbolo de moneda')}</div><div class="row">${f('pais.codigo', 'Código (GTQ)')}${f('pais.locale', 'Idioma (es_GT)')}</div>`);
     },
     portada(t) {
-      return card('Barra superior', 'Una frase por línea.', `${f('barra.activa', 'Mostrar barra', { check: 1 })}${f('barra.items', 'Mensajes', { kind: 'lines', rows: 4 })}<div class="row">${f('barra.movHome', 'Barra en movimiento en la página principal', { check: 1 })}${f('barra.movProd', 'Barra en movimiento en las páginas de producto', { check: 1 })}</div>${f('barra.dorado', 'Fondo dorado degradado (si pones un color de fondo, se usa ese)', { check: 1 })}`) +
+      return card('Barra superior (encabezado)', 'Una frase por línea. Corre de lado a lado y se ve arriba en la portada y en los productos.', `${f('barra.activa', 'Mostrar la barra', { check: 1 })}${f('barra.items', 'Mensajes', { kind: 'lines', rows: 4 })}
+        <div class="row">${f('barra.movHome', 'En movimiento en la página principal', { check: 1 })}${f('barra.movProd', 'En movimiento en las páginas de producto', { check: 1 })}</div>${f('barra.dorado', 'Fondo dorado degradado (si pones un color de fondo, se usa ese)', { check: 1 })}
+        <div class="row">${f('portada.barraVel', 'Velocidad: segundos por vuelta (menos = más rápida)', { type: 'number' })}${f('portada.barraTam', 'Tamaño del texto (px)', { type: 'number' })}</div>
+        <div class="row">${f('barra.fondo', 'Color de fondo', { type: 'color' })}${f('barra.color', 'Color del texto', { type: 'color' })}</div>
+        <div class="row">${f('portada.simbolo', 'Símbolo entre mensajes (vacío = ninguno)')}${f('barra.dir', 'Dirección', { opts: ['izq', 'der'] })}</div>`) +
+        card('Barra inferior (arriba del pie de página)', 'Otra barra igual, abajo de la página. Una frase por línea.', `${f('barraInf.activa', 'Mostrar la barra', { check: 1 })}${f('barraInf.items', 'Mensajes', { kind: 'lines', rows: 4 })}
+        <div class="row">${f('barraInf.movHome', 'En movimiento en la página principal', { check: 1 })}${f('barraInf.movProd', 'En movimiento en las páginas de producto', { check: 1 })}</div>${f('barraInf.dorado', 'Fondo dorado degradado (si pones un color de fondo, se usa ese)', { check: 1 })}
+        <div class="row">${f('barraInf.vel', 'Velocidad: segundos por vuelta (menos = más rápida)', { type: 'number' })}${f('barraInf.tam', 'Tamaño del texto (px)', { type: 'number' })}</div>
+        <div class="row">${f('barraInf.fondo', 'Color de fondo', { type: 'color' })}${f('barraInf.color', 'Color del texto', { type: 'color' })}</div>
+        <div class="row">${f('barraInf.simbolo', 'Símbolo entre mensajes (vacío = ninguno)')}${f('barraInf.dir', 'Dirección', { opts: ['izq', 'der'] })}</div>`) +
         card('Movimiento (solo en la página principal)', 'La barra superior corre de lado a lado y debajo del nombre se escribe una frase que va cambiando. Los productos no se mueven.', `${f('portada.mov', 'Activar la frase que se escribe sola', { check: 1 })}${f('portada.fijo', 'Texto fijo (queda quieto)')}${f('portada.frases', 'Frases que se escriben solas (una por línea)', { kind: 'lines', rows: 4 })}
-        <div class="row">${f('portada.escVel', 'Velocidad al escribir (ms por letra, menos = más rápido)', { type: 'number' })}${f('portada.escTam', 'Tamaño de la frase (px)', { type: 'number' })}</div>${f('portada.escColor', 'Color de la frase escrita', { type: 'color' })}
-        <div class="row">${f('portada.barraVel', 'Vuelta completa de la barra (segundos, más = más lenta)', { type: 'number' })}${f('portada.barraTam', 'Tamaño del texto de la barra (px)', { type: 'number' })}</div>
-        <div class="row">${f('barra.fondo', 'Fondo de la barra', { type: 'color' })}${f('barra.color', 'Color del texto de la barra', { type: 'color' })}</div>${f('portada.simbolo', 'Símbolo entre mensajes (vacío = ninguno)')}`) +
+        <div class="row">${f('portada.escVel', 'Velocidad al escribir (ms por letra, menos = más rápido)', { type: 'number' })}${f('portada.escTam', 'Tamaño de la frase (px)', { type: 'number' })}</div>${f('portada.escColor', 'Color de la frase escrita', { type: 'color' })}`) +
         card('Carrusel horizontal (solo en la página principal)', 'Los productos se deslizan de lado a lado con el dedo y también solos. Cada tarjeta lleva al producto.', `${f('portada.carrusel', 'Mostrar el carrusel', { check: 1 })}${f('portada.carruselTitulo', 'Título sobre el carrusel (opcional)')}<div class="row">${f('portada.carruselSeg', 'Cambia solo cada (segundos, 0 = no)', { type: 'number' })}${f('portada.carruselPrecio', 'Mostrar el precio', { check: 1 })}</div>`) +
         card('Cabecera de portada', '', `<div class="row">${f('portada.badge', 'Etiqueta (ej. Pago contraentrega)')}${f('portada.titulo', 'Título de la rejilla')}</div>${f('portada.confianza', 'Garantías (una por línea)', { kind: 'lines', rows: 4 })}`) +
         card('Promo por cantidad', 'La caja «Mientras más llevas, más ahorras». Si un producto no tiene precio de combo propio, este descuento arma el precio de 2 unidades.', `${f('promo.activa', 'Activar promo', { check: 1 })}${f('portada.mostrarPromo', 'Mostrar la caja en la portada', { check: 1 })}
