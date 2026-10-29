@@ -102,7 +102,7 @@
     return `${c.url}/storage/v1/object/public/${BUCKET}/${nombre}`;
   }
   let subiendoA = null;
-  function pedirArchivos(path, modo) {
+  function subirArchivos(path, modo) {
     let inp = document.getElementById('tnFile');
     if (!inp) {
       inp = document.createElement('input'); inp.type = 'file'; inp.id = 'tnFile'; inp.accept = 'image/*'; inp.hidden = true; document.body.appendChild(inp);
@@ -122,7 +122,51 @@
     }
     subiendoA = { path, modo }; inp.multiple = modo === 'push'; inp.click();
   }
-  const upBtn = (path, modo, txt) => `<button type="button" class="btn btn-sm tn-up" data-up="${path}" data-upmodo="${modo || 'set'}">📷 ${txt || 'Subir del dispositivo'}</button>`;
+
+  // ───────── Biblioteca de fotos: subir del dispositivo o elegir una que ya está guardada ─────────
+  async function listarSubidas() {
+    const tk = window.Nube && (await Nube.token()), c = window.DROPOX_CFG, slug = T().slug;
+    if (!tk) throw new Error('Inicia sesión para ver tus fotos.');
+    const r = await fetch(`${c.url}/storage/v1/object/list/${BUCKET}`, { method: 'POST', headers: { apikey: c.key, Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' }, body: JSON.stringify({ prefix: slug, limit: 300, offset: 0, sortBy: { column: 'created_at', order: 'desc' } }) });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(/bucket|not found/i.test(e.message || e.error || '') ? 'Falta crear el almacén de fotos (SQL «Subir fotos» de Supabase).' : (e.message || 'No se pudo leer tu almacén (' + r.status + ').')); }
+    const lista = await r.json();
+    return (Array.isArray(lista) ? lista : []).filter(o => o && o.id && /\.(webp|jpe?g|png|gif)$/i.test(o.name || '')).map(o => `${c.url}/storage/v1/object/public/${BUCKET}/${slug}/${o.name}`);
+  }
+  // fotos que ya usas en tus productos y en la marca
+  function fotosUsadas() {
+    const t = T(), out = [];
+    const ok = u => typeof u === 'string' && /^https:\/\//.test(u) && !out.includes(u) && out.push(u);
+    ['logo', 'og', 'favicon'].forEach(k => ok((t.marca || {})[k]));
+    (t.productos || []).forEach(q => { (q.imagenes || []).forEach(ok); (q.contenido || []).forEach(c => ok(c && c.img)); (q.bloques || []).forEach(c => ok(c && c.img)); (q.secciones || []).forEach(c => ok(c && c.img)); });
+    return out;
+  }
+  function elegirFoto(path, modo) {
+    const f = $('#dlgForm'), d = $('#dlg'), multi = modo === 'push', sel = [];
+    f.innerHTML = `<h2>${multi ? 'Elegir fotos' : 'Elegir foto'}</h2><p class="sub" style="margin-top:-6px;color:var(--mut)">Sube una nueva o toca una de las que ya tienes${multi ? ' (puedes marcar varias)' : ''}.</p>
+      <div class="tn-act"><button type="button" class="btn btn-pri" id="phUp">📤 Subir del dispositivo</button></div>
+      <div id="phMsg" class="note" style="min-height:16px"></div><div id="phBox"><p class="note">Cargando tus fotos…</p></div>
+      <div class="dlg-foot"><button type="button" class="btn" id="phNo">Cancelar</button>${multi ? '<button type="button" class="btn btn-pri" id="phOk" disabled>Usar fotos</button>' : ''}</div>`;
+    f.onsubmit = e => e.preventDefault();
+    $('#phNo').onclick = () => d.close();
+    $('#phUp').onclick = () => { d.close(); subirArchivos(path, modo); };
+    const poner = urls => { if (!urls.length) return; if (multi) { const L = getP(T(), path); if (Array.isArray(L)) L.push(...urls); else setP(T(), path, urls.slice()); } else setP(T(), path, urls[0]); Store.save(); d.close(); render(); toast(urls.length > 1 ? urls.length + ' fotos agregadas' : 'Foto elegida'); };
+    const grid = (tit, urls) => urls.length ? `<h3 style="font-size:13px;margin:12px 0 6px">${tit} <small style="color:var(--mut)">(${urls.length})</small></h3><div class="tn-ph">${urls.map(u => `<button type="button" data-u="${esc(u)}"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer"><i>✓</i></button>`).join('')}</div>` : '';
+    const dibujar = (subidas, errSub) => {
+      const usadas = fotosUsadas().filter(u => !subidas.includes(u));
+      $('#phBox').innerHTML = (errSub ? `<p class="note" style="color:var(--warn)">${esc(errSub)}</p>` : '') + grid('Subidas a mi almacén', subidas) + grid('Usadas en mis productos', usadas) + (!subidas.length && !usadas.length ? '<p class="note">Todavía no tienes fotos. Sube la primera con el botón de arriba.</p>' : '');
+      $('#phBox').querySelectorAll('[data-u]').forEach(b => b.onclick = () => {
+        if (!multi) return poner([b.dataset.u]);
+        const i = sel.indexOf(b.dataset.u); if (i < 0) sel.push(b.dataset.u); else sel.splice(i, 1);
+        b.classList.toggle('on', i < 0); const ok = $('#phOk'); ok.disabled = !sel.length; ok.textContent = sel.length ? 'Usar ' + sel.length + (sel.length === 1 ? ' foto' : ' fotos') : 'Usar fotos';
+      });
+    };
+    if (multi) $('#phOk').onclick = () => poner(sel.slice());
+    dibujar([], '');
+    listarSubidas().then(l => dibujar(l, '')).catch(e => dibujar([], e.message));
+    d.showModal();
+  }
+
+  const upBtn = (path, modo, txt) => `<button type="button" class="btn btn-sm tn-up" data-up="${path}" data-upmodo="${modo || 'set'}">📷 ${txt || 'Subir o elegir foto'}</button>`;
 
   // Campos
   const f = (path, label, o = {}) => {
@@ -648,7 +692,7 @@
       else if (a === 'dn' && i < L.length - 1) [L[i + 1], L[i]] = [L[i], L[i + 1]];
       Store.save(); render();
     });
-    el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => pedirArchivos(b.dataset.up, b.dataset.upmodo));
+    el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => elegirFoto(b.dataset.up, b.dataset.upmodo));
     el.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copiar(b.dataset.copy));
     // «Ver producto» y «Abrir tienda»: si hay cambios sin publicar, se publican primero y luego se abre el enlace
     el.querySelectorAll('.tn-url a.btn, a.tn-abrir, a.tn-ver').forEach(b => b.onclick = async e => {
