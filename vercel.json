@@ -21,58 +21,40 @@
       "includeFiles": "tienda-render.js"
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/t/:t",
-      "destination": "/api/tienda?t=:t"
-    },
-    {
-      "source": "/t/:t/:p",
-      "destination": "/api/tienda?t=:t&p=:p"
-    },
-    {
-      "source": "/",
+      "src": "^/(?!api/)([a-z0-9-]*)$",
       "has": [
         {
           "type": "host",
           "value": "^(?!.*\\.vercel\\.app$)(?!localhost)(?!dropox\\.).+$"
         }
       ],
-      "destination": "/api/tienda"
+      "dest": "/api/tienda?p=$1"
     },
     {
-      "source": "/:p((?!api/|t/)[a-z0-9-]+)",
+      "src": "^/(?!api/).*$",
       "has": [
         {
           "type": "host",
           "value": "^(?!.*\\.vercel\\.app$)(?!localhost)(?!dropox\\.).+$"
         }
       ],
-      "destination": "/api/tienda?p=:p"
-    }
-  ],
-  "redirects": [
-    {
-      "source": "/:archivo(.+\\..+)",
-      "has": [
-        {
-          "type": "host",
-          "value": "^(?!.*\\.vercel\\.app$)(?!localhost)(?!dropox\\.).+$"
-        }
-      ],
-      "destination": "/",
-      "permanent": false
+      "status": 302,
+      "headers": {
+        "Location": "/"
+      }
     },
     {
-      "source": "/t/:resto*",
-      "has": [
-        {
-          "type": "host",
-          "value": "^(?!.*\\.vercel\\.app$)(?!localhost)(?!dropox\\.).+$"
-        }
-      ],
-      "destination": "/",
-      "permanent": false
+      "src": "^/t/([^/]+)/([^/]+)$",
+      "dest": "/api/tienda?t=$1&p=$2"
+    },
+    {
+      "src": "^/t/([^/]+)$",
+      "dest": "/api/tienda?t=$1"
+    },
+    {
+      "handle": "filesystem"
     }
   ]
 }
