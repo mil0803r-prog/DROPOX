@@ -126,8 +126,11 @@
     if (t.portada.carruselTitulo === undefined) t.portada.carruselTitulo = 'Lo más pedido';
   }
   function migrarBarra(t) {
-    if (t._bar) return; t._bar = true;
+    if (t._bar2) return; t._bar2 = true;
     t.barra = t.barra || {};
+    // la barra superior estaba apagada o vacía y por eso no se veía: se enciende con mensajes de ejemplo (se puede apagar en «Barra superior»)
+    t.barra.activa = true;
+    if (!Array.isArray(t.barra.items) || !t.barra.items.filter(Boolean).length) t.barra.items = ['Envío gratis a todo el Perú', 'Pagas al recibir', 'Caja de regalo'];
     if (t.barra.movHome === undefined) t.barra.movHome = true;
     if (t.barra.movProd === undefined) t.barra.movProd = true;
     if (t.barra.dorado === undefined) t.barra.dorado = true;
