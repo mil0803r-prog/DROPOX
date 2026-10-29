@@ -43,12 +43,32 @@
     else inp = `<input data-p="${path}" ${o.type === 'number' ? 'data-k="num" type="number" step="any" inputmode="decimal"' : o.type === 'color' ? 'type="color" style="padding:3px;height:44px"' : 'type="text"'} value="${esc(v ?? '')}" id="${id}" ${o.ph ? `placeholder="${esc(o.ph)}"` : ''}>`;
     return `<div class="field" ${o.full ? 'style="grid-column:1/-1"' : ''}><label for="${id}">${esc(label)}</label>${inp}${o.hint ? `<div class="note">${o.hint}</div>` : ''}</div>`;
   };
+
+  const TIPO = { producto: ['Producto', 'Página de producto completa'], landing: ['Landing', 'Título, imagen y botón'], codigo: ['Código', 'Tu propio HTML'] };
+  const nuevoProducto = tipo => {
+    const b = { slug: 'producto-' + Date.now().toString(36).slice(-4), nombre: 'Producto nuevo', titulo: 'Producto nuevo', kicker: '', etiqueta: '', imagenes: [], precio: 0, tachado: 0, combo2: 0, categoria: '', rating: 0, resenas: 0, vendidos: 0, masVendido: false, nuevo: true, activo: true, tipo, bloques: [], faq: [], resenasLista: [] };
+    if (tipo === 'landing') b.secciones = [{ tipo: 'titulo', x: 'Escribe aquí el título' }, { tipo: 'imagen', img: '' }, { tipo: 'boton', x: 'Quiero el mío', accion: 'formulario', wa: '', msg: '' }, { tipo: 'imagen', img: '' }, { tipo: 'boton', x: 'Pedir por WhatsApp', accion: 'whatsapp', wa: '', msg: '' }];
+    if (tipo === 'codigo') Object.assign(b, { html: '<section style="padding:24px 16px;text-align:center">\n  <h1>{{nombre}}</h1>\n  <p style="font-size:28px;font-weight:800">{{precio}}</p>\n  <button class="cta" data-abrir>Quiero el mío</button>\n  <p><a data-wa href="#">Escríbenos por WhatsApp</a></p>\n</section>', css: '', js: '' });
+    return b;
+  };
+  function elegirTipo(cb) {
+    const f = $('#dlgForm'), d = $('#dlg');
+    f.innerHTML = `<h2>¿Qué tipo de página quieres?</h2><div class="tn-tipos">
+      <button type="button" data-tp="producto"><b>1 · Página de producto</b><span>Título, carrusel de fotos, precio con oferta y precio de comparación, bloques con imagen y título, reseñas y preguntas.</span></button>
+      <button type="button" data-tp="landing"><b>2 · Landing page</b><span>Título, imagen, botón (formulario o WhatsApp), imagen, botón… en el orden que tú quieras.</span></button>
+      <button type="button" data-tp="codigo"><b>3 · Código</b><span>Pegas tu propio HTML, CSS y JS. Los botones con <code>data-abrir</code> abren el formulario de pedido.</span></button></div>
+      <div class="dlg-foot"><button type="button" class="btn" id="tpNo">Cancelar</button></div>`;
+    f.onsubmit = e => e.preventDefault();
+    f.querySelectorAll('[data-tp]').forEach(b => b.onclick = () => { d.close(); cb(b.dataset.tp); });
+    $('#tpNo').onclick = () => d.close();
+    d.showModal();
+  }
   const abiertas = new Set(['basico']);
   const sec = (k, titulo, sub, body) => `<details class="tn-sec" data-sec="${k}" ${abiertas.has(k) ? 'open' : ''}><summary><b>${titulo}</b><small>${esc(sub || '')}</small></summary><div class="tn-secb">${body}</div></details>`;
   const thumb = u => /^https:\/\//.test(u || '') ? `<img class="tn-th" src="${esc(u)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : '<div class="tn-th tn-nth">sin foto</div>';
-  const FACT = { imagen: () => '', bloque: () => ({ t: '', x: '', img: '' }), resena: () => ({ n: '', c: '', e: 5, t: '' }), faq: () => ['', ''] };
+  const FACT = { 'sec-titulo': () => ({ tipo: 'titulo', x: '' }), 'sec-texto': () => ({ tipo: 'texto', x: '' }), 'sec-imagen': () => ({ tipo: 'imagen', img: '' }), 'sec-boton': () => ({ tipo: 'boton', x: 'Quiero el mío', accion: 'formulario', wa: '', msg: '' }), imagen: () => '', bloque: () => ({ t: '', x: '', img: '' }), resena: () => ({ n: '', c: '', e: 5, t: '' }), faq: () => ['', ''] };
   // Lista editable: cada elemento con subir, bajar y quitar; abajo el botón para agregar
-  const rep = (path, arr, tpl, kind, etiq) => `<div class="tn-rep">${arr.map((it, i) => `<div class="tn-item"><div class="tn-ctl"><b>${i + 1}</b><button type="button" class="btn btn-sm" data-ra="up" data-rp="${path}" data-ri="${i}" aria-label="Subir">↑</button><button type="button" class="btn btn-sm" data-ra="dn" data-rp="${path}" data-ri="${i}" aria-label="Bajar">↓</button><button type="button" class="btn btn-sm btn-del" data-ra="del" data-rp="${path}" data-ri="${i}" aria-label="Quitar">✕</button></div><div class="tn-itb">${tpl(it, path + '.' + i, i)}</div></div>`).join('')}<button type="button" class="btn btn-sm btn-pri" data-ra="add" data-rk="${kind}" data-rp="${path}">+ ${etiq}</button></div>`;
+  const rep = (path, arr, tpl, kind, etiq) => `<div class="tn-rep">${arr.map((it, i) => `<div class="tn-item"><div class="tn-ctl"><b>${i + 1}</b><button type="button" class="btn btn-sm" data-ra="up" data-rp="${path}" data-ri="${i}" aria-label="Subir">↑</button><button type="button" class="btn btn-sm" data-ra="dn" data-rp="${path}" data-ri="${i}" aria-label="Bajar">↓</button><button type="button" class="btn btn-sm btn-del" data-ra="del" data-rp="${path}" data-ri="${i}" aria-label="Quitar">✕</button></div><div class="tn-itb">${tpl(it, path + '.' + i, i)}</div></div>`).join('')}${(Array.isArray(etiq) ? etiq : [[kind, etiq]]).map(([k, l]) => `<button type="button" class="btn btn-sm btn-pri" data-ra="add" data-rk="${k}" data-rp="${path}">+ ${l}</button>`).join(' ')}</div>`;
   const card = (t, sub, body) => `<div class="card"><h3>${t}</h3>${sub ? `<p class="sub">${sub}</p>` : ''}${body}</div>`;
 
   // ───────── Pestañas ─────────
@@ -102,13 +122,14 @@
       const ps = t.productos || [], p = ps[pi], base = `productos.${pi}.`;
       const x = p ? R().precios(t, p) : null;
       const head = card('Productos', 'Elige un producto y edítalo sección por sección. Cada uno tiene su página: tudominio.com/<dirección>.', `
-        <div class="field"><select id="tnProd" style="width:100%">${ps.map((q, i) => `<option value="${i}" ${i === pi ? 'selected' : ''}>${q.activo === false ? '⏸ ' : ''}${esc(q.nombre)}</option>`).join('')}</select></div>
+        <div class="field"><select id="tnProd" style="width:100%">${ps.map((q, i) => `<option value="${i}" ${i === pi ? 'selected' : ''}>${q.activo === false ? '⏸ ' : ''}[${TIPO[q.tipo || 'producto'][0]}] ${esc(q.nombre)}</option>`).join('')}</select></div>
         <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnPDup">Duplicar</button><button class="btn" id="tnPUp">↑</button><button class="btn" id="tnPDn">↓</button><button class="btn btn-del" id="tnPDel">Eliminar</button>${p ? `<button class="btn" id="tnVer">Ver cómo queda</button>` : ''}</div>`);
       if (!p) return head;
       const chk = (path, label) => `<div class="field"><label class="chk"><input type="checkbox" data-p="${path}" data-k="check" ${getP(T(), path) !== false ? 'checked' : ''}> ${esc(label)}</label></div>`;
       const imgs = p.imagenes || [];
-      const S1 = sec('basico', '1 · Datos básicos', 'Nombre, dirección, etiquetas', `
-        ${f(base + 'activo', 'Visible en la tienda', { check: 1 })}
+      const tipoSel = `<div class="field"><label>Tipo de página</label><select data-p="${base}tipo" style="width:100%">${Object.entries(TIPO).map(([k, v]) => `<option value="${k}" ${(p.tipo || 'producto') === k ? 'selected' : ''}>${v[0]} — ${v[1]}</option>`).join('')}</select></div>`;
+      const S1 = sec('basico', '1 · Datos básicos', 'Nombre, dirección, tipo de página', `
+        ${tipoSel}${f(base + 'activo', 'Visible en la tienda', { check: 1 })}
         <div class="row">${f(base + 'nombre', 'Nombre en la rejilla')}${f(base + 'slug', 'Dirección (slug)', { hint: 'Ej.: collar-saturno → tudominio.com/collar-saturno' })}</div>
         ${f(base + 'titulo', 'Título de la página del producto', { full: 1 })}
         <div class="row">${f(base + 'etiqueta', 'Etiqueta (ej. JOYERÍA ÚNICA)')}${f(base + 'kicker', 'Frase corta sobre el título')}</div>
@@ -135,6 +156,27 @@
       const S7 = sec('mostrar', '7 · Qué se muestra en esta página', 'Garantía, pasos de entrega y sellos', `
         ${chk(base + 'mostrar.confianza', 'Sellos de confianza bajo el precio')}${chk(base + 'mostrar.garantia', 'Garantía de satisfacción')}${chk(base + 'mostrar.pasos', 'Pasos «Así llega tu pedido»')}
         <p class="note">El texto de la garantía, los pasos y los sellos se editan en la pestaña <b>Oferta y envío</b> y valen para todos los productos.</p>`);
+      const tipo = p.tipo || 'producto';
+      if (tipo === 'landing') {
+        const SL = sec('secciones', '4 · Secciones de la landing', (p.secciones || []).length + ' sección(es) · se ven en este orden', `
+          <p class="note" style="margin:0 0 8px">Arma la página como quieras: título, imagen, botón, imagen, botón… Un botón abre el formulario de pedido o te manda a WhatsApp.</p>
+          ${rep(base + 'secciones', p.secciones || [], (it, b) => {
+            const et = { titulo: 'Título', texto: 'Texto', imagen: 'Imagen', boton: 'Botón' }[it.tipo] || it.tipo;
+            let c = '';
+            if (it.tipo === 'titulo') c = `<label>Título</label><input data-p="${b}.x" type="text" value="${esc(it.x)}">`;
+            else if (it.tipo === 'texto') c = `<label>Texto</label><textarea data-p="${b}.x" rows="3">${esc(it.x)}</textarea>`;
+            else if (it.tipo === 'imagen') c = `<div class="tn-ri">${thumb(it.img)}<div style="flex:1;min-width:0"><label>Imagen (enlace)</label><input data-p="${b}.img" type="text" value="${esc(it.img)}" placeholder="https://…"></div></div>`;
+            else c = `<label>Texto del botón</label><input data-p="${b}.x" type="text" value="${esc(it.x)}"><label>Qué hace</label><select data-p="${b}.accion" style="width:100%"><option value="formulario" ${it.accion !== 'whatsapp' ? 'selected' : ''}>Abrir el formulario de pedido</option><option value="whatsapp" ${it.accion === 'whatsapp' ? 'selected' : ''}>Ir a WhatsApp</option></select>${it.accion === 'whatsapp' ? `<label>Número de WhatsApp (vacío = el de contacto)</label><input data-p="${b}.wa" type="text" value="${esc(it.wa)}" placeholder="50212345678"><label>Mensaje</label><input data-p="${b}.msg" type="text" value="${esc(it.msg)}" placeholder="Hola, quiero pedir…">` : ''}`;
+            return `<div class="tn-ri tn-col"><span class="tn-tag">${et}</span>${c}</div>`;
+          }, 'sec-titulo', [['sec-titulo', 'Título'], ['sec-imagen', 'Imagen'], ['sec-boton', 'Botón'], ['sec-texto', 'Texto']])}`);
+        return head + `<div class="tn-secs">${S1 + S2.replace('2 · Fotos', '2 · Foto de portada').replace(' · la primera es la principal', ' · la primera sale en la portada de la tienda') + S3.replace('3 · Precio', '3 · Precio (para el formulario)') + SL}</div>`;
+      }
+      if (tipo === 'codigo') {
+        const SC = sec('codigo', '4 · Tu código', 'HTML, CSS y JS propios', `
+          <p class="note" style="margin:0 0 8px">Pega aquí lo que te hagan o lo que te arme yo. Puedes usar: <code>{{nombre}}</code> <code>{{precio}}</code> <code>{{tachado}}</code> <code>{{precio2}}</code> <code>{{ahorro}}</code> <code>{{descuento}}</code>. Cualquier elemento con <code>data-abrir</code> abre el formulario de pedido; un enlace con <code>data-wa</code> va a WhatsApp.</p>
+          ${f(base + 'html', 'HTML', { area: 1, rows: 14, full: 1 })}${f(base + 'css', 'CSS (opcional)', { area: 1, rows: 6, full: 1 })}${f(base + 'js', 'JavaScript (opcional)', { area: 1, rows: 5, full: 1 })}`);
+        return head + `<div class="tn-secs">${S1 + S2.replace('2 · Fotos', '2 · Foto de portada') + S3.replace('3 · Precio', '3 · Precio (para el formulario)') + SC}</div>`;
+      }
       return head + `<div class="tn-secs">${S1 + S2 + S3 + S4 + S5 + S6 + S7}</div>`;
     },
     pedido(t) {
@@ -178,7 +220,7 @@
   function pintarPrevia() {
     const fr = document.getElementById('tnFr'); if (!fr) return;
     const t = T(), ok = !pagPrev || R().activos(t).some(p => p.slug === pagPrev);
-    fr.onload = () => { try { fr.contentDocument.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (!a) return; e.preventDefault(); const h = a.getAttribute('href'); pagPrev = h === '/' || h === '' ? '' : h.replace(/^\/+/, ''); const pg = document.getElementById('tnPg'); if (pg) pg.value = pagPrev; pintarPrevia(); }); } catch (x) {} };
+    fr.onload = () => { try { fr.contentDocument.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (!a) return; const h = a.getAttribute('href'); if (!/^\//.test(h)) return; e.preventDefault(); pagPrev = h === '/' || h === '' ? '' : h.replace(/^\/+/, ''); const pg = document.getElementById('tnPg'); if (pg) pg.value = pagPrev; pintarPrevia(); }); } catch (x) {} };
     fr.srcdoc = R().renderizar(t, ok ? pagPrev : '', { base: '', preview: true, slugTienda: t.slug }).html;
     fr.style.height = Math.round(innerHeight * 0.75) + 'px';
   }
@@ -265,7 +307,7 @@
     on('#tnVer', () => { pagPrev = (T().productos[pi] || {}).slug || ''; tab = 'previa'; render(); scrollTo(0, 0); });
     const ps = q('#tnProd'); if (ps) ps.onchange = () => { pi = +ps.value; render(); };
     const arr = () => T().productos;
-    on('#tnPNew', () => { arr().push({ slug: 'producto-' + (arr().length + 1), nombre: 'Producto nuevo', titulo: 'Producto nuevo', kicker: '', etiqueta: '', imagenes: [], precio: 0, tachado: 0, combo2: 0, categoria: '', rating: 0, resenas: 0, vendidos: 0, masVendido: false, nuevo: true, activo: true, bloques: [], faq: [], resenasLista: [] }); pi = arr().length - 1; Store.save(); render(); });
+    on('#tnPNew', () => elegirTipo(tp => { arr().push(nuevoProducto(tp)); pi = arr().length - 1; abiertas.add('basico'); Store.save(); render(); }));
     on('#tnPDup', () => { const c = clon(arr()[pi]); c.slug += '-2'; c.nombre += ' (copia)'; arr().splice(pi + 1, 0, c); pi++; Store.save(); render(); });
     on('#tnPUp', () => { if (pi > 0) { [arr()[pi - 1], arr()[pi]] = [arr()[pi], arr()[pi - 1]]; pi--; Store.save(); render(); } });
     on('#tnPDn', () => { if (pi < arr().length - 1) { [arr()[pi + 1], arr()[pi]] = [arr()[pi], arr()[pi + 1]]; pi++; Store.save(); render(); } });
