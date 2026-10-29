@@ -251,7 +251,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
       if (c.tipo === 'texto') return `<p class="cb-p sr lk-rv"${E}>${esc(c.x)}</p>`;
       return url(c.img) ? `<img class="cb-img sr lk-rv"${E} src="${url(c.img)}" alt="" loading="lazy">` : '';
     }).join('');
-    const faqs = [...(p.faq || []).map((f, k) => [f, 'p:preguntas:faq.' + k + '.0']), ...(cfg.faq || []).map(f => [f, 'g:textos:faq'])];
+    const faqs = [...(p.faq || []).map((f, k) => [f, 'p:preguntas:faq.' + k + '.0']), ...(p.mostrar && p.mostrar.faqGeneral === false ? [] : (cfg.faq || []).map(f => [f, 'g:textos:faq']))];
     const pols = (cfg.politicas || []).filter(z => z && z[0]);
     const canon = opt.canon;
     const css0 = css(cfg).split('\n');
