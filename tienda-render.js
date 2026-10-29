@@ -187,7 +187,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     <div class="grid" id="grid">${lista.length ? lista.map(card).join('') : '<p style="grid-column:1/-1;text-align:center;padding:30px 10px;opacity:.7">Pronto tendremos productos para ti.</p>'}</div>
     ${pie(cfg)}</div>
     <script>(function(){var c=document.getElementById('cats');if(!c)return;c.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;c.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('#grid .pc').forEach(function(a){a.style.display=!b.dataset.c||a.dataset.c===b.dataset.c?'':'none'})})})();</script>
-    ${pixeles(cfg, 'home')}</body></html>`;
+    ${opt.preview ? '' : pixeles(cfg, 'home')}</body></html>`;
   }
 
   // Ventana de pedido contraentrega (la misma para producto, landing y código)
@@ -255,7 +255,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     <div class="sticky"${ed(opt, 'p:precio:precio')}><div class="in"><div class="pp">${x.tach ? `<s>${q(cfg, x.tach)}</s>` : ''}<b>${q(cfg, x.pr)}</b></div><button type="button" data-abrir>Pedir ahora · pago al recibir</button></div></div>
     ${pedidoHtml(cfg, x)}
     ${scriptsPedido(cfg, p, x, imgs, opt)}
-    ${pixeles(cfg, 'producto', p)}</body></html>`;
+    ${opt.preview ? '' : pixeles(cfg, 'producto', p)}</body></html>`;
   }
 
   // ───────── Landing: título · imagen · botón · imagen · botón … ─────────
@@ -275,7 +275,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     }).join('');
     return `<!doctype html><html lang="es"><head>${head(cfg, p.titulo || p.nombre, p.kicker || m.lema || p.nombre, imgs[0], opt.canon, 'product', p)}<style>.lp-i{width:100%;display:block;margin:14px 0 0}.lp-b{margin-top:14px;margin-bottom:6px;text-align:center;text-decoration:none}.lp-t h1,.lp-t h2{font-size:26px}</style></head><body><div class="wrap" id="app">
     ${barra(cfg, opt)}${html}<div style="height:16px"></div>${pie(cfg, { faq: false })}</div>
-    ${pedidoHtml(cfg, x)}${scriptsPedido(cfg, p, x, imgs, opt)}${pixeles(cfg, 'producto', p)}</body></html>`;
+    ${pedidoHtml(cfg, x)}${scriptsPedido(cfg, p, x, imgs, opt)}${opt.preview ? '' : pixeles(cfg, 'producto', p)}</body></html>`;
   }
 
   // ───────── Código: HTML, CSS y JS propios (con {{precio}}, {{nombre}}…) ─────────
@@ -288,7 +288,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     ${barra(cfg, opt)}<div class="cod"${ed(opt, 'p:codigo:html')}>${sub(p.html)}</div>${pie(cfg, { faq: false })}</div>
     ${pedidoHtml(cfg, x)}${scriptsPedido(cfg, p, x, imgs, opt)}
     <script>[].forEach.call(document.querySelectorAll('[data-wa]'),function(a){var w=window.__T.wa;if(w){a.href=w;a.target='_blank';a.rel='noopener'}else{a.addEventListener('click',function(e){e.preventDefault();var b=document.querySelector('[data-abrir]');if(b)b.click()})}});</script>
-    ${p.js ? `<script>${String(p.js).replace(/<\/script/gi, '<\\/script')}</script>` : ''}${pixeles(cfg, 'producto', p)}</body></html>`;
+    ${p.js ? `<script>${String(p.js).replace(/<\/script/gi, '<\\/script')}</script>` : ''}${opt.preview ? '' : pixeles(cfg, 'producto', p)}</body></html>`;
   }
 
   // JS de la página de producto (galería, ofertas, ventana de pedido y envío)
@@ -319,7 +319,7 @@ $('#pedBody').innerHTML='<div class="ok"><div class="ck">✓</div><h2>¡Pedido c
 
   // ───────── Entrada principal ─────────
   // Guía de toque (solo vista previa): al tocar una parte, el editor abre la sección que la controla
-  const GUIA = `<style>html.guia [data-ed]{cursor:pointer}html.guia [data-ed]:hover{outline:2px dashed #7c3aed;outline-offset:2px;border-radius:6px}</style><script>(function(){function g(){try{return window.parent.__tnGuia!==false}catch(x){return false}}var d=document,h=d.documentElement;if(g())h.classList.add('guia');var tip=d.createElement('div');tip.style.cssText='position:fixed;z-index:99;left:8px;right:8px;bottom:8px;background:#4c1d95;color:#fff;font:600 12px system-ui;padding:7px 10px;border-radius:10px;opacity:0;pointer-events:none;transition:.15s;text-align:center';tip.textContent='Toca para editar esto';d.body.appendChild(tip);d.addEventListener('mouseover',function(e){var t=e.target.closest&&e.target.closest('[data-ed]');tip.style.opacity=t&&g()?1:0});d.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('[data-ed]');if(!t||!g())return;e.preventDefault();e.stopPropagation();try{window.parent.Tienda.ir(t.getAttribute('data-ed'))}catch(x){}},true)})();</script>`;
+  const GUIA = `<style>html.guia [data-ed]{cursor:pointer}html.guia [data-ed]:hover{outline:2px dashed #7c3aed;outline-offset:2px;border-radius:6px}</style><script>(function(){if(window.__gu)return;window.__gu=1;function g(){try{return window.parent.__tnGuia!==false}catch(x){return false}}var d=document,h=d.documentElement;if(g())h.classList.add('guia');var tip=d.createElement('div');tip.style.cssText='position:fixed;z-index:99;left:8px;right:8px;bottom:8px;background:#4c1d95;color:#fff;font:600 12px system-ui;padding:7px 10px;border-radius:10px;opacity:0;pointer-events:none;transition:.15s;text-align:center';tip.textContent='Toca para editar esto';h.appendChild(tip);d.addEventListener('mouseover',function(e){var t=e.target.closest&&e.target.closest('[data-ed]');tip.style.opacity=t&&g()?1:0});d.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('[data-ed]');if(!t||!g())return;e.preventDefault();e.stopPropagation();try{window.parent.Tienda.ir(t.getAttribute('data-ed'))}catch(x){}},true)})();</script>`;
   const conGuia = (html, opt) => (opt && opt.preview ? html.replace('</body>', GUIA + '</body>') : html);
 
   // ruta: '' (portada) o el slug de un producto. opt: { base, preview, canon }

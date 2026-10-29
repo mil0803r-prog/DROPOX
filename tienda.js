@@ -279,11 +279,25 @@
     },
   };
 
+
+  // Actualiza la vista previa SIN recargar el documento: si la cabecera (estilos, fuentes, metadatos) es igual, solo se cambia el contenido;
+  // así no se vuelven a pedir fuentes ni a decodificar imágenes y se mantiene el scroll.
+  const cabeza = h => { const m = /<head>([\s\S]*?)<\/head>/.exec(h); return m ? m[1] : ''; };
+  function parchear(fr, html, alCargar) {
+    const d = fr.contentDocument;
+    if (!d || !d.body || !fr._cab || cabeza(html) !== fr._cab) { fr._cab = cabeza(html); fr.onload = alCargar || null; fr.srcdoc = html; return; }
+    const nd = new DOMParser().parseFromString(html, 'text/html'), w = fr.contentWindow, y = w.scrollY;
+    d.body.textContent = '';
+    nd.body.childNodes.forEach(n => d.body.appendChild(d.importNode(n, true)));
+    d.body.querySelectorAll('script').forEach(o => { const n = d.createElement('script'); [...o.attributes].forEach(a => n.setAttribute(a.name, a.value)); n.textContent = o.textContent; o.replaceWith(n); });
+    w.scrollTo(0, y);
+  }
+
   function pintarPrevia() {
     const fr = document.getElementById('tnFr'); if (!fr) return;
     const t = T(), ok = !pagPrev || R().activos(t).some(p => p.slug === pagPrev);
-    fr.onload = () => { try { fr.contentDocument.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (!a) return; const h = a.getAttribute('href'); if (!/^\//.test(h)) return; e.preventDefault(); pagPrev = h === '/' || h === '' ? '' : h.replace(/^\/+/, ''); const pg = document.getElementById('tnPg'); if (pg) pg.value = pagPrev; pintarPrevia(); }); } catch (x) {} };
-    fr.srcdoc = R().renderizar(t, ok ? pagPrev : '', { base: '', preview: true, slugTienda: t.slug }).html;
+    const alCargar = () => { try { fr.contentDocument.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (!a) return; const h = a.getAttribute('href'); if (!/^\//.test(h)) return; e.preventDefault(); pagPrev = h === '/' || h === '' ? '' : h.replace(/^\/+/, ''); const pg = document.getElementById('tnPg'); if (pg) pg.value = pagPrev; pintarPrevia(); }); } catch (x) {} };
+    parchear(fr, R().renderizar(t, ok ? pagPrev : '', { base: '', preview: true, slugTienda: t.slug }).html, alCargar);
     fr.style.height = Math.round(innerHeight * 0.75) + 'px';
   }
 
@@ -304,13 +318,13 @@
       const t2 = Object.assign({}, t, { productos: t.productos.map((q, i) => (i === pi ? Object.assign({}, q, { activo: true }) : q)) });
       html = R().renderizar(t2, p.slug, { base: '', preview: true, slugTienda: t.slug }).html;
     }
-    if (html === htmlCel && fr.srcdoc) return; // nada cambió: no se recarga el celular
+    if (html === htmlCel && fr._cab) return; // nada cambió: no se recarga el celular
     htmlCel = html;
-    fr.onload = () => { try { const w = fr.contentWindow; w.scrollTo(0, scrollCel); w.addEventListener('scroll', () => { scrollCel = w.scrollY; }, { passive: true }); fr.contentDocument.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (a && /^\//.test(a.getAttribute('href'))) e.preventDefault(); }); } catch (x) {} };
-    fr.srcdoc = html;
+    const alCargar = () => { try { const w = fr.contentWindow; w.scrollTo(0, scrollCel); w.addEventListener('scroll', () => { scrollCel = w.scrollY; }, { passive: true }); fr.contentDocument.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (a && /^\//.test(a.getAttribute('href'))) e.preventDefault(); }); } catch (x) {} };
+    parchear(fr, html, alCargar);
   };
   // pintar: de inmediato al abrir; con una pequeña pausa mientras se escribe
-  const pintarCelular = (ya = true) => { if (ya) { pintarCelularYa(); return; } clearTimeout(tmrCel); tmrCel = setTimeout(pintarCelularYa, 450); };
+  const pintarCelular = (ya = true) => { if (ya) { pintarCelularYa(); return; } clearTimeout(tmrCel); tmrCel = setTimeout(pintarCelularYa, 500); };
 
   // Guía de toque: desde la vista previa se salta a la sección y al campo que controla esa parte
   function enfocar(path) {
