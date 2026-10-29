@@ -65,7 +65,11 @@ a{color:inherit;text-decoration:none}img{max-width:100%;display:block}button{fon
 .mq{overflow:hidden;white-space:nowrap;text-align:left;padding:9px 0;letter-spacing:.04em;text-transform:uppercase}.mq-t{display:inline-flex;width:max-content;animation:mq 22s linear infinite}.mq-t span{display:inline-block;padding-right:34px}.mq-s{font-style:normal;margin-left:34px;opacity:.55}
 @keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .tw{margin-top:10px;font-weight:800;font-size:23px;line-height:1.2}.tw-f{color:var(--tx)}.tw-l{color:var(--ac);min-height:1.25em}.tw-c{display:inline-block;width:2px;height:1em;margin-left:2px;vertical-align:-.12em;background:var(--ac);animation:tcur .8s steps(1) infinite}
-@keyframes tcur{50%{opacity:0}}@media (prefers-reduced-motion:reduce){.mq-t{animation:none}.tw-c{animation:none}}
+@keyframes tcur{50%{opacity:0}}
+.cr{margin:14px 0 4px}.cr-h{font-size:18px;font-weight:800;padding:0 16px 8px}.cr-t{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 16px 4px;scroll-padding:0 16px}.cr-t::-webkit-scrollbar{display:none}
+.cr-s{position:relative;flex:0 0 82%;scroll-snap-align:center;border-radius:var(--r);overflow:hidden;background:var(--soft);aspect-ratio:1/1;display:block}.cr-s img{width:100%;height:100%;object-fit:cover}
+.cr-c{position:absolute;left:0;right:0;bottom:0;padding:34px 14px 12px;background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff}.cr-c b{display:block;font-size:16px;line-height:1.2}.cr-c span{display:inline-block;margin-top:4px;font-weight:800;font-size:15px}.cr-c s{opacity:.7;font-weight:500;margin-right:6px}
+.cr-d{display:flex;justify-content:center;gap:6px;margin-top:8px}.cr-d i{width:7px;height:7px;border-radius:50%;background:var(--line);transition:.25s}.cr-d i.on{width:20px;border-radius:6px;background:var(--ac)}@media (prefers-reduced-motion:reduce){.mq-t{animation:none}.tw-c{animation:none}}
 .top{display:flex;align-items:center;justify-content:space-between;padding:12px 16px}
 .top img{height:34px;width:auto;border-radius:8px}.top b{font-size:18px}
 .vf{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--pc);background:color-mix(in srgb,var(--pc) 12%,transparent);padding:4px 10px;border-radius:99px}
@@ -155,6 +159,13 @@ dialog::backdrop{background:#0009}dialog[open]{animation:pop .3s ease both}
     const sim = String(pt.simbolo === undefined ? '\u2726' : pt.simbolo).slice(0, 4), vel = Math.min(120, Math.max(4, nn(pt.barraVel) || 22));
     return `<div class="annbar mq" role="note"${st ? ` style="${esc(st)}"` : ''}${ed(opt, 'g:portada:barra.items')}><div class="mq-t" style="animation-duration:${vel}s" data-s="${esc(sim)}">${g.replace(/<\/span>/g, esc(sim) ? '<i class="mq-s">' + esc(sim) + '</i></span>' : '</span>')}${g.replace(/<\/span>/g, esc(sim) ? '<i class="mq-s">' + esc(sim) + '</i></span>' : '</span>')}</div></div>`;
   }
+  function carrusel(cfg, opt, lista) {
+    const pt = cfg.portada || {}, it = lista.filter(p => (p.imagenes || [])[0]);
+    if (pt.carrusel === false || !it.length) return '';
+    const sl = it.map(p => { const x = precios(cfg, p); return `<a class="cr-s" href="${link(cfg, p)}"${ed(opt, 'v:' + p.slug + ':')}><img src="${url(p.imagenes[0])}" alt="${esc(p.nombre)}" loading="lazy"><div class="cr-c"><b>${esc(p.nombre)}</b>${pt.carruselPrecio === false ? '' : `<span>${x.tach ? `<s>${q(cfg, x.tach)}</s>` : ''}${q(cfg, x.pr)}</span>`}</div></a>`; }).join('');
+    return `<div class="cr" id="cr" data-s="${Math.min(30, Math.max(0, Number(pt.carruselSeg) || 4))}"><div class="cr-h"${ed(opt, 'g:portada:portada.carruselTitulo')}>${esc(pt.carruselTitulo || '')}</div><div class="cr-t" id="crT">${sl}</div>${it.length > 1 ? `<div class="cr-d" id="crD">${it.map((_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</div>` : ''}</div>`;
+  }
+  const CR_JS = "(function(){var c=document.getElementById('crT');if(!c)return;var k=c.children,d=document.querySelectorAll('#crD i'),s=+document.getElementById('cr').dataset.s||0,i=0,h=0;function w(){return k.length>1?k[1].offsetLeft-k[0].offsetLeft:c.clientWidth}function go(n){i=(n+k.length)%k.length;c.scrollTo({left:k[i].offsetLeft-(c.clientWidth-k[i].offsetWidth)/2,behavior:'smooth'})}c.addEventListener('scroll',function(){var n=Math.round(c.scrollLeft/(w()||1));if(n<0)n=0;if(n>=k.length)n=k.length-1;i=n;d.forEach(function(x,j){x.classList.toggle('on',j===n)})},{passive:true});function a(){clearInterval(h);if(s>0&&k.length>1&&!(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches))h=setInterval(function(){go(i+1)},s*1000)}['touchstart','mousedown','wheel'].forEach(function(e){c.addEventListener(e,function(){clearInterval(h)},{passive:true})});['touchend','mouseup'].forEach(function(e){c.addEventListener(e,function(){setTimeout(a,4000)},{passive:true})});a()})();";
   function escribe(cfg, opt) {
     const pt = cfg.portada || {}, fr = (pt.frases || []).map(x => String(x).trim()).filter(Boolean), nn = x => Math.max(0, Number(x) || 0);
     if (pt.mov === false || !fr.length) return '';
@@ -206,13 +217,14 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     ${barraMov(cfg, opt)}
     <div class="hero-s"${ed(opt, 'g:marca:marca.nombre')}>${m.verificada ? '<span class="vf">✓ Tienda verificada</span>' : ''}${m.logo ? `<img class="lg"${ed(opt, 'g:marca:marca.logo')} src="${url(m.logo)}" alt="${esc(m.nombre)}">` : ''}<h1${ed(opt, 'g:marca:marca.nombre')}>${esc(m.nombre)}</h1>${pt.badge ? `<div style="margin-top:8px"><span class="pill">${esc(pt.badge)}</span></div>` : ''}${m.lema ? `<p class="lm">${esc(m.lema)}</p>` : ''}${escribe(cfg, opt)}
     <div class="chips"${ed(opt, 'g:portada:portada.confianza')}>${(pt.confianza || []).map(x => `<span><i>✓</i>${esc(x)}</span>`).join('')}</div></div>
+    ${carrusel(cfg, opt, lista)}
     ${pm.activa && pt.mostrarPromo !== false ? `<div class="promo"${ed(opt, 'g:portada:promo.titulo')}><h2>${esc(pm.titulo)}</h2><div class="big">${esc(pm.cantidad)} o más · -${esc(pm.descuento)}%</div><p>${esc(pm.texto)}</p></div>` : ''}
     ${cats.length ? `<div class="cats" id="cats"${ed(opt, 'g:portada:categorias')}><button class="on" data-c="">Todos</button>${cats.map(c => `<button data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : ''}
     <h2 class="sec"${ed(opt, 'g:portada:portada.titulo')}>${esc(pt.titulo || 'Los más vendidos')}</h2>
     <div class="grid" id="grid">${lista.length ? lista.map(card).join('') : '<p style="grid-column:1/-1;text-align:center;padding:30px 10px;opacity:.7">Pronto tendremos productos para ti.</p>'}</div>
     ${pie(cfg, { ed: opt.preview })}</div>
     <script>(function(){var c=document.getElementById('cats');if(!c)return;c.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;c.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('#grid .pc').forEach(function(a){a.style.display=!b.dataset.c||a.dataset.c===b.dataset.c?'':'none'})})})();</script>
-    <script>${TW_JS}</script>
+    <script>${TW_JS}${CR_JS}</script>
     ${opt.preview ? '' : pixeles(cfg, 'home')}</body></html>`;
   }
 
