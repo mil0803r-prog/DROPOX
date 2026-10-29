@@ -136,9 +136,14 @@ window.TIENDA_BASE = {
   "clarity": ""
  },
  "contacto": {
-  "whatsapp": "",
+  "whatsapp": "51970189535",
   "email": ""
  },
  "dominios": [],
- "productos": []
+ "productos": [],
+ "pedidoWa": {
+  "activo": true,
+  "numero": "51970189535",
+  "mensaje": "Hola, quiero hacer este pedido:"
+ }
 };

@@ -196,7 +196,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
   // Ventana de pedido contraentrega (la misma para producto, landing y código)
   function pedidoHtml(cfg, x) {
     return `<dialog id="ped"><div class="ped" id="pedBody">
-      <button class="x" type="button" id="pedX" aria-label="Cerrar">×</button><h2>Completa tu pedido</h2><p class="sub">Pagas en efectivo al recibir. Confirmamos por WhatsApp antes del envío.</p>
+      <button class="x" type="button" id="pedX" aria-label="Cerrar">×</button><h2>Completa tu pedido</h2><p class="sub">${waPedido(cfg) ? 'Al pulsar el botón se abre WhatsApp con el resumen de tu pedido; solo tienes que enviarlo. Pagas en efectivo al recibir.' : 'Pagas en efectivo al recibir. Confirmamos por WhatsApp antes del envío.'}</p>
       <form id="pedF" novalidate autocomplete="on">
         <div class="hp"><label>No llenar<input name="web" tabindex="-1" autocomplete="off"></label></div>
         ${x.c2 ? `<label>Cantidad</label><select name="qty" id="qty"><option value="1">1 unidad · ${q(cfg, x.pr)}</option><option value="2">2 unidades · ${q(cfg, x.c2)}</option></select>` : '<input type="hidden" name="qty" id="qty" value="1">'}
@@ -207,17 +207,19 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
         <label>Punto de referencia</label><input name="referencia" placeholder="Ej.: frente a la tienda, casa blanca">
         <p class="aviso">Escribe tu dirección completa y un punto de referencia para que tu pedido llegue sin problemas.</p>
         <div class="resu"><div><span>Producto</span><span id="rP"></span></div><div><span>Envío</span><span id="rE"></span></div><div class="tt"><span>Total a pagar al recibir</span><span id="rT"></span></div></div>
-        <div class="err" id="pedErr" role="alert"></div><button class="go" id="pedGo" type="submit">Confirmar pedido</button>
+        <div class="err" id="pedErr" role="alert"></div><button class="go" id="pedGo" type="submit">${waPedido(cfg) ? 'Pedir por WhatsApp' : 'Confirmar pedido'}</button>
       </form></div></dialog>`;
   }
+  const telWa = v => { let d = String(v || '').replace(/\D/g, ''); if (d.length === 9 && d[0] === '9') d = '51' + d; return d; };
+  const waPedido = cfg => { const w = cfg.pedidoWa || {}; return w.activo && telWa(w.numero) ? { tel: telWa(w.numero), msg: String(w.mensaje || 'Hola, quiero hacer este pedido:') } : null; };
   function waLink(cfg, p, numero, msg) {
-    const tel = String(numero || (cfg.contacto || {}).whatsapp || '').replace(/\D/g, '');
+    const tel = telWa(numero || (cfg.pedidoWa || {}).numero || (cfg.contacto || {}).whatsapp);
     if (!tel) return '';
     return 'https://wa.me/' + tel + '?text=' + encodeURIComponent(msg || ('Hola, quiero pedir: ' + p.nombre));
   }
   function scriptsPedido(cfg, p, x, imgs, opt) {
     const e = cfg.envio || {}, pais = cfg.pais || {};
-    const datos = { t: cfg._slugTienda || '', p: p.slug, pr: x.pr, c2: x.c2, env: e.gratis === false ? n(e.costo) : 0, mon: pais.moneda || 'S/', cod: pais.codigo || 'PEN', prev: !!opt.preview, nom: p.nombre, img: imgs[0] || '', wa: waLink(cfg, p, '', '') };
+    const datos = { t: cfg._slugTienda || '', p: p.slug, pr: x.pr, c2: x.c2, env: e.gratis === false ? n(e.costo) : 0, mon: pais.moneda || 'S/', cod: pais.codigo || 'PEN', prev: !!opt.preview, nom: p.nombre, img: imgs[0] || '', wa: waLink(cfg, p, '', ''), wao: (waPedido(cfg) || {}).tel || '', wam: (waPedido(cfg) || {}).msg || '' };
     return `<script>window.__T=${JSON.stringify(datos).replace(/</g, '\\u003c')};</script><script>${clienteProducto()}</script>`;
   }
 
@@ -359,7 +361,12 @@ $('#pedX').addEventListener('click',function(){dlg.close()});dlg.addEventListene
 f.addEventListener('submit',function(e){e.preventDefault();err.textContent='';var d2=Object.fromEntries(new FormData(f).entries());
 if(!d2.nombre.trim()||!d2.telefono.trim()||!d2.departamento||!d2.ciudad.trim()||!d2.direccion.trim()){err.textContent='Completa nombre, teléfono, departamento, ciudad y dirección.';return}
 if(d2.telefono.replace(/\\D/g,'').length<8){err.textContent='Revisa tu número de teléfono.';return}
-if(T.prev){err.textContent='Vista previa: aquí se enviaría el pedido.';return}
+if(T.prev){err.textContent=T.wao?'Vista previa: aquí se abriría WhatsApp con el resumen del pedido.':'Vista previa: aquí se enviaría el pedido.';return}
+if(T.wao){var qn=+qty.value||1,total=tot(),L=[T.wam,'','*Producto:* '+T.nom,'*Cantidad:* '+qn+(qn===1?' unidad':' unidades'),'*Total a pagar al recibir:* '+fm(total)+(T.env?'':' (envío gratis)'),'','*Nombre:* '+(d2.nombre+' '+(d2.apellido||'')).trim(),'*Teléfono:* '+d2.telefono,'*Departamento:* '+d2.departamento,'*Ciudad:* '+d2.ciudad,'*Dirección:* '+d2.direccion];if((d2.referencia||'').trim())L.push('*Referencia:* '+d2.referencia);var u='https://wa.me/'+T.wao+'?text='+encodeURIComponent(L.join('\\n'));
+try{var w=window.open(u,'_blank');if(!w)location.href=u}catch(x){location.href=u}
+try{d2.t=T.t;d2.producto=T.p;fetch('/api/pedido-tienda',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify(d2)}).catch(function(){})}catch(x){}
+if(window.fbq)fbq('track','Lead',{value:total,currency:T.cod});if(window.ttq)ttq.track('Contact');
+$('#pedBody').innerHTML='<div class="ok"><div class="ck">✓</div><h2>¡Casi listo!</h2><p>Se abrió WhatsApp con el resumen de tu pedido. <b>Envía el mensaje</b> para que lo confirmemos. Pagas al recibir.</p><p style="margin-top:12px"><a class="go" style="display:block;text-decoration:none;text-align:center" href="'+u+'" target="_blank" rel="noopener">Abrir WhatsApp otra vez</a></p></div>';return}
 var go2=$('#pedGo');go2.disabled=true;go2.textContent='Enviando…';d2.t=T.t;d2.producto=T.p;
 fetch('/api/pedido-tienda',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d2)}).then(function(r){return r.json().catch(function(){return{}})}).then(function(j){
 if(!j.ok){err.textContent=j.error||'No se pudo enviar. Intenta de nuevo.';go2.disabled=false;go2.textContent='Confirmar pedido';return}
