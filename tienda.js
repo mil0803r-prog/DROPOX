@@ -3,7 +3,11 @@
    Aquí se guarda TODA la configuración (marca, diseño, portada, productos, oferta, envío, textos, pixeles, dominios) y desde aquí se publica.
    La tienda pública la sirve api/tienda.js según el dominio; los pedidos llegan a la pestaña «Pedidos» y se pasan a Pedidos de DROPOX. */
 (() => {
-  const TABS = [['resumen', 'Resumen'], ['marca', 'Marca y diseño'], ['portada', 'Portada'], ['productos', 'Productos'], ['pedido', 'Oferta y envío'], ['textos', 'Textos y políticas'], ['rastreo', 'Pixeles y contacto'], ['dominios', 'Dominios'], ['pedidos', 'Pedidos'], ['previa', 'Vista previa']];
+  // Tres zonas: Ajustes (Landing / Tienda), Página principal y Mis productos (lista y editor de cada producto)
+  const TABS_AJ = [['resumen', 'Resumen'], ['pedido', 'Oferta y envío'], ['rastreo', 'Pixeles y contacto'], ['dominios', 'Dominios'], ['pedidos', 'Pedidos'], ['previa', 'Vista previa']];
+  const TABS_HOME = [['marca', 'Marca y diseño'], ['portada', 'Portada'], ['textos', 'Textos y políticas']];
+  const grupoDe = k => (TABS_HOME.some(x => x[0] === k) ? 'home' : (k === 'lista' || k === 'productos') ? 'lista' : 'ajustes');
+  const TITULOS = { ajustes: ['Landing / Tienda', 'Ajustes de tu tienda: oferta y envío, pixeles, dominios y pedidos.'], home: ['Página principal', 'El inicio de tu tienda: marca, portada y textos. Aquí no se editan los productos.'], lista: ['Mis productos', 'Todos los productos de tu tienda. Edita, duplica, mira o elimina cada uno.'] };
   let tab = 'resumen', ti = 0, pi = 0, pagPrev = '', anchoPrev = 420, lista = null, errLista = '';
   const clon = o => JSON.parse(JSON.stringify(o));
   const R = () => window.TiendaRender;
@@ -147,7 +151,7 @@
     d.showModal();
   }
   /*UP*/
-  const abiertas = new Set(['previa', 'basico']);
+  const abiertas = new Set(['previa', 'previaHome', 'basico']);
   const GUIA_SW = `<label class="chk tn-guia"><input type="checkbox" id="tnGuia" ${window.__tnGuia !== false ? 'checked' : ''}> Guía: tocar una parte para editarla</label>`;
   const sec = (k, titulo, sub, body) => `<details class="tn-sec" data-sec="${k}" ${abiertas.has(k) ? 'open' : ''}><summary><b>${titulo}</b><small>${esc(sub || '')}</small></summary><div class="tn-secb">${body}</div></details>`;
   const thumb = u => /^https:\/\//.test(u || '') ? `<img class="tn-th" src="${esc(u)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : '<div class="tn-th tn-nth">sin foto</div>';
@@ -204,13 +208,20 @@
         ${f('promo.titulo', 'Título')}<div class="row">${f('promo.cantidad', 'Cantidad mínima', { type: 'number' })}${f('promo.descuento', 'Descuento (%)', { type: 'number' })}</div>${f('promo.texto', 'Texto de apoyo')}`) +
         card('Categorías', 'Los botones sobre la rejilla. Una por línea; cada producto elige la suya.', f('categorias', 'Categorías', { kind: 'lines', rows: 5 }));
     },
+    lista(t) {
+      const ps = t.productos || [];
+      let h = card('Mis productos', ps.length ? ps.length + (ps.length === 1 ? ' producto' : ' productos') + ' · cada uno tiene su propia página y enlace.' : 'Todavía no hay productos.', `
+        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button>${ps.length ? '<button class="btn btn-del" id="tnPZero">Dejar todo en cero</button>' : ''}</div>${ps.length ? '' : '<p class="note">Pulsa «+ Producto nuevo» y elige el tipo de página (producto, landing, código o la plantilla lista).</p>'}`);
+      h += ps.map((q, i) => { const x = R().precios(t, q), lk = urlProducto(t, q); return `<div class="card tn-row">
+        <div class="tn-rowi">${thumb((q.imagenes || [])[0])}<div class="tn-rowt"><b>${esc(q.nombre || 'Sin nombre')}</b><small>${TIPO[q.tipo || 'producto'][0]} · ${R().q(t, x.pr)}${x.c2 ? ' · 2 por ' + R().q(t, x.c2) : ''} · ${q.activo === false ? 'Oculto' : 'Visible'}${q.creado ? ' · ' + fechaCorta(q.creado) : ''}</small></div></div>
+        <div class="tn-rowa"><button class="btn btn-pri btn-sm" data-edit="${i}">Editar</button><button class="btn btn-sm" data-dup="${i}">Duplicar</button><a class="btn btn-sm tn-ver" href="${esc(lk.url)}" target="_blank" rel="noopener">Ver ↗</a><button class="btn btn-sm btn-del" data-del="${i}">Eliminar</button><button class="btn btn-sm" data-mv="${i}:-1" aria-label="Subir" ${i === 0 ? 'disabled' : ''}>↑</button><button class="btn btn-sm" data-mv="${i}:1" aria-label="Bajar" ${i === ps.length - 1 ? 'disabled' : ''}>↓</button></div></div>`; }).join('');
+      return h;
+    },
     productos(t) {
       const ps = t.productos || [], p = ps[pi], base = `productos.${pi}.`;
       const x = p ? R().precios(t, p) : null;
-      const head = card('Productos', 'Elige un producto y edítalo sección por sección. Cada uno tiene su página: tudominio.com/<dirección>.', `
-        <div class="field"><select id="tnProd" style="width:100%">${ps.map((q, i) => `<option value="${i}" ${i === pi ? 'selected' : ''}>${q.activo === false ? '⏸ ' : ''}[${TIPO[q.tipo || 'producto'][0]}] ${esc(q.nombre)}</option>`).join('')}</select></div>
-        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnPDup">Duplicar</button><button class="btn" id="tnPUp">↑</button><button class="btn" id="tnPDn">↓</button><button class="btn btn-del" id="tnPDel">Eliminar</button><button class="btn btn-del" id="tnPZero">Dejar todo en cero</button></div>${ps.length ? '' : '<p class="note">No hay productos. Pulsa «+ Producto nuevo» y elige el tipo de página.</p>'}`);
-      if (!p) return head;
+      if (!p) { tab = 'lista'; return pantalla.lista(t); }
+      const head = `<div class="tn-act" style="margin:0 0 10px"><button type="button" class="btn" id="tnBack">← Mis productos</button></div>` + card('Editando: ' + esc(p.nombre), 'Cada producto tiene su página: tudominio.com/<dirección>.', `<div class="tn-act"><button class="btn" id="tnPDup">Duplicar</button><a class="btn tn-ver" href="${esc(urlProducto(t, p).url)}" target="_blank" rel="noopener">Ver producto ↗</a><button class="btn btn-del" id="tnPDel">Eliminar</button></div>`);
       const lk = urlProducto(t, p);
       const enlace = `<div class="card tn-url"><div class="tn-urlt"><small class="cap">Enlace de este producto</small><a href="${esc(lk.url)}" target="_blank" rel="noopener">${esc(lk.url)}</a></div>
         <div class="tn-act"><a class="btn btn-sm btn-pri" href="${esc(lk.url)}" target="_blank" rel="noopener">Ver producto ↗</a><button type="button" class="btn btn-sm" data-copy="${esc(lk.url)}">Copiar enlace</button></div>
@@ -342,6 +353,22 @@
     w.scrollTo(0, y);
   }
 
+
+  // Vista previa de la Página principal (celular); se actualiza sin recargar y conserva el scroll
+  let scrollHome = 0, htmlHome = '', tmrHome = 0;
+  const pintarHomeYa = () => {
+    clearTimeout(tmrHome);
+    const fr = document.getElementById('tnFrH'), d = document.querySelector('[data-sec=previaHome]');
+    if (!fr || !d || !d.open) return;
+    const t = T(), html = R().renderizar(t, '', { base: '', preview: true, slugTienda: t.slug }).html;
+    if (html === htmlHome && fr._cab) return;
+    htmlHome = html;
+    const alCargar = () => { try { const w = fr.contentWindow; w.scrollTo(0, scrollHome); w.addEventListener('scroll', () => { scrollHome = w.scrollY; }, { passive: true }); fr.contentDocument.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (a && /^\//.test(a.getAttribute('href'))) e.preventDefault(); }); } catch (x) {} };
+    parchear(fr, html, alCargar);
+  };
+  const pintarHome = (ya = true) => { if (ya) { pintarHomeYa(); return; } clearTimeout(tmrHome); tmrHome = setTimeout(pintarHomeYa, 500); };
+  const fonoHome = () => sec('previaHome', '📱 Vista previa de la página principal', 'Así se ve el inicio · toca una parte para editarla', `${GUIA_SW}<div class="tn-phone"><div class="tn-notch"></div><iframe id="tnFrH" title="Vista previa de la página principal" sandbox="allow-scripts allow-same-origin"></iframe></div>`);
+
   function pintarPrevia() {
     const fr = document.getElementById('tnFr'); if (!fr) return;
     const t = T(), ok = !pagPrev || R().activos(t).some(p => p.slug === pagPrev);
@@ -386,6 +413,7 @@
   }
   function ir(spec) {
     const [k, sec, campo] = String(spec).split(':');
+    if (k === 'v') { const i = T().productos.findIndex(q => q.slug === sec); if (i >= 0) { pi = i; tab = 'productos'; render(); scrollTo(0, 0); } return; }
     if (k === 'g') { tab = sec; render(); setTimeout(() => enfocar(campo), 80); return; }
     if (tab === 'previa') { const i = T().productos.findIndex(q => q.slug === pagPrev); if (i >= 0) pi = i; tab = 'productos'; abiertas.add(sec); render(); setTimeout(() => enfocar('productos.' + pi + '.' + campo), 100); return; }
     abiertas.add(sec);
@@ -456,18 +484,19 @@
   function vista(el) {
     const t = asegurar();
     if (!R()) { el.innerHTML = secH('tienda', 'Landing / Tienda', 'No se cargó el motor de la tienda.'); return; }
-    el.innerHTML = `${secH('tienda', 'Landing / Tienda', 'Tu tienda estilo millora.shop: configúrala, publícala y conecta tus dominios.')}
-      <div class="tn-tabs" role="tablist">${TABS.map(([k, l]) => `<button type="button" class="${k === tab ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('')}</div>
+    if (tab === 'productos' && !(t.productos || [])[pi]) tab = 'lista';
+    const g = grupoDe(tab), tabs = g === 'home' ? TABS_HOME : g === 'ajustes' ? TABS_AJ : null;
+    el.innerHTML = `${secH('tienda', TITULOS[g][0], TITULOS[g][1])}
+      ${tabs ? `<div class="tn-tabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" class="${k === tab ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('')}</div>` : ''}
       <div class="tn-save"><span id="tnSt" data-e="ok">${esc(estadoTxt())}</span><label class="chk tn-auto"><input type="checkbox" id="tnAuto" ${t.autoPublicar ? 'checked' : ''}> Guardado automático</label></div>
       <div class="tn-body">${pantalla[tab](t)}</div>`;
     if (tab === 'previa') pintarPrevia();
     if (tab === 'productos') pintarCelular();
+    if (g === 'home') pintarHome();
     if (tab === 'pedidos' && lista === null) cargarPedidos();
     enlazar(el);
-    if (pendienteNuevo) { pendienteNuevo = false; q0(el); }
   }
 
-  function q0(el) { const b = el.querySelector('#tnPNew'); if (b) b.click(); }
 
   function enlazar(el) {
     const q = s => el.querySelector(s), on = (s, fn) => { const b = q(s); if (b) b.onclick = fn; };
@@ -477,7 +506,7 @@
     const ESTRUCT = /(^|\.)(tipo|accion|nombre|slug|activo|precio|tachado|combo2|imagenes(\.\d+)?|img)$/;
     const valor = i => { const k = i.dataset.k; return k === 'check' ? i.checked : k === 'num' ? num(i.value) : KIND[k] ? KIND[k].inn(i.value) : i.value; };
     el.querySelectorAll('[data-p]').forEach(i => {
-      if (i.tagName === 'INPUT' && i.type === 'text' || i.tagName === 'TEXTAREA') i.oninput = () => { const k = i.dataset.k; if (k || /(^|\.)slug$/.test(i.dataset.p)) return; setP(T(), i.dataset.p, i.value); if (tab === 'productos') pintarCelular(false); };
+      if (i.tagName === 'INPUT' && i.type === 'text' || i.tagName === 'TEXTAREA') i.oninput = () => { const k = i.dataset.k; if (k || /(^|\.)slug$/.test(i.dataset.p)) return; setP(T(), i.dataset.p, i.value); if (tab === 'productos') pintarCelular(false); else if (grupoDe(tab) === 'home') pintarHome(false); };
       i.onchange = () => {
         const t = T();
         if (/(^|\.)slug$/.test(i.dataset.p)) { i.value = slugify(i.value) || 'producto'; setP(t, i.dataset.p, i.value); }
@@ -485,6 +514,7 @@
         Store.save();
         if (ESTRUCT.test(i.dataset.p)) render();
         else if (tab === 'productos') pintarCelular(false);
+        else if (grupoDe(tab) === 'home') pintarHome(false);
       };
     });
     el.querySelectorAll('[data-pre]').forEach(b => b.onclick = () => { Object.assign(T().diseno, R().PRESETS[b.dataset.pre], { preset: b.dataset.pre }); Store.save(); render(); toast('Estilo aplicado'); });
@@ -495,7 +525,7 @@
     on('#tnExp', () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(T(), null, 1)], { type: 'application/json' })); a.download = 'tienda-' + T().slug + '.json'; a.click(); });
     on('#tnImp', () => q('#tnImpF').click());
     const imp = q('#tnImpF'); if (imp) imp.onchange = () => { const fl = imp.files[0]; if (!fl) return; fl.text().then(x => { try { const c = JSON.parse(x); if (!c.productos || !c.marca) throw 0; c.slug = slugify(c.slug || c.nombre) || 'tienda'; S.tiendas.push(c); ti = S.tiendas.length - 1; pi = 0; Store.save(); render(); toast('Tienda importada'); } catch (e) { toast('Archivo no válido'); } }); };
-    el.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.sec) { d.open ? abiertas.add(d.dataset.sec) : abiertas.delete(d.dataset.sec); if (d.dataset.sec === 'previa') { const fr = document.getElementById('tnFrP'); if (fr && d.open && !fr.srcdoc) pintarCelular(); } } }, true);
+    el.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.sec) { d.open ? abiertas.add(d.dataset.sec) : abiertas.delete(d.dataset.sec); if (d.dataset.sec === 'previa') { const fr = document.getElementById('tnFrP'); if (fr && d.open && !fr.srcdoc) pintarCelular(); } if (d.dataset.sec === 'previaHome') { const fh = document.getElementById('tnFrH'); if (fh && d.open && !fh.srcdoc) pintarHome(); } } }, true);
     el.querySelectorAll('[data-ra]').forEach(b => b.onclick = () => {
       const arr = getP(T(), b.dataset.rp), i = +b.dataset.ri, a = b.dataset.ra;
       if (!Array.isArray(arr)) setP(T(), b.dataset.rp, []);
@@ -509,7 +539,7 @@
     el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => pedirArchivos(b.dataset.up, b.dataset.upmodo));
     el.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copiar(b.dataset.copy));
     // «Ver producto» y «Abrir tienda»: si hay cambios sin publicar, se publican primero y luego se abre el enlace
-    el.querySelectorAll('.tn-url a.btn, a.tn-abrir').forEach(b => b.onclick = async e => {
+    el.querySelectorAll('.tn-url a.btn, a.tn-abrir, a.tn-ver').forEach(b => b.onclick = async e => {
       if (!sucio && !publicando) return;
       e.preventDefault();
       const w = window.open('about:blank', '_blank');
@@ -524,12 +554,16 @@
     on('#tnVer', () => { pagPrev = (T().productos[pi] || {}).slug || ''; tab = 'previa'; render(); scrollTo(0, 0); });
     const ps = q('#tnProd'); if (ps) ps.onchange = () => { pi = +ps.value; render(); };
     const arr = () => T().productos;
-    on('#tnPNew', () => elegirTipo(tp => { arr().push(tp.startsWith('plantilla-') ? desdePlantilla(tp.slice(10)) : nuevoProducto(tp)); pi = arr().length - 1; abiertas.add('basico'); Store.save(); render(); }));
-    on('#tnPDup', () => { const c = clon(arr()[pi]); c.slug += '-2'; c.nombre += ' (copia)'; arr().splice(pi + 1, 0, c); pi++; Store.save(); render(); });
-    on('#tnPUp', () => { if (pi > 0) { [arr()[pi - 1], arr()[pi]] = [arr()[pi], arr()[pi - 1]]; pi--; Store.save(); render(); } });
+    on('#tnPNew', () => elegirTipo(tp => { arr().push(tp.startsWith('plantilla-') ? desdePlantilla(tp.slice(10)) : nuevoProducto(tp)); pi = arr().length - 1; tab = 'productos'; abiertas.add('basico'); Store.save(); render(); scrollTo(0, 0); }));
+    on('#tnPDup', () => { const c = clon(arr()[pi]), base = c.slug.replace(/-\d+$/, ''), usados = arr().map(z => z.slug); let n = 2; while (usados.includes(base + '-' + n)) n++; c.slug = base + '-' + n; c.nombre += ' (copia)'; c.creado = new Date().toISOString(); arr().splice(pi + 1, 0, c); pi++; Store.save(); render(); toast('Producto duplicado'); });
+    on('#tnBack', () => { tab = 'lista'; render(); scrollTo(0, 0); });
+    el.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { pi = +b.dataset.edit; tab = 'productos'; render(); scrollTo(0, 0); });
+    el.querySelectorAll('[data-dup]').forEach(b => b.onclick = () => { const i = +b.dataset.dup, c = clon(arr()[i]), base = c.slug.replace(/-\d+$/, ''), usados = arr().map(z => z.slug); let n = 2; while (usados.includes(base + '-' + n)) n++; c.slug = base + '-' + n; c.nombre += ' (copia)'; c.creado = new Date().toISOString(); arr().splice(i + 1, 0, c); Store.save(); render(); toast('Producto duplicado'); });
+    el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const i = +b.dataset.del, q = arr()[i]; if (q) ask('¿Eliminar «' + q.nombre + '»? Esta acción no se puede deshacer.', () => { arr().splice(i, 1); Store.save(); render(); toast('Producto eliminado'); }, 'Eliminar'); });
+    el.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { const [i, d] = b.dataset.mv.split(':').map(Number), j = i + d; if (j < 0 || j >= arr().length) return; [arr()[i], arr()[j]] = [arr()[j], arr()[i]]; Store.save(); render(); });
     on('#tnPDn', () => { if (pi < arr().length - 1) { [arr()[pi + 1], arr()[pi]] = [arr()[pi], arr()[pi + 1]]; pi++; Store.save(); render(); } });
     on('#tnPZero', () => ask('Se borran TODOS los productos de «' + T().nombre + '» (' + arr().length + '). La tienda publicada no cambia hasta que pulses Publicar. ¿Dejar todo en cero?', () => { T().productos = []; pi = 0; Store.save(); render(); toast('Productos en cero'); }, 'Borrar todos'));
-    on('#tnPDel', () => { const p = arr()[pi]; if (p) ask('¿Eliminar «' + p.nombre + '»?', () => { arr().splice(pi, 1); pi = 0; Store.save(); render(); }, 'Eliminar'); });
+    on('#tnPDel', () => { const p = arr()[pi]; if (p) ask('¿Eliminar «' + p.nombre + '»? Esta acción no se puede deshacer.', () => { arr().splice(pi, 1); pi = 0; tab = 'lista'; Store.save(); render(); scrollTo(0, 0); toast('Producto eliminado'); }, 'Eliminar'); });
     on('#tnRef', () => { lista = null; render(); });
     el.querySelectorAll('[data-pasar]').forEach(b => b.onclick = () => pasar(b.dataset.pasar));
     const pg = q('#tnPg'); if (pg) pg.onchange = () => { pagPrev = pg.value; pintarPrevia(); };
@@ -538,11 +572,11 @@
 
   // Subsecciones del menú: cada producto creado queda listado debajo de «Landing / Tienda»
   const fechaCorta = iso => { try { return new Date(iso).toLocaleDateString('es', { day: 'numeric', month: 'short' }); } catch (e) { return ''; } };
-  const subitems = () => { try { return asegurar().productos.map((p, i) => ({ i, nombre: (p.activo === false ? '⏸ ' : '') + (p.nombre || 'Sin nombre'), tipo: TIPO[p.tipo || 'producto'][0], creado: p.creado ? fechaCorta(p.creado) : '' })); } catch (e) { return []; } };
-  const actual = () => (tab === 'productos' ? pi : -1);
-  let pendienteNuevo = false;
-  const abrirProducto = i => { tab = 'productos'; pi = i; };
-  const nuevo = () => { tab = 'productos'; pendienteNuevo = true; };
+  ['marca', 'portada', 'textos'].forEach(k => { const o = pantalla[k]; pantalla[k] = t => fonoHome() + o(t); });
+  // Menú: dos subsecciones bajo «Landing / Tienda»
+  const subitems = () => { try { const n = (asegurar().productos || []).length; return [{ id: 'home', nombre: 'Página principal', detalle: 'Inicio de la tienda' }, { id: 'lista', nombre: 'Mis productos', detalle: n + (n === 1 ? ' producto' : ' productos') }]; } catch (e) { return []; } };
+  const actual = () => { const g = grupoDe(tab); return g === 'ajustes' ? '' : g; };
+  const abrir = id => { tab = id === 'home' ? 'marca' : 'lista'; };
   if (!Store.__tn) { const o = Store.save; Store.save = function () { const r = o.apply(this, arguments); try { if (/^#tienda/.test(location.hash) && !publicando) cambio(); } catch (e) {} return r; }; Store.__tn = true; }
-  window.Tienda = { vista, ir, guia, subitems, actual, abrirProducto, nuevo };
+  window.Tienda = { vista, ir, guia, subitems, actual, abrir };
 })();

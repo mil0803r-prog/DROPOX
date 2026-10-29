@@ -144,7 +144,7 @@ dialog::backdrop{background:#0009}dialog[open]{animation:pop .3s ease both}
     const m = cfg.marca || {}, c = cfg.contacto || {};
     const pols = (cfg.politicas || []).filter(x => x && x[0]);
     const pagina = cfg._slugTienda ? '/t/' + esc(cfg._slugTienda) : '';
-    return `<div class="acc">${(!o || o.faq !== false) && (cfg.faq || []).length ? `<h2>Preguntas frecuentes</h2>${cfg.faq.map(x => `<details><summary>${esc(x[0])}</summary><div class="tx">${esc(x[1])}</div></details>`).join('')}` : ''}
+    return `<div class="acc"${o && o.ed ? ' data-ed="g:textos:faq"' : ''}>${(!o || o.faq !== false) && (cfg.faq || []).length ? `<h2>Preguntas frecuentes</h2>${cfg.faq.map(x => `<details><summary>${esc(x[0])}</summary><div class="tx">${esc(x[1])}</div></details>`).join('')}` : ''}
     ${pols.map(x => `<details><summary>${esc(x[0])}</summary><div class="tx">${esc(x[1])}</div></details>`).join('')}</div>
     <footer${o && o.ed ? ' data-ed="g:rastreo:contacto.whatsapp"' : ''}>${c.whatsapp ? `<p><a href="https://wa.me/${esc(String(c.whatsapp).replace(/\D/g, ''))}" rel="noopener">WhatsApp: ${esc(c.whatsapp)}</a></p>` : ''}${c.email ? `<p>${esc(c.email)}</p>` : ''}<p>© ${new Date().getFullYear()} ${esc(m.nombre)} · <a href="${pagina || '/'}">Inicio</a></p></footer>`;
   }
@@ -173,7 +173,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     const m = cfg.marca || {}, pt = cfg.portada || {}, pm = cfg.promo || {}, lista = activos(cfg), cats = (cfg.categorias || []).filter(Boolean);
     const card = p => {
       const x = precios(cfg, p);
-      return `<a class="pc" data-c="${esc(p.categoria || '')}" href="${link(cfg, p)}">${x.pct1 ? `<span class="tagp">-${x.pct1}%</span>` : ''}${p.masVendido ? '' : p.nuevo ? '<span class="tagn">Nuevo</span>' : ''}
+      return `<a class="pc" data-c="${esc(p.categoria || '')}" href="${link(cfg, p)}"${ed(opt, 'v:' + p.slug + ':')}>${x.pct1 ? `<span class="tagp">-${x.pct1}%</span>` : ''}${p.masVendido ? '' : p.nuevo ? '<span class="tagn">Nuevo</span>' : ''}
       <div class="im">${(p.imagenes || [])[0] ? `<img src="${url(p.imagenes[0])}" alt="${esc(p.nombre)}" loading="lazy">` : ''}</div>
       <div class="bd">${p.masVendido ? `<span class="st" style="color:var(--wc)">Más vendido${n(p.vendidos) ? ' · +' + n(p.vendidos) + ' vendidos' : ''}</span>` : n(p.vendidos) ? `<span class="lv">+${n(p.vendidos)} vendidos</span>` : ''}
       <h3>${esc(p.nombre)}</h3>${n(p.rating) ? `<span class="st">${stars(p.rating)} <small>${n(p.rating).toFixed(1)} (${n(p.resenas)})</small></span>` : ''}
@@ -182,13 +182,13 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     };
     return `<!doctype html><html lang="es"><head>${head(cfg, m.nombre, m.descripcion || m.lema, m.og || m.logo, opt.canon, 'website')}</head><body><div class="wrap" id="app">
     ${barra(cfg, opt)}
-    <div class="hero-s"${ed(opt, 'g:marca:marca.nombre')}>${m.verificada ? '<span class="vf">✓ Tienda verificada</span>' : ''}${m.logo ? `<img class="lg" src="${url(m.logo)}" alt="${esc(m.nombre)}">` : ''}<h1>${esc(m.nombre)}</h1>${pt.badge ? `<div style="margin-top:8px"><span class="pill">${esc(pt.badge)}</span></div>` : ''}${m.lema ? `<p class="lm">${esc(m.lema)}</p>` : ''}
-    <div class="chips">${(pt.confianza || []).map(x => `<span><i>✓</i>${esc(x)}</span>`).join('')}</div></div>
+    <div class="hero-s"${ed(opt, 'g:marca:marca.nombre')}>${m.verificada ? '<span class="vf">✓ Tienda verificada</span>' : ''}${m.logo ? `<img class="lg"${ed(opt, 'g:marca:marca.logo')} src="${url(m.logo)}" alt="${esc(m.nombre)}">` : ''}<h1${ed(opt, 'g:marca:marca.nombre')}>${esc(m.nombre)}</h1>${pt.badge ? `<div style="margin-top:8px"><span class="pill">${esc(pt.badge)}</span></div>` : ''}${m.lema ? `<p class="lm">${esc(m.lema)}</p>` : ''}
+    <div class="chips"${ed(opt, 'g:portada:portada.confianza')}>${(pt.confianza || []).map(x => `<span><i>✓</i>${esc(x)}</span>`).join('')}</div></div>
     ${pm.activa && pt.mostrarPromo !== false ? `<div class="promo"${ed(opt, 'g:portada:promo.titulo')}><h2>${esc(pm.titulo)}</h2><div class="big">${esc(pm.cantidad)} o más · -${esc(pm.descuento)}%</div><p>${esc(pm.texto)}</p></div>` : ''}
-    ${cats.length ? `<div class="cats" id="cats"><button class="on" data-c="">Todos</button>${cats.map(c => `<button data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : ''}
-    <h2 class="sec">${esc(pt.titulo || 'Los más vendidos')}</h2>
+    ${cats.length ? `<div class="cats" id="cats"${ed(opt, 'g:portada:categorias')}><button class="on" data-c="">Todos</button>${cats.map(c => `<button data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : ''}
+    <h2 class="sec"${ed(opt, 'g:portada:portada.titulo')}>${esc(pt.titulo || 'Los más vendidos')}</h2>
     <div class="grid" id="grid">${lista.length ? lista.map(card).join('') : '<p style="grid-column:1/-1;text-align:center;padding:30px 10px;opacity:.7">Pronto tendremos productos para ti.</p>'}</div>
-    ${pie(cfg)}</div>
+    ${pie(cfg, { ed: opt.preview })}</div>
     <script>(function(){var c=document.getElementById('cats');if(!c)return;c.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;c.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('#grid .pc').forEach(function(a){a.style.display=!b.dataset.c||a.dataset.c===b.dataset.c?'':'none'})})})();</script>
     ${opt.preview ? '' : pixeles(cfg, 'home')}</body></html>`;
   }
