@@ -94,10 +94,25 @@
   }
   addEventListener('dropox:listo', () => { restaurado = false; restaurar(); });
 
+  // Cada producto sale con un número de reseñas propio y distinto: primero 197, 219 y 378 al azar, luego otros al azar sin repetir.
+  function asignarResenas(t) {
+    const ps = t.productos || [], pend = ps.filter(q => !q._rs);
+    if (!pend.length) return;
+    const usados = new Set(ps.filter(q => q._rs).map(q => +q.resenas));
+    const base = [197, 219, 378].filter(x => !usados.has(x)).sort(() => Math.random() - .5);
+    pend.forEach(q => {
+      let n = base.shift();
+      while (n == null || usados.has(n)) n = 150 + Math.floor(Math.random() * 300);
+      usados.add(n); q.resenas = n; q._rs = true;
+      if (!(+q.rating > 0)) q.rating = [4.7, 4.8, 4.9][Math.floor(Math.random() * 3)];
+    });
+    setTimeout(() => { try { Store.save(); } catch (e) {} }, 0);
+  }
+
   function asegurar() {
     if (!Array.isArray(S.tiendas) || !S.tiendas.length) S.tiendas = [clon(window.TIENDA_BASE)];
     if (ti >= S.tiendas.length) ti = 0;
-    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); restaurar();
+    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); S.tiendas.forEach(asignarResenas); restaurar();
     const t = S.tiendas[ti];
     if (pi >= (t.productos || []).length) pi = 0;
     return t;
@@ -766,11 +781,11 @@
       render(); const m2 = q('#tnRecMsg'); if (m2) m2.innerHTML = f.join(' · ') + `<br>Ahora tienes <b>${n()}</b> productos. ` + (err ? '⚠ No se pudo guardar en la nube: ' + esc(err) : '✓ Guardado en tu cuenta.');
     });
     on('#tnPNew', () => elegirTipo(tp => { arr().push(tp.startsWith('plantilla-') ? desdePlantilla(tp.slice(10)) : nuevoProducto(tp)); pi = arr().length - 1; tab = 'productos'; abiertas.add('basico'); Store.save(); render(); scrollTo(0, 0); }));
-    on('#tnPDup', () => { const c = clon(arr()[pi]), base = c.slug.replace(/-\d+$/, ''), usados = arr().map(z => z.slug); let n = 2; while (usados.includes(base + '-' + n)) n++; c.slug = base + '-' + n; c.nombre += ' (copia)'; c.creado = new Date().toISOString(); arr().splice(pi + 1, 0, c); pi++; Store.save(); render(); toast('Producto duplicado'); });
+    on('#tnPDup', () => { const c = clon(arr()[pi]), base = c.slug.replace(/-\d+$/, ''), usados = arr().map(z => z.slug); let n = 2; while (usados.includes(base + '-' + n)) n++; c.slug = base + '-' + n; c.nombre += ' (copia)'; c.creado = new Date().toISOString(); delete c._rs; arr().splice(pi + 1, 0, c); pi++; Store.save(); render(); toast('Producto duplicado'); });
     on('#tnImpUrl', importarLanding);
     on('#tnBack', () => { tab = 'lista'; render(); scrollTo(0, 0); });
     el.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { pi = +b.dataset.edit; tab = 'productos'; render(); scrollTo(0, 0); });
-    el.querySelectorAll('[data-dup]').forEach(b => b.onclick = () => { const i = +b.dataset.dup, c = clon(arr()[i]), base = c.slug.replace(/-\d+$/, ''), usados = arr().map(z => z.slug); let n = 2; while (usados.includes(base + '-' + n)) n++; c.slug = base + '-' + n; c.nombre += ' (copia)'; c.creado = new Date().toISOString(); arr().splice(i + 1, 0, c); Store.save(); render(); toast('Producto duplicado'); });
+    el.querySelectorAll('[data-dup]').forEach(b => b.onclick = () => { const i = +b.dataset.dup, c = clon(arr()[i]), base = c.slug.replace(/-\d+$/, ''), usados = arr().map(z => z.slug); let n = 2; while (usados.includes(base + '-' + n)) n++; c.slug = base + '-' + n; c.nombre += ' (copia)'; c.creado = new Date().toISOString(); delete c._rs; arr().splice(i + 1, 0, c); Store.save(); render(); toast('Producto duplicado'); });
     el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const i = +b.dataset.del, q = arr()[i]; if (q) ask('¿Eliminar «' + q.nombre + '»? Esta acción no se puede deshacer.', () => { borrar(T(), q); arr().splice(i, 1); Store.save(); render(); toast('Producto eliminado'); }, 'Eliminar'); });
     el.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { const [i, d] = b.dataset.mv.split(':').map(Number), j = i + d; if (j < 0 || j >= arr().length) return; [arr()[i], arr()[j]] = [arr()[j], arr()[i]]; Store.save(); render(); });
     on('#tnPDn', () => { if (pi < arr().length - 1) { [arr()[pi + 1], arr()[pi]] = [arr()[pi], arr()[pi + 1]]; pi++; Store.save(); render(); } });
