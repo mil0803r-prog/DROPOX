@@ -147,21 +147,29 @@ dialog::backdrop{background:#0009}dialog[open]{animation:pop .3s ease both}
   const stars = v => '★'.repeat(Math.round(n(v))) + '☆'.repeat(5 - Math.round(n(v)));
   function barra(cfg, opt) {
     const b = cfg.barra || {};
-    return b.activa ? barraGen(cfg, opt, b.items, 'g:portada:barra.items', b.movProd !== false) : '';
+    return b.activa ? barraGen(cfg, opt, b.items, 'g:portada:barra.items', b.movProd !== false, ajustesSup(cfg)) : '';
   }
-  // Barra superior. En movimiento (corre de lado a lado, dorada) en la portada y/o en los productos; se activa o apaga en «Barra superior».
-  function barraGen(cfg, opt, items, edk, mov) {
-    const b = cfg.barra || {}, pt = cfg.portada || {}, it = (items || []).filter(Boolean);
+  // Barras de anuncios (la de arriba y la de abajo). En movimiento corren de lado a lado, doradas; cada una con su propia velocidad, tamaño, colores y símbolo.
+  function barraGen(cfg, opt, items, edk, mov, o) {
+    o = o || {};
+    const it = (items || []).filter(Boolean);
     if (!it.length) return '';
     if (!mov) return `<div class="annbar" role="note"${ed(opt, edk)}><div class="ann-row">${it.map(esc).join('<span class="ann-sep" aria-hidden="true">·</span>')}</div></div>`;
     const nn = x => Math.max(0, Number(x) || 0), hex = x => x && /^#[0-9a-f]{3,8}$/i.test(x) ? x : '';
-    const oro = b.dorado !== false && !hex(b.fondo);
-    const st = [hex(b.fondo) ? `background:${b.fondo}` : '', hex(b.color) ? `color:${b.color}` : '', nn(pt.barraTam) ? `font-size:${Math.min(40, nn(pt.barraTam))}px` : ''].filter(Boolean).join(';');
-    const sim = String(pt.simbolo === undefined ? '' : pt.simbolo).slice(0, 4), vel = Math.min(120, Math.max(4, nn(pt.barraVel) || 22));
+    const oro = o.dorado !== false && !hex(o.fondo);
+    const st = [hex(o.fondo) ? `background:${o.fondo}` : '', hex(o.color) ? `color:${o.color}` : '', nn(o.tam) ? `font-size:${Math.min(40, nn(o.tam))}px` : ''].filter(Boolean).join(';');
+    const sim = String(o.simbolo === undefined ? '' : o.simbolo).slice(0, 4), vel = Math.min(120, Math.max(4, nn(o.vel) || 22));
     const sp = sim ? `<i class="mq-s">${esc(sim)}</i>` : '', g = `<span>${it.concat(it, it).map(x => esc(x) + sp).join('</span><span>')}</span>`;
-    return `<div class="annbar mq${oro ? ' oro' : ''}" role="note"${st ? ` style="${esc(st)}"` : ''}${ed(opt, edk)}><div class="mq-t" style="animation-duration:${vel}s">${g}${g}</div></div>`;
+    return `<div class="annbar mq${oro ? ' oro' : ''}" role="note"${st ? ` style="${esc(st)}"` : ''}${ed(opt, edk)}><div class="mq-t" style="animation-duration:${vel}s${o.dir === 'der' ? ';animation-direction:reverse' : ''}">${g}${g}</div></div>`;
   }
-  const barraMov = (cfg, opt) => { const b = cfg.barra || {}; return b.activa ? barraGen(cfg, opt, b.items, 'g:portada:barra.items', b.movHome !== false) : ''; };
+  const ajustesSup = cfg => { const b = cfg.barra || {}, pt = cfg.portada || {}; return { fondo: b.fondo, color: b.color, dorado: b.dorado, vel: pt.barraVel, tam: pt.barraTam, simbolo: pt.simbolo, dir: b.dir }; };
+  const barraMov = (cfg, opt) => { const b = cfg.barra || {}; return b.activa ? barraGen(cfg, opt, b.items, 'g:portada:barra.items', b.movHome !== false, ajustesSup(cfg)) : ''; };
+  // Barra de abajo (encima del pie de página), en la portada y en los productos
+  function barraInf(cfg, opt, enPortada) {
+    const b = cfg.barraInf || {};
+    if (!b.activa) return '';
+    return barraGen(cfg, opt, b.items, 'g:portada:barraInf.items', (enPortada ? b.movHome : b.movProd) !== false, b);
+  }
   function carrusel(cfg, opt, lista) {
     const pt = cfg.portada || {}, it = lista.filter(p => (p.imagenes || [])[0]);
     if (pt.carrusel === false || !it.length) return '';
@@ -225,7 +233,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     ${cats.length ? `<div class="cats" id="cats"${ed(opt, 'g:portada:categorias')}><button class="on" data-c="">Todos</button>${cats.map(c => `<button data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : ''}
     <h2 class="sec"${ed(opt, 'g:portada:portada.titulo')}>${esc(pt.titulo || 'Los más vendidos')}</h2>
     <div class="grid" id="grid">${lista.length ? lista.map(card).join('') : '<p style="grid-column:1/-1;text-align:center;padding:30px 10px;opacity:.7">Pronto tendremos productos para ti.</p>'}</div>
-    ${pie(cfg, { ed: opt.preview })}</div>
+    ${barraInf(cfg, opt, true)}${pie(cfg, { ed: opt.preview })}</div>
     <script>(function(){var c=document.getElementById('cats');if(!c)return;c.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;c.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('#grid .pc').forEach(function(a){a.style.display=!b.dataset.c||a.dataset.c===b.dataset.c?'':'none'})})})();</script>
     <script>${TW_JS}${CR_JS}</script>
     ${opt.preview ? '' : pixeles(cfg, 'home')}</body></html>`;
@@ -300,7 +308,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     const vars = `:root{--pg:${fondo};--accent:${ac};--accent-text:#fff;--accent-soft:color-mix(in srgb,${ac} 7%,transparent);--accent-border:color-mix(in srgb,${ac} 22%,transparent);--accent-glow:color-mix(in srgb,${ac} 35%,transparent);--accent-halo:color-mix(in srgb,${ac} 18%,transparent);--price-c:${color(d.precio, '#16a34a')};--was-c:${color(d.tachado, '#e11d48')};--btn-bg:${bt};--btn-soft:color-mix(in srgb,${bt} 12%,transparent);--btn-line:color-mix(in srgb,${bt} 34%,transparent);--btn-glow:color-mix(in srgb,${bt} 35%,transparent);--offers-c:${ac};--offers-text:#fff;--offers-soft:color-mix(in srgb,${ac} 5%,transparent);--btn-radius:${Math.max(0, Math.min(28, n(d.radio) || 12))}px;--btn-text:${color(d.botonTxt, '#ffffff')};--form-bg:#fff;--form-input-bg:#fff;--form-input-border:#dddeee;--form-input-icon-bg:#F1F5F9;--form-focus-border:${ac};--font:'${fuente(d.fuente)}',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;--btn-shadow:0 6px 18px rgba(0,0,0,.16);--btn-pad:16px;--btn-font:17px;--btn-lbl:17px;--btn-pr:17px;--btn-width:100%;--ink-bar:${tx};--ink-bar-tx:${d.preset === 'oro' ? color(d.botonTxt, '#F4C468') : fondo}}`;
     const extra = `html,body{background:${fondo}}body{font-family:var(--font);color:${tx};line-height:1.5;-webkit-font-smoothing:antialiased;padding-bottom:0}.lk-rv,.sr{opacity:1}.js .lk-rv:not(.in),.js .sr:not(.in){opacity:0;transform:translateY(14px)}.lk-rv,.sr{transition:opacity .5s ease,transform .5s ease}.lk-rv.in,.sr.in{opacity:1;transform:none}`;
     const fnt = encodeURIComponent(fuente(d.fuente)).replace(/%20/g, '+');
-    const barraHtml = barraP.length ? barraGen(cfg, opt, barraP, 'p:basico:barra', (cfg.barra || {}).movProd !== false) : barra(cfg, opt);
+    const barraHtml = barraP.length ? barraGen(cfg, opt, barraP, 'p:basico:barra', (cfg.barra || {}).movProd !== false, ajustesSup(cfg)) : barra(cfg, opt);
     const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>${esc(titulo)}</title><meta name="description" content="${esc(p.kicker || m.lema || titulo)}"><meta name="theme-color" content="${fondo}">${url(m.favicon || m.logo) ? `<link rel="icon" href="${url(m.favicon || m.logo)}">` : ''}${canon ? `<link rel="canonical" href="${esc(canon)}"><meta property="og:url" content="${esc(canon)}">` : ''}
 <meta property="og:type" content="product"><meta property="og:site_name" content="${esc(m.nombre)}"><meta property="og:title" content="${esc(titulo)}"><meta property="og:description" content="${esc(p.kicker || m.lema || titulo)}"><meta property="og:locale" content="${esc(pais.locale || 'es_PE')}">${imgs[0] ? `<meta property="og:image" content="${url(imgs[0])}"><meta name="twitter:image" content="${url(imgs[0])}">` : ''}<meta name="twitter:card" content="summary_large_image"><meta property="product:price:amount" content="${n(p.precio)}"><meta property="product:price:currency" content="${esc(pais.codigo || 'PEN')}">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${fnt}:wght@400;500;600;700;800;900&display=swap"><style>${base}\n${vars}\n${LUMY_CSS}\n${css0.filter(l => /^(\.annbar\.mq|@keyframes mq)/.test(l)).join('\n')}\n${extra}</style></head><body class="has-lpf den-compact"><div class="wrap" id="app" role="main" data-hero="inmersivo">
@@ -323,7 +331,7 @@ ${contHtml ? `<div class="cblocks">${contHtml}</div>` : ''}
 ${sh('faq') && faqs.length ? `<div class="faq sr lk-rv" id="faqSection"><div class="faq-title">Preguntas frecuentes</div>${faqs.map(([f, sp]) => `<details class="faq-item sr"${ed(opt, sp)}><summary>${esc(f[0])}<span class="faq-ar" aria-hidden="true">+</span></summary><div class="faq-a">${esc(f[1])}</div></details>`).join('')}</div>` : ''}
 ${rs.length && sh('resenas') ? `<div class="pad pad-reviews"><div class="reviews reviews-cards lk-rv"${ed(opt, 'p:resenas:resenasLista.0.t')}><div class="rev-head sr"><b>${prom.toFixed(1)}</b><div class="rev-meta"><span class="rev-stars">${stars(prom)}</span><span class="rev-bar"><i style="width:${Math.round(prom / 5 * 100)}%"></i></span><span class="rev-count">+${totalRes} reseñas verificadas</span></div></div><div class="rev-title">${esc(p.resenasTitulo || ('Lo que opinan desde ' + (pais.pais || 'tu país')))}</div><div class="rev-grid">${rs.map(([r, rk]) => `<div class="rev-card sr"${ed(opt, 'p:resenas:resenasLista.' + rk + '.t')}><div class="rev-top"><span class="rev-stars sm">${stars(r.e)}</span><span class="rev-verif">${SV.verif}Comprador verificado</span></div><p class="rev-text">${esc(r.t)}</p><div class="rev-who"><span class="rev-ava">${esc(String(r.n || '?').trim().charAt(0).toUpperCase())}</span><b>${esc(r.n)}</b>${r.c ? `<span> · ${esc(r.c)}</span>` : ''}</div></div>`).join('')}</div></div></div>` : ''}
 </div>
-<footer class="lpf"><div class="lpf-in"><div class="lpf-reassure">${SV.reassure}<span>${esc(e.reaseguro || 'Pago 100% contraentrega: pagas cuando recibes tu pedido en la puerta de tu casa.')}</span></div><nav class="lpf-links"${ed(opt, 'g:textos:politicas')}>${pols.map((z, k) => `<button type="button" class="lpf-link" data-pol="${k}">${esc(z[0])}</button>`).join('')}${faqs.length ? '<a class="lpf-link" href="#faqSection">Preguntas frecuentes</a>' : ''}</nav><div class="lpf-legal">© ${new Date().getFullYear()}. Todos los derechos reservados.</div></div></footer>
+${barraInf(cfg, opt)}<footer class="lpf"><div class="lpf-in"><div class="lpf-reassure">${SV.reassure}<span>${esc(e.reaseguro || 'Pago 100% contraentrega: pagas cuando recibes tu pedido en la puerta de tu casa.')}</span></div><nav class="lpf-links"${ed(opt, 'g:textos:politicas')}>${pols.map((z, k) => `<button type="button" class="lpf-link" data-pol="${k}">${esc(z[0])}</button>`).join('')}${faqs.length ? '<a class="lpf-link" href="#faqSection">Preguntas frecuentes</a>' : ''}</nav><div class="lpf-legal">© ${new Date().getFullYear()}. Todos los derechos reservados.</div></div></footer>
 <div class="sticky-cta" id="stickyCta"${ed(opt, 'p:precio:precio')}><div class="sc-pblock"><span class="sc-plbl">Total</span><span class="sc-pnow"><span class="sc-price" id="scPrice">${q(cfg, precioSel)}</span><span style="font-size:10px;font-weight:800;color:#94a3b8;letter-spacing:.03em">${esc(pais.codigo || 'PEN')}</span><span class="sc-was" id="scWas"${antesSel > precioSel ? '' : ' style="display:none"'}>${q(cfg, antesSel)}</span></span></div><button class="cta cta-anim shine" id="stickyBtn" type="button" data-abrir>${esc(cta)}</button></div>
 ${pedidoHtml(cfg, x)}
 <dialog id="pol"><div class="ped"><button class="x" type="button" id="polX" aria-label="Cerrar">×</button><h2 id="polT"></h2><div class="lpf-poltext" id="polB"></div></div></dialog>
@@ -348,7 +356,7 @@ ${scriptsPedido(cfg, p, x, imgs, opt)}${opt.preview ? '' : pixeles(cfg, 'product
       return '';
     }).join('');
     return `<!doctype html><html lang="es"><head>${head(cfg, p.titulo || p.nombre, p.kicker || m.lema || p.nombre, imgs[0], opt.canon, 'product', p)}<style>.lp-i{width:100%;display:block;margin:14px 0 0}.lp-b{margin-top:14px;margin-bottom:6px;text-align:center;text-decoration:none}.lp-t h1,.lp-t h2{font-size:26px}</style></head><body><div class="wrap" id="app">
-    ${barra(cfg, opt)}${html}<div style="height:16px"></div>${pie(cfg, { faq: false })}</div>
+    ${barra(cfg, opt)}${html}<div style="height:16px"></div>${barraInf(cfg, opt)}${pie(cfg, { faq: false })}</div>
     ${pedidoHtml(cfg, x)}${scriptsPedido(cfg, p, x, imgs, opt)}${opt.preview ? '' : pixeles(cfg, 'producto', p)}</body></html>`;
   }
 
@@ -359,7 +367,7 @@ ${scriptsPedido(cfg, p, x, imgs, opt)}${opt.preview ? '' : pixeles(cfg, 'product
     const sub = t => String(t || '').replace(/\{\{\s*([a-z0-9]+)\s*\}\}/gi, (a, k) => (k in vars ? vars[k] : a));
     const wa = vars.whatsapp;
     return `<!doctype html><html lang="es"><head>${head(cfg, p.titulo || p.nombre, p.kicker || m.lema || p.nombre, imgs[0], opt.canon, 'product', p)}<style>${String(p.css || '').replace(/<\/style/gi, '<\\/style')}</style></head><body><div class="wrap" id="app">
-    ${p.codigoPuro ? '' : barra(cfg, opt)}<div class="cod"${ed(opt, 'p:codigo:html')}>${sub(p.html)}</div>${p.codigoPuro ? '' : pie(cfg, { faq: false })}</div>
+    ${p.codigoPuro ? '' : barra(cfg, opt)}<div class="cod"${ed(opt, 'p:codigo:html')}>${sub(p.html)}</div>${p.codigoPuro ? '' : barraInf(cfg, opt) + pie(cfg, { faq: false })}</div>
     ${pedidoHtml(cfg, x)}
     <dialog id="pol"><div class="ped"><button class="x" type="button" id="polX" aria-label="Cerrar">×</button><h2 id="polT"></h2><div id="polB" style="white-space:pre-line;font-size:14px;line-height:1.6"></div></div></dialog>
     <script>window.__POL=${JSON.stringify((cfg.politicas || []).filter(z => z && z[0])).replace(/</g, '\\u003c')};</script>
