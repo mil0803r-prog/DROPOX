@@ -101,6 +101,7 @@
   const TIPO = { producto: ['Producto', 'Página de producto completa'], landing: ['Landing', 'Título, imagen y botón'], codigo: ['Código', 'Tu propio HTML'] };
   const nuevoProducto = tipo => {
     const b = { creado: new Date().toISOString(), slug: 'producto-' + Date.now().toString(36).slice(-4), nombre: 'Producto nuevo', titulo: 'Producto nuevo', kicker: '', etiqueta: '', imagenes: [], precio: 0, tachado: 0, combo2: 0, categoria: '', rating: 0, resenas: 0, vendidos: 0, masVendido: false, nuevo: true, activo: true, tipo, bloques: [], faq: [], resenasLista: [] };
+    if (tipo === 'producto') Object.assign(b, { contenido: [], cta: 'Quiero el mío', banner: '', oferta1: { label: 'Llévate uno', badge: 'OFERTA' }, oferta2: { label: 'Para ti y un ser querido', badge: 'AHORRA MÁS' }, sel: 2 });
     if (tipo === 'landing') b.secciones = [{ tipo: 'titulo', x: 'Escribe aquí el título' }, { tipo: 'imagen', img: '' }, { tipo: 'boton', x: 'Quiero el mío', accion: 'formulario', wa: '', msg: '' }, { tipo: 'imagen', img: '' }, { tipo: 'boton', x: 'Pedir por WhatsApp', accion: 'whatsapp', wa: '', msg: '' }];
     if (tipo === 'codigo') Object.assign(b, { html: '<section style="padding:24px 16px;text-align:center">\n  <h1>{{nombre}}</h1>\n  <p style="font-size:28px;font-weight:800">{{precio}}</p>\n  <button class="cta" data-abrir>Quiero el mío</button>\n  <p><a data-wa href="#">Escríbenos por WhatsApp</a></p>\n</section>', css: '', js: '' });
     return b;
@@ -122,7 +123,7 @@
   const GUIA_SW = `<label class="chk tn-guia"><input type="checkbox" id="tnGuia" ${window.__tnGuia !== false ? 'checked' : ''}> Guía: tocar una parte para editarla</label>`;
   const sec = (k, titulo, sub, body) => `<details class="tn-sec" data-sec="${k}" ${abiertas.has(k) ? 'open' : ''}><summary><b>${titulo}</b><small>${esc(sub || '')}</small></summary><div class="tn-secb">${body}</div></details>`;
   const thumb = u => /^https:\/\//.test(u || '') ? `<img class="tn-th" src="${esc(u)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : '<div class="tn-th tn-nth">sin foto</div>';
-  const FACT = { 'sec-titulo': () => ({ tipo: 'titulo', x: '' }), 'sec-texto': () => ({ tipo: 'texto', x: '' }), 'sec-imagen': () => ({ tipo: 'imagen', img: '' }), 'sec-boton': () => ({ tipo: 'boton', x: 'Quiero el mío', accion: 'formulario', wa: '', msg: '' }), imagen: () => '', bloque: () => ({ t: '', x: '', img: '' }), resena: () => ({ n: '', c: '', e: 5, t: '' }), faq: () => ['', ''] };
+  const FACT = { 'cont-titulo': () => ({ tipo: 'titulo', x: '' }), 'cont-texto': () => ({ tipo: 'texto', x: '' }), 'cont-imagen': () => ({ tipo: 'imagen', img: '' }), 'sec-titulo': () => ({ tipo: 'titulo', x: '' }), 'sec-texto': () => ({ tipo: 'texto', x: '' }), 'sec-imagen': () => ({ tipo: 'imagen', img: '' }), 'sec-boton': () => ({ tipo: 'boton', x: 'Quiero el mío', accion: 'formulario', wa: '', msg: '' }), imagen: () => '', bloque: () => ({ t: '', x: '', img: '' }), resena: () => ({ n: '', c: '', e: 5, t: '' }), faq: () => ['', ''] };
   // Lista editable: cada elemento con subir, bajar y quitar; abajo el botón para agregar
   const rep = (path, arr, tpl, kind, etiq) => `<div class="tn-rep">${arr.map((it, i) => `<div class="tn-item"><div class="tn-ctl"><b>${i + 1}</b><button type="button" class="btn btn-sm" data-ra="up" data-rp="${path}" data-ri="${i}" aria-label="Subir">↑</button><button type="button" class="btn btn-sm" data-ra="dn" data-rp="${path}" data-ri="${i}" aria-label="Bajar">↓</button><button type="button" class="btn btn-sm btn-del" data-ra="del" data-rp="${path}" data-ri="${i}" aria-label="Quitar">✕</button></div><div class="tn-itb">${tpl(it, path + '.' + i, i)}</div></div>`).join('')}${(Array.isArray(etiq) ? etiq : [[kind, etiq]]).map(([k, l]) => `<button type="button" class="btn btn-sm btn-pri" data-ra="add" data-rk="${k}" data-rp="${path}">+ ${l}</button>`).join(' ')}</div>`;
   const card = (t, sub, body) => `<div class="card"><h3>${t}</h3>${sub ? `<p class="sub">${sub}</p>` : ''}${body}</div>`;
@@ -194,28 +195,45 @@
         <div class="row">${f(base + 'nombre', 'Nombre en la rejilla')}${f(base + 'slug', 'Dirección (slug)', { hint: 'Ej.: collar-saturno → tudominio.com/collar-saturno' })}</div>
         ${f(base + 'titulo', 'Título de la página del producto', { full: 1 })}
         <div class="row">${f(base + 'etiqueta', 'Etiqueta (ej. JOYERÍA ÚNICA)')}${f(base + 'kicker', 'Frase corta sobre el título')}</div>
+        ${(p.tipo || 'producto') === 'producto' ? f(base + 'barra', 'Barra superior de este producto (una frase por línea; vacío = la general)', { kind: 'lines', rows: 3, full: 1 }) : ''}
         ${f(base + 'categoria', 'Categoría', { opts: ['', ...(t.categorias || [])] })}
         <div class="row">${f(base + 'masVendido', 'Marcar «Más vendido»', { check: 1 })}${f(base + 'nuevo', 'Marcar «Nuevo»', { check: 1 })}</div>`);
       const S2 = sec('fotos', '2 · Fotos', imgs.length + ' foto(s) · la primera es la principal', `
         ${rep(base + 'imagenes', imgs, (u, b) => `<div class="tn-ri">${thumb(u)}<div style="flex:1;min-width:0"><input data-p="${b}" type="text" value="${esc(u)}" placeholder="https://… enlace de la foto"></div></div>`, 'imagen', 'Agregar foto')}
         <div style="margin-top:8px">${upBtn(base + 'imagenes', 'push', 'Subir fotos del dispositivo')}</div>
         <details class="tn-mini"><summary>Pegar varias a la vez</summary>${f(base + 'imagenes', 'Un enlace por línea', { kind: 'lines', rows: 5, full: 1 })}</details>`);
+      const esProd = (p.tipo || 'producto') === 'producto';
       const S3 = sec('precio', '3 · Precio y oferta', x.pct1 ? `−${x.pct1}% · ahorro ${R().q(t, x.ahorro1)}` : 'Precio de venta', `
         <div class="row">${f(base + 'precio', 'Precio de venta', { type: 'number' })}${f(base + 'tachado', 'Precio antes (tachado, opcional)', { type: 'number' })}</div>
         ${f(base + 'combo2', 'Precio por 2 unidades (0 = usar el descuento de la promo)', { type: 'number', full: 1 })}
-        <div class="tn-calc"><span>1 unidad: <b>${R().q(t, x.pr)}</b>${x.ahorro1 ? ` · ahorras ${R().q(t, x.ahorro1)} (−${x.pct1}%)` : ''}</span>${x.c2 ? `<span>2 unidades: <b>${R().q(t, x.c2)}</b> · ${R().q(t, x.c2 / 2)} c/u · ahorras ${R().q(t, x.base2 - x.c2)}</span>` : '<span>Sin oferta de 2 unidades</span>'}</div>`);
-      const S4 = sec('contenido', '4 · Bloques de contenido', (p.bloques || []).length + ' bloque(s) con foto', `
-        <p class="note" style="margin:0 0 8px">Cada bloque es un título, un texto y una foto, en el orden que se ven en la página.</p>
-        ${rep(base + 'bloques', p.bloques || [], (bl, b, i) => `<div class="tn-ri tn-col"><div class="tn-ri">${thumb(bl.img)}<div style="flex:1;min-width:0"><label>Título</label><input data-p="${b}.t" type="text" value="${esc(bl.t)}"></div></div><label>Texto</label><textarea data-p="${b}.x" rows="3">${esc(bl.x)}</textarea><label>Foto (enlace)</label><input data-p="${b}.img" type="text" value="${esc(bl.img)}" placeholder="https://…"><div style="margin-top:6px">${upBtn(b + '.img')}</div></div>`, 'bloque', 'Agregar bloque')}`);
+        <div class="tn-calc"><span>1 unidad: <b>${R().q(t, x.pr)}</b>${x.ahorro1 ? ` · ahorras ${R().q(t, x.ahorro1)} (−${x.pct1}%)` : ''}</span>${x.c2 ? `<span>2 unidades: <b>${R().q(t, x.c2)}</b> · ${R().q(t, x.c2 / 2)} c/u · ahorras ${R().q(t, x.base2 - x.c2)}</span>` : '<span>Sin oferta de 2 unidades</span>'}</div>${esProd ? `
+        <div class="row" style="margin-top:12px">${f(base + 'oferta1.label', 'Oferta de 1 unidad: texto')}${f(base + 'oferta1.badge', 'Etiqueta (ej. OFERTA)')}</div>
+        <div class="row">${f(base + 'oferta2.label', 'Oferta de 2 unidades: texto')}${f(base + 'oferta2.badge', 'Etiqueta (ej. AHORRA MÁS)')}</div>
+        <div class="field"><label>Oferta marcada al abrir la página</label><select data-p="${base}sel" data-k="num" style="width:100%"><option value="1" ${p.sel === 1 ? 'selected' : ''}>1 unidad</option><option value="2" ${p.sel !== 1 ? 'selected' : ''}>2 unidades (si hay precio de 2)</option></select></div>
+        ${f(base + 'banner', 'Aviso sobre el precio (ej. Envío gratis esta semana)', { full: 1 })}
+        ${f(base + 'sellos', 'Sellos bajo el aviso (uno por línea; vacío = Pago contraentrega, Envío gratis, Calidad certificada)', { kind: 'lines', rows: 3, full: 1 })}
+        ${f(base + 'cta', 'Texto del botón (ej. Quiero mi collar)', { full: 1 })}` : ''}`);
+      if (!Array.isArray(p.contenido)) p.contenido = (p.bloques || []).flatMap(bl => [bl && bl.t ? { tipo: 'titulo', x: bl.t } : null, bl && bl.x ? { tipo: 'texto', x: bl.x } : null, bl && bl.img ? { tipo: 'imagen', img: bl.img } : null].filter(Boolean));
+      const S4 = sec('contenido', '4 · Contenido de la página', p.contenido.length + ' elemento(s) · título, texto e imagen en el orden que quieras', `
+        <p class="note" style="margin:0 0 8px">Se ven debajo de las ofertas, uno tras otro. Mezcla títulos, textos e imágenes como en la página de referencia.</p>
+        ${rep(base + 'contenido', p.contenido, (it, b) => {
+          const et = { titulo: 'Título', texto: 'Texto', imagen: 'Imagen' }[it.tipo] || it.tipo;
+          const c = it.tipo === 'titulo' ? `<label>Título</label><input data-p="${b}.x" type="text" value="${esc(it.x)}">`
+            : it.tipo === 'texto' ? `<label>Texto</label><textarea data-p="${b}.x" rows="3">${esc(it.x)}</textarea>`
+            : `<div class="tn-ri">${thumb(it.img)}<div style="flex:1;min-width:0"><label>Imagen (enlace)</label><input data-p="${b}.img" type="text" value="${esc(it.img)}" placeholder="https://…"><div style="margin-top:6px">${upBtn(b + '.img')}</div></div></div>`;
+          return `<div class="tn-ri tn-col"><span class="tn-tag">${et}</span>${c}</div>`;
+        }, 'cont-titulo', [['cont-titulo', 'Título'], ['cont-texto', 'Texto'], ['cont-imagen', 'Imagen']])}`);
       const S5 = sec('resenas', '5 · Valoración y reseñas', (p.resenasLista || []).length + ' reseña(s)', `
         ${chk(base + 'mostrar.resenas', 'Mostrar las reseñas en la página')}
+        ${f(base + 'resenasTitulo', 'Título de las reseñas (vacío = «Lo que opinan desde <país>»)', { full: 1 })}
         <div class="row">${f(base + 'rating', 'Estrellas (0 a 5)', { type: 'number' })}${f(base + 'resenas', 'Número de reseñas', { type: 'number' })}</div>
         ${f(base + 'vendidos', 'Vendidos (+N, se ve en la portada)', { type: 'number' })}
         ${rep(base + 'resenasLista', p.resenasLista || [], (r, b) => `<div class="tn-ri tn-col"><div class="row"><div><label>Nombre</label><input data-p="${b}.n" type="text" value="${esc(r.n)}"></div><div><label>Ciudad</label><input data-p="${b}.c" type="text" value="${esc(r.c)}"></div></div><div class="row"><div><label>Estrellas (1 a 5)</label><input data-p="${b}.e" data-k="num" type="number" min="1" max="5" value="${esc(r.e)}"></div><div></div></div><label>Comentario</label><textarea data-p="${b}.t" rows="2">${esc(r.t)}</textarea></div>`, 'resena', 'Agregar reseña')}`);
       const S6 = sec('preguntas', '6 · Preguntas frecuentes del producto', (p.faq || []).length + ' pregunta(s) · además de las generales', `
         ${chk(base + 'mostrar.faq', 'Mostrar las preguntas en la página')}
         ${rep(base + 'faq', p.faq || [], (q, b) => `<div class="tn-ri tn-col"><label>Pregunta</label><input data-p="${b}.0" type="text" value="${esc(q[0])}"><label>Respuesta</label><textarea data-p="${b}.1" rows="2">${esc(q[1])}</textarea></div>`, 'faq', 'Agregar pregunta')}`);
-      const S7 = sec('mostrar', '7 · Qué se muestra en esta página', 'Garantía, pasos de entrega y sellos', `
+      const S6g = sec('garantia', '7 · Garantía de este producto', 'Título y texto propios (vacío = la general)', `${f(base + 'garantiaTitulo', 'Título (ej. Garantía contraentrega)')}${f(base + 'garantiaTexto', 'Texto', { area: 1, rows: 3, full: 1 })}`);
+      const S7 = sec('mostrar', '8 · Qué se muestra en esta página', 'Garantía, pasos de entrega y sellos', `
         ${chk(base + 'mostrar.confianza', 'Sellos de confianza bajo el precio')}${chk(base + 'mostrar.garantia', 'Garantía de satisfacción')}${chk(base + 'mostrar.pasos', 'Pasos «Así llega tu pedido»')}
         <p class="note">El texto de la garantía, los pasos y los sellos se editan en la pestaña <b>Oferta y envío</b> y valen para todos los productos.</p>`);
       const tipo = p.tipo || 'producto';
@@ -239,13 +257,14 @@
           ${f(base + 'html', 'HTML', { area: 1, rows: 14, full: 1 })}${f(base + 'css', 'CSS (opcional)', { area: 1, rows: 6, full: 1 })}${f(base + 'js', 'JavaScript (opcional)', { area: 1, rows: 5, full: 1 })}`);
         return head + enlace + `<div class="tn-secs">${SP + S1 + S2.replace('2 · Fotos', '2 · Foto de portada') + S3.replace('3 · Precio', '3 · Precio (para el formulario)') + SC}</div>`;
       }
-      return head + enlace + `<div class="tn-secs">${SP + S1 + S2 + S3 + S4 + S5 + S6 + S7}</div>`;
+      return head + enlace + `<div class="tn-secs">${SP + S1 + S2 + S3 + S4 + S5 + S6 + S6g + S7}</div>`;
     },
     pedido(t) {
       return card('Envío y garantía', 'Lo que se muestra en la página del producto y en el pedido.', `${f('envio.gratis', 'Envío gratis', { check: 1 })}<div class="row">${f('envio.costo', 'Costo de envío si no es gratis', { type: 'number' })}${f('envio.productoDias', 'Llegada en el producto (ej. 2 a 5 días)')}</div>
         ${f('envio.dias', 'Tiempo general de entrega')}${f('envio.garantia', 'Garantía de satisfacción', { area: 1, rows: 3 })}
         ${f('envio.pasos', 'Pasos «Así llega tu pedido» — formato: Paso | Tiempo', { kind: 'pasos', rows: 4 })}
         ${f('confianzaProducto', 'Tres sellos bajo el precio (uno por línea)', { kind: 'lines', rows: 3 })}`) +
+        card('Garantía y seguimiento (página de producto)', 'Lo que se ve en la tarjeta de garantía y en «Así llega tu pedido».', `${f('envio.garantiaTitulo', 'Título de la garantía')}<div class="row">${f('envio.pagos.titulo', 'Tarjeta de pagos: título')}${f('envio.pagos.extra', 'Detalle (ej. Atención personalizada)')}</div>${f('envio.pagos.metodo', 'Método de pago (ej. Contraentrega)')}${f('envio.sellosGarantia', 'Sellos de la garantía (uno por línea, máximo 2)', { kind: 'lines', rows: 2, full: 1 })}${f('envio.seguimiento', 'Etiqueta sobre «Así llega tu pedido»')}${f('envio.reaseguro', 'Frase del pie de página', { area: 1, rows: 2, full: 1 })}`) +
         card('Pedido contraentrega', 'La ventana de pedido ya trae: cantidad (1 o 2), nombre, apellido, teléfono, departamento (los 22 de Guatemala), municipio, dirección completa, punto de referencia, resumen y total. El precio se recalcula en el servidor con tu configuración publicada y el pedido llega a la pestaña Pedidos.', '');
     },
     textos(t) {
