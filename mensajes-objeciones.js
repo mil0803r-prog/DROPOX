@@ -131,6 +131,13 @@ window.MSG_OBJ = [
     'Hola {cliente} 💜 Con solo {adelanto} separo tu pedido y el resto lo pagas al recibir. Dime y te paso los datos.',
     'Hola {cliente} 🙌 Los regalos especiales no esperan 😊 Con solo {adelanto} separo tu pedido. Cuando quieras, me dices.',
   ]],
+  ['yp1', 'Dijo que iba a yapear el adelanto y no pagó', 'shalom', [
+    'Hola {cliente} 😊 ¿Pudiste hacer el Yape de los {adelanto}? Te tengo tu pedido separado. Apenas me envíes la captura lo despacho y te paso el código de seguimiento. Si tuviste algún problema con el pago, dime y te ayudo.',
+    'Hola {cliente} 👋 Quedamos en el Yape de {adelanto} y aún no me llega. ¿Te salió algún error o necesitas el número otra vez? Es {cuenta_pago}. Si me mandas la captura, lo despacho de inmediato.',
+    'Hola {cliente} 😊 Te recuerdo que los {adelanto} son parte de los {oferta} y es lo que separa tu pedido. Cuando hagas el Yape a {cuenta_pago}, envíame la captura y lo despachamos.',
+    'Hola {cliente} 💜 Los regalos especiales no esperan 😊 Con solo {adelanto} por Yape ({cuenta_pago}) separo tu pedido. ¿Lo hacemos ahora?',
+    'Hola {cliente}, no quiero incomodarte 🙏 Como no me llegó el Yape de {adelanto}, voy a liberar tu pedido. Si todavía lo quieres, dime y lo separo de nuevo.',
+  ]],
   ['ob8', '«¿Por qué adelanto? ¿Es estafa?»', 'shalom', [
     'Qué bueno que lo preguntes, {cliente}, yo también desconfiaría 🙌 El adelanto de {adelanto} es porque el envío lo pagamos nosotros por adelantado, y así nos aseguramos de que recojas tu pedido. Se descuenta del total. Si quieres, te mando fotos de pedidos que ya entregamos y el código de seguimiento apenas salga.',
     'Entiendo, {cliente} 🙏 El adelanto de {adelanto} es parte del precio y asegura que recojas tu pedido, porque el envío lo adelantamos nosotros. Lo demás ({saldo}) lo pagas al recibir en la agencia.',
