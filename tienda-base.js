@@ -28,17 +28,17 @@ window.TIENDA_BASE = {
  "barra": {
   "activa": true,
   "items": [
-   "Envíos gratis a partir de 40 GTQ",
+   "Envíos gratis a partir de S/ 40",
    "Compra segura contraentrega",
    "Productos exclusivos"
   ]
  },
  "pais": {
-  "moneda": "Q",
-  "codigo": "GTQ",
-  "pais": "Guatemala",
-  "locale": "es_GT",
-  "tel": "502"
+  "pais": "Perú",
+  "moneda": "S/",
+  "codigo": "PEN",
+  "locale": "es_PE",
+  "tel": "51"
  },
  "portada": {
   "badge": "Pago contraentrega",
@@ -122,7 +122,7 @@ window.TIENDA_BASE = {
   ],
   [
    "Derecho de retracto",
-   "Conforme a la Ley de Protección al Consumidor (DIACO), y por tratarse de una venta contra entrega, puedes revisar el producto al momento de la entrega y no estás obligado a recibirlo si no es lo que esperabas. Si llega defectuoso o equivocado, escríbenos a nuestros canales de contacto indicando tu número de pedido para coordinar el cambio o la devolución; también puedes acudir a la DIACO."
+   "Conforme al Código de Protección y Defensa del Consumidor (INDECOPI), y por tratarse de una venta contra entrega, puedes revisar el producto al momento de la entrega y no estás obligado a recibirlo si no es lo que esperabas. Si llega defectuoso o equivocado, escríbenos a nuestros canales de contacto indicando tu número de pedido para coordinar el cambio o la devolución; también puedes acudir a la INDECOPI."
   ],
   [
    "Términos y condiciones",
