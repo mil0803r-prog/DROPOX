@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
     if (!prod) return res.status(404).json({ ok: false, error: 'Producto no disponible.' });
     const x = R.precios(fila.config, prod), cant = b.qty == 2 && x.c2 ? 2 : 1, sub = cant === 2 ? x.c2 : x.pr;
     const env = (fila.config.envio && fila.config.envio.gratis === false) ? Number(fila.config.envio.costo) || 0 : 0, total = Math.round((sub + env) * 100) / 100;
-    const fila_ = { slug, datos: { producto: prod.nombre, productoSlug: prodSlug, cantidad: cant, precioUnit: cant === 2 ? Math.round(x.c2 / 2 * 100) / 100 : x.pr, envio: env, total, moneda: (fila.config.pais || {}).codigo || 'GTQ', nombre: (nombre + ' ' + apellido).trim(), telefono: tel, departamento: depto, ciudad, direccion: dir, referencia: ref, origen: lim(req.headers.referer, 200) } };
+    const fila_ = { slug, datos: { producto: prod.nombre, productoSlug: prodSlug, cantidad: cant, precioUnit: cant === 2 ? Math.round(x.c2 / 2 * 100) / 100 : x.pr, envio: env, total, moneda: (fila.config.pais || {}).codigo || 'PEN', nombre: (nombre + ' ' + apellido).trim(), telefono: tel, departamento: depto, ciudad, direccion: dir, referencia: ref, origen: lim(req.headers.referer, 200) } };
     const ins = await fetch(`${URL_SB}/rest/v1/tienda_pedidos`, { method: 'POST', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify(fila_), signal: AbortSignal.timeout(8000) });
     if (!ins.ok) return res.status(502).json({ ok: false, error: 'No pudimos guardar tu pedido. Intenta de nuevo en un momento.' });
     return res.json({ ok: true, total });

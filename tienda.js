@@ -1,5 +1,5 @@
 'use strict';
-/* DROPOX — Landing / Tienda: arma tiendas con el mismo estilo y estructura de millora.shop (Guatemala, contraentrega).
+/* DROPOX — Landing / Tienda: arma tiendas con el mismo estilo y estructura de millora.shop (contraentrega, en soles).
    Aquí se guarda TODA la configuración (marca, diseño, portada, productos, oferta, envío, textos, pixeles, dominios) y desde aquí se publica.
    La tienda pública la sirve api/tienda.js según el dominio; los pedidos llegan a la pestaña «Pedidos» y se pasan a Pedidos de DROPOX. */
 (() => {
@@ -9,9 +9,23 @@
   const R = () => window.TiendaRender;
   const slugify = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
 
+  // Todo en soles: las tiendas guardadas antes en quetzales pasan una sola vez a Perú, S/ y PEN (los precios los pones tú)
+  function migrarSoles(t) {
+    if (t._soles) return;
+    t._soles = true;
+    const p = t.pais || {};
+    if (p.codigo && p.codigo !== 'GTQ' && p.moneda !== 'Q') return;
+    t.pais = { pais: 'Perú', moneda: 'S/', codigo: 'PEN', locale: 'es_PE', tel: '51' };
+    const fix = x => typeof x === 'string' ? x.replace(/(\d+)\s*GTQ/g, 'S/ $1').replace(/DIACO/g, 'INDECOPI').replace(/Conforme a la Ley de Protección al Consumidor/g, 'Conforme al Código de Protección y Defensa del Consumidor').replace(/Guatemala/g, 'Perú') : Array.isArray(x) ? x.map(fix) : x;
+    if (t.barra) t.barra.items = fix(t.barra.items);
+    t.politicas = fix(t.politicas); t.faq = fix(t.faq);
+    if (t.marca) { t.marca.lema = fix(t.marca.lema); t.marca.descripcion = fix(t.marca.descripcion); }
+  }
+
   function asegurar() {
     if (!Array.isArray(S.tiendas) || !S.tiendas.length) S.tiendas = [clon(window.TIENDA_BASE)];
     if (ti >= S.tiendas.length) ti = 0;
+    S.tiendas.forEach(migrarSoles);
     const t = S.tiendas[ti];
     if (pi >= (t.productos || []).length) pi = 0;
     return t;
@@ -145,11 +159,11 @@
         <div class="field"><select id="tnSel" style="width:100%">${S.tiendas.map((x, i) => `<option value="${i}" ${i === ti ? 'selected' : ''}>${esc(x.nombre)} · /t/${esc(x.slug)}</option>`).join('')}</select></div>
         <div class="tn-act"><button class="btn" id="tnDup">Duplicar esta tienda</button><button class="btn btn-del" id="tnDel">Eliminar</button><button class="btn" id="tnExp">Exportar configuración</button><button class="btn" id="tnImp">Importar</button><input type="file" id="tnImpF" accept="application/json" hidden></div>`) +
         card('Cómo está hecha la tienda de referencia', 'Lo que replica este constructor de millora.shop:', `<ul class="tn-ul">
-        <li><b>Barra superior</b> con 3 mensajes (envío gratis desde 40 GTQ, contraentrega, exclusivos).</li>
+        <li><b>Barra superior</b> con 3 mensajes (envío gratis desde S/ 40, contraentrega, exclusivos).</li>
         <li><b>Portada</b>: tienda verificada, logo, etiqueta «Pago contraentrega», lema, 3 garantías, caja de promo por cantidad (2 o más −10%), categorías y rejilla «Los más vendidos» con precio tachado, ahorro, estrellas y «Lleva 2 y ahorra».</li>
         <li><b>Página de producto</b>: galería con miniaturas, etiqueta, título, estrellas, precio con −%, llegada en 2 a 5 días, 3 sellos de confianza, paquetes 1 o 2 unidades, botón con brillo, garantía, pasos «Así llega tu pedido», bloques de beneficios con foto, FAQ, reseñas verificadas y barra fija inferior.</li>
         <li><b>Pedido en ventana</b> contraentrega: nombre, teléfono, departamento, municipio, dirección, referencia y total.</li>
-        <li><b>Pie</b>: preguntas frecuentes y 5 políticas (privacidad, envíos, cambios, retracto DIACO, términos).</li>
+        <li><b>Pie</b>: preguntas frecuentes y 5 políticas (privacidad, envíos, cambios, retracto INDECOPI, términos).</li>
         <li><b>Pixeles</b>: Meta, TikTok, Google Analytics y Clarity.</li></ul>`);
     },
     marca(t) {
@@ -166,7 +180,7 @@
         <div class="row">${f('diseno.texto', 'Texto', { type: 'color' })}${f('diseno.precio', 'Precio (verde)', { type: 'color' })}</div>
         <div class="row">${f('diseno.tachado', 'Precio tachado / descuento', { type: 'color' })}${f('diseno.ancho', 'Ancho máximo (px)', { type: 'number' })}</div>
         ${f('diseno.grano', 'Textura de papel (grano)', { check: 1 })}`) +
-        card('País y moneda', 'Millora usa Guatemala (quetzales, contraentrega).', `<div class="row">${f('pais.pais', 'País')}${f('pais.moneda', 'Símbolo de moneda')}</div><div class="row">${f('pais.codigo', 'Código (GTQ)')}${f('pais.locale', 'Idioma (es_GT)')}</div>`);
+        card('País y moneda', 'Todo va en soles (S/ · PEN) con pago contraentrega.', `<div class="row">${f('pais.pais', 'País')}${f('pais.moneda', 'Símbolo de moneda')}</div><div class="row">${f('pais.codigo', 'Código (GTQ)')}${f('pais.locale', 'Idioma (es_GT)')}</div>`);
     },
     portada(t) {
       return card('Barra superior', 'Una frase por línea.', `${f('barra.activa', 'Mostrar barra', { check: 1 })}${f('barra.items', 'Mensajes', { kind: 'lines', rows: 4 })}`) +
@@ -265,7 +279,7 @@
         ${f('envio.pasos', 'Pasos «Así llega tu pedido» — formato: Paso | Tiempo', { kind: 'pasos', rows: 4 })}
         ${f('confianzaProducto', 'Tres sellos bajo el precio (uno por línea)', { kind: 'lines', rows: 3 })}`) +
         card('Garantía y seguimiento (página de producto)', 'Lo que se ve en la tarjeta de garantía y en «Así llega tu pedido».', `${f('envio.garantiaTitulo', 'Título de la garantía')}<div class="row">${f('envio.pagos.titulo', 'Tarjeta de pagos: título')}${f('envio.pagos.extra', 'Detalle (ej. Atención personalizada)')}</div>${f('envio.pagos.metodo', 'Método de pago (ej. Contraentrega)')}${f('envio.sellosGarantia', 'Sellos de la garantía (uno por línea, máximo 2)', { kind: 'lines', rows: 2, full: 1 })}${f('envio.seguimiento', 'Etiqueta sobre «Así llega tu pedido»')}${f('envio.reaseguro', 'Frase del pie de página', { area: 1, rows: 2, full: 1 })}`) +
-        card('Pedido contraentrega', 'La ventana de pedido ya trae: cantidad (1 o 2), nombre, apellido, teléfono, departamento (los 22 de Guatemala), municipio, dirección completa, punto de referencia, resumen y total. El precio se recalcula en el servidor con tu configuración publicada y el pedido llega a la pestaña Pedidos.', '');
+        card('Pedido contraentrega', 'La ventana de pedido ya trae: cantidad (1 o 2), nombre, apellido, teléfono, departamento (los 24 de Perú más el Callao), municipio, dirección completa, punto de referencia, resumen y total. El precio se recalcula en el servidor con tu configuración publicada y el pedido llega a la pestaña Pedidos.', '');
     },
     textos(t) {
       return card('Preguntas frecuentes', 'Se muestran en portada y en cada producto. Formato: Pregunta | Respuesta (una por línea).', f('faq', 'Preguntas', { kind: 'pairs', rows: 6, full: 1 })) +
