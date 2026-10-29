@@ -463,24 +463,33 @@
 
 
   // ───────── Importar una landing desde una URL ─────────
+  // Primero se elige el diseño (tarjetas) y luego se revisa lo encontrado antes de agregarlo.
   function importarLanding() {
     const f = $('#dlgForm'), d = $('#dlg');
-    let res = null;
-    f.innerHTML = `<h2>Importar landing desde una URL</h2><p class="sub" style="margin-top:-6px;color:var(--mut)">Pega la dirección de la página. La leo y la convierto en un producto que puedes editar.</p>
+    let res = null, modo = 'producto';
+    const rellenables = (T().productos || []).map((q, i) => [q, i]).filter(([q]) => (q.tipo || 'producto') === 'producto');
+    f.innerHTML = `<h2>Importar landing desde una URL</h2>
       <div class="field"><label>Dirección de la página (URL)</label><input id="imU" type="url" inputmode="url" placeholder="https://www.tutienda.com/producto" autocomplete="off"></div>
-      <div class="field"><label>Cómo importarla</label><select id="imM" style="width:100%"><option value="producto">Como producto editable (título, fotos, textos y preguntas)</option><option value="codigo">Como código (copia exacta del diseño de la página)</option></select></div>
+      <div id="imPaso1"><label style="margin-top:4px">¿A qué diseño quieres importarla?</label>
+      <div class="tn-tipos" id="imDis">
+        <button type="button" class="sel" data-md="producto"><b>Producto completo</b><span>Como «Collar de las Emociones»: fotos, ofertas de 1 y 2 unidades, garantía, contenido y preguntas.</span></button>
+        <button type="button" data-md="landing"><b>Landing simple</b><span>Título, imagen y botón de pedir por WhatsApp, uno tras otro.</span></button>
+        <button type="button" data-md="codigo"><b>Copia exacta de la página</b><span>Copia el diseño tal cual está (en código).</span></button>
+        <button type="button" data-md="rellenar" ${rellenables.length ? '' : 'disabled style="opacity:.45"'}><b>Rellenar un producto que ya tengo</b><span>${rellenables.length ? 'Conserva su diseño (por ejemplo, una copia de la plantilla) y cambia solo el contenido.' : 'Aún no tienes un producto de tipo Producto para rellenar.'}</span></button>
+      </div>
+      <div class="field" id="imDest" style="display:none"><label>¿Cuál producto?</label><select id="imD" style="width:100%">${rellenables.map(([q, i]) => `<option value="${i}">${esc(q.nombre)}</option>`).join('')}</select></div></div>
       <div class="note" id="imMsg" style="min-height:18px"></div><div id="imRes"></div>
       <div class="dlg-foot"><button type="button" class="btn" id="imNo">Cancelar</button><button type="button" class="btn btn-pri" id="imGo">Analizar página</button></div>`;
     f.onsubmit = e => e.preventDefault();
     const msg = t => { $('#imMsg').textContent = t; };
     $('#imNo').onclick = () => d.close();
     const go = $('#imGo');
+    f.querySelectorAll('[data-md]').forEach(b => b.onclick = () => { if (b.disabled || res) return; modo = b.dataset.md; f.querySelectorAll('[data-md]').forEach(x => x.classList.toggle('sel', x === b)); $('#imDest').style.display = modo === 'rellenar' ? '' : 'none'; });
     const unico = nom => { const b = slugify(nom) || 'producto', usados = (T().productos || []).map(q => q.slug); let sl = b, i = 2; while (usados.includes(sl)) sl = b + '-' + i++; return sl; };
     go.onclick = async () => {
       if (res) return agregar();
       const u = $('#imU').value.trim();
       if (!u) return msg('Escribe la dirección de la página.');
-      const modo = $('#imM').value;
       go.disabled = true; go.textContent = 'Analizando…'; msg('Leyendo la página, puede tardar unos segundos…');
       try {
         const tk = window.Nube && (await Nube.token());
@@ -488,37 +497,52 @@
         const r = await fetch('/api/importar', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk }, body: JSON.stringify({ url: u, copia: modo === 'codigo' }) });
         const j = await r.json().catch(() => ({}));
         if (!j.ok) throw new Error(j.error || 'No se pudo importar esa página.');
-        res = j; res.modo = modo;
-        const poco = !j.contenido.length && modo === 'producto';
-        $('#imRes').innerHTML = `<div class="tn-calc" style="margin:8px 0 10px"><span>✓ <b>${esc(j.titulo || 'Sin título')}</b></span><span>${j.imagenes.length} foto(s) · ${j.contenido.length} elemento(s) de contenido · ${j.faq.length} pregunta(s)${j.precio ? ' · precio detectado: ' + esc(j.precio) + ' ' + esc(j.moneda || '') : ''}</span>${modo === 'codigo' ? `<span>Se copia el diseño completo (${Math.round(((j.copia || {}).html || '').length / 1024)} KB de HTML).</span>` : ''}${poco ? '<span style="color:var(--warn)">Esta página trae poco contenido legible; prueba «Como código».</span>' : ''}</div>
-          ${modo === 'producto' ? `<div class="field"><label>Dónde guardarlo (así eliges el diseño)</label><select id="imD" style="width:100%"><option value="nuevo">Producto nuevo con el diseño estándar</option>${(T().productos || []).map((q, i) => ((q.tipo || 'producto') === 'producto' ? `<option value="${i}">Rellenar «${esc(q.nombre)}» (conserva su diseño, ofertas y textos)</option>` : '')).join('')}</select></div>
-          <div class="tn-calc" id="imQ" style="display:none;margin-bottom:10px"><b style="font-size:12px">Qué se reemplaza en ese producto</b><label class="chk"><input type="checkbox" id="imQf" checked> Fotos</label><label class="chk"><input type="checkbox" id="imQc" checked> Contenido (títulos, textos e imágenes)</label><label class="chk"><input type="checkbox" id="imQp" checked> Preguntas frecuentes</label><label class="chk"><input type="checkbox" id="imQt" checked> Nombre, título y frase</label></div>` : ''}
+        res = j;
+        const poco = !j.contenido.length && modo !== 'codigo';
+        const dest = modo === 'rellenar' ? (T().productos[+$('#imD').value] || {}).nombre : '';
+        $('#imPaso1').style.display = 'none'; $('#imU').readOnly = true;
+        $('#imRes').innerHTML = `<div class="tn-calc" style="margin:4px 0 10px"><span>✓ <b>${esc(j.titulo || 'Sin título')}</b></span><span>${j.imagenes.length} foto(s) · ${j.contenido.length} elemento(s) de contenido · ${j.faq.length} pregunta(s)${j.precio ? ' · precio detectado: ' + esc(j.precio) + ' ' + esc(j.moneda || '') : ''}</span><span>Diseño elegido: <b>${{ producto: 'Producto completo', landing: 'Landing simple', codigo: 'Copia exacta de la página', rellenar: 'Rellenar «' + esc(dest) + '»' }[modo]}</b></span>${poco ? '<span style="color:var(--warn)">Esta página trae poco contenido legible; prueba «Copia exacta de la página».</span>' : ''}</div>
+          ${modo === 'rellenar' ? `<div class="tn-calc" style="margin-bottom:10px"><b style="font-size:12px">Qué se reemplaza en ese producto</b><label class="chk"><input type="checkbox" id="imQf" checked> Fotos</label><label class="chk"><input type="checkbox" id="imQc" checked> Contenido (títulos, textos e imágenes)</label><label class="chk"><input type="checkbox" id="imQp" checked> Preguntas frecuentes</label><label class="chk"><input type="checkbox" id="imQt" checked> Nombre, título y frase</label></div>` : ''}
           <div class="field"><label>Nombre del producto</label><input id="imN" type="text" value="${esc((j.titulo || '').slice(0, 80))}"></div>
           <div class="row"><div class="field"><label>Precio de 1 unidad (en soles)</label><input id="imP" type="number" step="any" inputmode="decimal" value="${j.precio && /^(PEN|S\/)?$/.test(j.moneda || '') ? j.precio : ''}" placeholder="0"></div><div class="field"><label>Precio de 2 unidades (opcional)</label><input id="imP2" type="number" step="any" inputmode="decimal" placeholder="0"></div></div>
           <div class="note">Las fotos se enlazan desde la página original; si es tuya, luego puedes subirlas a tu almacén. Los precios de otra moneda no se convierten: ponlos tú en soles.</div>`;
-        const dd = $('#imD'); if (dd) dd.onchange = () => { const e = dd.value !== 'nuevo'; $('#imQ').style.display = e ? '' : 'none'; go.textContent = e ? 'Rellenar ese producto' : 'Agregar a mis productos'; };
-        msg(''); go.disabled = false; go.textContent = 'Agregar a mis productos';
+        msg(''); go.disabled = false; go.textContent = modo === 'rellenar' ? 'Rellenar ese producto' : 'Agregar a mis productos';
       } catch (e) { msg(e.message); go.disabled = false; go.textContent = 'Analizar página'; }
     };
     function agregar() {
-      const dd = $('#imD'), dest = dd && dd.value !== 'nuevo' ? +dd.value : -1;
-      if (dest >= 0 && T().productos[dest]) {
-        const q = T().productos[dest], nom0 = ($('#imN').value || '').trim() || res.titulo || q.nombre, pr0 = num($('#imP').value), p20 = num($('#imP2').value);
+      const nom = ($('#imN').value || '').trim() || res.titulo || 'Producto importado', pr = num($('#imP').value), p2 = num($('#imP2').value);
+      const cont = res.contenido.map(x => (x.tipo === 'imagen' ? { tipo: 'imagen', img: x.img } : { tipo: x.tipo, x: x.x }));
+      const marca = { importadoDe: res.url, creado: new Date().toISOString(), nuevo: false };
+      if (modo === 'rellenar') {
+        const q = T().productos[+$('#imD').value];
+        if (!q) return;
         if ($('#imQf').checked && res.imagenes.length) q.imagenes = res.imagenes.slice(0, 10);
-        if ($('#imQc').checked) { q.contenido = res.contenido.map(x => (x.tipo === 'imagen' ? { tipo: 'imagen', img: x.img } : { tipo: x.tipo, x: x.x })); delete q.bloques; }
+        if ($('#imQc').checked) { q.contenido = cont; delete q.bloques; }
         if ($('#imQp').checked && res.faq.length) { q.faq = res.faq; q.mostrar = Object.assign({}, q.mostrar, { faqGeneral: false }); }
-        if ($('#imQt').checked) { q.nombre = nom0; q.titulo = nom0; if (res.descripcion) q.kicker = res.descripcion.slice(0, 80); }
-        if (pr0 > 0) q.precio = pr0;
-        if (p20 > 0) q.combo2 = p20;
+        if ($('#imQt').checked) { q.nombre = nom; q.titulo = nom; if (res.descripcion) q.kicker = res.descripcion.slice(0, 80); }
+        if (pr > 0) q.precio = pr;
+        if (p2 > 0) q.combo2 = p2;
         q.importadoDe = res.url;
-        pi = dest; tab = 'productos'; Store.save(); d.close(); render(); scrollTo(0, 0); toast('Contenido importado en «' + q.nombre + '»: se conservó su diseño');
+        pi = +$('#imD').value; tab = 'productos'; Store.save(); d.close(); render(); scrollTo(0, 0); toast('Contenido importado en «' + q.nombre + '»: se conservó su diseño');
         return;
       }
-      const nom = ($('#imN').value || '').trim() || res.titulo || 'Producto importado', pr = num($('#imP').value), p2 = num($('#imP2').value);
-      const base = res.modo === 'codigo' ? nuevoProducto('codigo') : nuevoProducto('producto');
-      Object.assign(base, { slug: unico(nom), nombre: nom, titulo: nom, precio: pr, combo2: p2, tachado: 0, nuevo: false, creado: new Date().toISOString(), importadoDe: res.url, imagenes: res.imagenes.slice(0, res.modo === 'codigo' ? 1 : 10) });
-      if (res.modo === 'codigo') Object.assign(base, { html: (res.copia || {}).html || '', css: (res.copia || {}).css || '', js: '', codigoPuro: true });
-      else Object.assign(base, { kicker: (res.descripcion || '').slice(0, 80), contenido: res.contenido.map(x => (x.tipo === 'imagen' ? { tipo: 'imagen', img: x.img } : { tipo: x.tipo, x: x.x })), faq: res.faq });
+      let base;
+      if (modo === 'codigo') {
+        base = Object.assign(nuevoProducto('codigo'), marca, { html: (res.copia || {}).html || '', css: (res.copia || {}).css || '', js: '', codigoPuro: true, imagenes: res.imagenes.slice(0, 1) });
+      } else if (modo === 'landing') {
+        const sec = [], boton = () => ({ tipo: 'boton', x: 'Pedir por WhatsApp', accion: 'whatsapp', wa: '', msg: '' });
+        sec.push({ tipo: 'titulo', x: nom });
+        if (res.imagenes[0]) sec.push({ tipo: 'imagen', img: res.imagenes[0] });
+        sec.push(boton());
+        let n = 0;
+        cont.forEach(c => { sec.push(c); if (++n % 4 === 0) sec.push(boton()); });
+        if (sec[sec.length - 1].tipo !== 'boton') sec.push(boton());
+        base = Object.assign(nuevoProducto('landing'), marca, { secciones: sec, imagenes: res.imagenes.slice(0, 1) });
+      } else {
+        // Producto completo: el diseño de «Collar de las Emociones» (ofertas, aviso, garantía, estructura) con el contenido de la página
+        base = Object.assign(crearDePlantilla('collar', T().productos), marca, { etiqueta: '', barra: [], cta: 'Quiero el mío', garantiaTitulo: '', garantiaTexto: '', categoria: '', resenasLista: [], rating: 0, resenas: 0, vendidos: 0, imagenes: res.imagenes.slice(0, 10), contenido: cont, faq: res.faq, kicker: (res.descripcion || '').slice(0, 80), mostrar: { faqGeneral: !res.faq.length } });
+      }
+      Object.assign(base, { slug: unico(nom), nombre: nom, titulo: nom, precio: pr, combo2: p2, tachado: 0 });
       T().productos.push(base); pi = T().productos.length - 1; tab = 'productos'; Store.save(); d.close(); render(); scrollTo(0, 0); toast('Landing importada: revísala y ajusta el precio');
     }
     d.showModal();
