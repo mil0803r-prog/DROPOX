@@ -492,6 +492,16 @@
     });
     el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => pedirArchivos(b.dataset.up, b.dataset.upmodo));
     el.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copiar(b.dataset.copy));
+    // «Ver producto»: si hay cambios sin publicar, se publican primero y luego se abre el enlace (así nunca llegas a un «no encontrado»)
+    el.querySelectorAll('.tn-url a.btn').forEach(b => b.onclick = async e => {
+      if (!sucio && !publicando) return;
+      e.preventDefault();
+      const w = window.open('about:blank', '_blank');
+      toast('Publicando antes de abrir el producto…');
+      if (publicando) { for (let i = 0; i < 40 && publicando; i++) await new Promise(r => setTimeout(r, 250)); } else await publicar(true);
+      if (errPub) { if (w) w.close(); return toast(errPub); }
+      if (w) w.location = b.href; else location.href = b.href;
+    });
     const au = q('#tnAuto'); if (au) au.onchange = () => { T().autoPublicar = au.checked; Store.save(); if (au.checked) { sucio = true; clearTimeout(tmrAuto); tmrAuto = setTimeout(() => publicar(true), 600); toast('Guardado automático activado: tus cambios se publican solos'); } else toast('Guardado automático apagado: publica con el botón'); pintarEstado(); };
     on('#tnCelRef', pintarCelular);
     const gs = q('#tnGuia'); if (gs) gs.onchange = () => guia(gs.checked);
