@@ -561,3 +561,6 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .tn-row{display:flex;flex-direction:column;gap:10px;padding:12px 14px}.tn-rowi{display:flex;gap:12px;align-items:center}.tn-rowt{min-width:0;display:grid;gap:2px}.tn-rowt b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tn-rowt small{font-size:12px;color:var(--mut)}
 .tn-rowa{display:flex;flex-wrap:wrap;gap:6px}.tn-rowa .btn[disabled]{opacity:.35}
 @media(min-width:760px){.tn-row{flex-direction:row;align-items:center;justify-content:space-between}.tn-rowa{justify-content:flex-end}}
+
+.tn-sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.tn-swb{display:flex;align-items:center;gap:10px;text-align:left;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:14px;padding:8px 10px;font:inherit;cursor:pointer}
+.tn-swb i{width:34px;height:34px;border-radius:10px;border:1px solid #0002;flex:0 0 auto}.tn-swb span{display:grid;font-size:12.5px;font-weight:700}.tn-swb small{font-weight:600;color:var(--mut);font-size:11px}

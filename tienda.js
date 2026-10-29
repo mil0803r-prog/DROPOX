@@ -157,6 +157,7 @@
     d.showModal();
   }
   /*UP*/
+  const PALETA_LOGO = [['Oro claro', '#FDDE83'], ['Oro', '#F4C468'], ['Oro medio', '#E2AE52'], ['Oro profundo', '#AA7831'], ['Negro', '#0A0A0A'], ['Plata', '#D6D6D6'], ['Plata oscura', '#B7B7B7'], ['Blanco', '#FFFFFF']];
   const abiertas = new Set(['previa', 'previaHome', 'basico']);
   const GUIA_SW = `<label class="chk tn-guia"><input type="checkbox" id="tnGuia" ${window.__tnGuia !== false ? 'checked' : ''}> Guía: tocar una parte para editarla</label>`;
   const sec = (k, titulo, sub, body) => `<details class="tn-sec" data-sec="${k}" ${abiertas.has(k) ? 'open' : ''}><summary><b>${titulo}</b><small>${esc(sub || '')}</small></summary><div class="tn-secb">${body}</div></details>`;
@@ -198,7 +199,8 @@
         ${f('marca.descripcion', 'Descripción para buscadores y compartir', { area: 1, full: 1 })}
         ${f('marca.logo', 'Logo (enlace o subir del dispositivo)', { up: 1 })}${f('marca.favicon', 'Ícono de la pestaña', { up: 1 })}${f('marca.og', 'Imagen al compartir el enlace', { up: 1 })}
         ${f('marca.verificada', 'Mostrar «Tienda verificada»', { check: 1 })}`) +
-        card('Estilo', 'Empieza con un estilo y ajusta los colores.', `<div class="tn-act">${Object.keys(pre).map(k => `<button class="btn" data-pre="${k}">${{ classic: 'Millora clásico (crema y dorado)', tienda: 'Millora tienda (Baloo 2)', rosa: 'Rosa y vino', oscuro: 'Oscuro' }[k]}</button>`).join('')}</div>
+        card('Paleta del logo', 'Los colores de tu logo de la M dorada. Toca uno para usarlo como color de acento, o aplica toda la paleta con «Millora oro y negro».', `<div class="tn-sw">${PALETA_LOGO.map(([n, c]) => `<button type="button" class="tn-swb" data-sw="${c}" title="${n} ${c}"><i style="background:${c}"></i><span>${n}<small>${c}</small></span></button>`).join('')}</div>`) +
+        card('Estilo', 'Empieza con un estilo y ajusta los colores.', `<div class="tn-act">${['oro', ...Object.keys(pre).filter(k => k !== 'oro')].map(k => `<button class="btn" data-pre="${k}">${{ oro: '★ Millora oro y negro (fondo blanco)', classic: 'Millora clásico (crema y dorado)', tienda: 'Millora tienda (Baloo 2)', rosa: 'Rosa y vino', oscuro: 'Oscuro' }[k]}</button>`).join('')}</div>
         <div class="row">${f('diseno.fuente', 'Tipografía (Google Fonts)', { opts: ['Playfair Display', 'Baloo 2', 'Nunito', 'Inter', 'Poppins', 'Montserrat', 'Lora', 'DM Sans', 'Plus Jakarta Sans'] })}${f('diseno.radio', 'Redondeo de bordes (px)', { type: 'number' })}</div>
         <div class="row">${f('diseno.acento', 'Color de acento', { type: 'color' })}${f('diseno.boton', 'Color del botón', { type: 'color' })}</div>
         <div class="row">${f('diseno.botonTxt', 'Texto del botón', { type: 'color' })}${f('diseno.fondo', 'Fondo', { type: 'color' })}</div>
@@ -524,6 +526,7 @@
         else if (grupoDe(tab) === 'home') pintarHome(false);
       };
     });
+    el.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => { T().diseno.acento = b.dataset.sw; Store.save(); render(); toast('Color de acento: ' + b.dataset.sw); });
     el.querySelectorAll('[data-pre]').forEach(b => b.onclick = () => { Object.assign(T().diseno, R().PRESETS[b.dataset.pre], { preset: b.dataset.pre }); Store.save(); render(); toast('Estilo aplicado'); });
     on('#tnPub', () => publicar(true)); on('#tnPub2', () => publicar(true)); on('#tnDes', () => publicar(false));
     const sel = q('#tnSel'); if (sel) sel.onchange = () => { ti = +sel.value; pi = 0; lista = null; render(); };
