@@ -33,3 +33,21 @@ create policy "crear pedido" on public.tienda_pedidos for insert to anon, authen
 create policy "dueños ven pedidos" on public.tienda_pedidos for all
   using (lower(auth.jwt() ->> 'email') in ('milderrss03@gmail.com', 'frayrojas2327@gmail.com'))
   with check (lower(auth.jwt() ->> 'email') in ('milderrss03@gmail.com', 'frayrojas2327@gmail.com'));
+
+-- ───────── Subir fotos del dispositivo (Storage) ─────────
+-- Crea el almacén público «tienda» (cualquiera puede ver las fotos; solo los dos correos permitidos pueden subir, cambiar o borrar).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('tienda', 'tienda', true, 8388608, array['image/webp', 'image/jpeg', 'image/png', 'image/gif'])
+on conflict (id) do update set public = true, file_size_limit = 8388608, allowed_mime_types = array['image/webp', 'image/jpeg', 'image/png', 'image/gif'];
+
+drop policy if exists "tienda ver fotos" on storage.objects;
+drop policy if exists "tienda subir fotos" on storage.objects;
+drop policy if exists "tienda cambiar fotos" on storage.objects;
+drop policy if exists "tienda borrar fotos" on storage.objects;
+create policy "tienda ver fotos" on storage.objects for select using (bucket_id = 'tienda');
+create policy "tienda subir fotos" on storage.objects for insert to authenticated
+  with check (bucket_id = 'tienda' and lower(auth.jwt() ->> 'email') in ('milderrss03@gmail.com', 'frayrojas2327@gmail.com'));
+create policy "tienda cambiar fotos" on storage.objects for update to authenticated
+  using (bucket_id = 'tienda' and lower(auth.jwt() ->> 'email') in ('milderrss03@gmail.com', 'frayrojas2327@gmail.com'));
+create policy "tienda borrar fotos" on storage.objects for delete to authenticated
+  using (bucket_id = 'tienda' and lower(auth.jwt() ->> 'email') in ('milderrss03@gmail.com', 'frayrojas2327@gmail.com'));
