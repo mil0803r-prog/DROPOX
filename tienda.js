@@ -491,13 +491,29 @@
         res = j; res.modo = modo;
         const poco = !j.contenido.length && modo === 'producto';
         $('#imRes').innerHTML = `<div class="tn-calc" style="margin:8px 0 10px"><span>✓ <b>${esc(j.titulo || 'Sin título')}</b></span><span>${j.imagenes.length} foto(s) · ${j.contenido.length} elemento(s) de contenido · ${j.faq.length} pregunta(s)${j.precio ? ' · precio detectado: ' + esc(j.precio) + ' ' + esc(j.moneda || '') : ''}</span>${modo === 'codigo' ? `<span>Se copia el diseño completo (${Math.round(((j.copia || {}).html || '').length / 1024)} KB de HTML).</span>` : ''}${poco ? '<span style="color:var(--warn)">Esta página trae poco contenido legible; prueba «Como código».</span>' : ''}</div>
+          ${modo === 'producto' ? `<div class="field"><label>Dónde guardarlo (así eliges el diseño)</label><select id="imD" style="width:100%"><option value="nuevo">Producto nuevo con el diseño estándar</option>${(T().productos || []).map((q, i) => ((q.tipo || 'producto') === 'producto' ? `<option value="${i}">Rellenar «${esc(q.nombre)}» (conserva su diseño, ofertas y textos)</option>` : '')).join('')}</select></div>
+          <div class="tn-calc" id="imQ" style="display:none;margin-bottom:10px"><b style="font-size:12px">Qué se reemplaza en ese producto</b><label class="chk"><input type="checkbox" id="imQf" checked> Fotos</label><label class="chk"><input type="checkbox" id="imQc" checked> Contenido (títulos, textos e imágenes)</label><label class="chk"><input type="checkbox" id="imQp" checked> Preguntas frecuentes</label><label class="chk"><input type="checkbox" id="imQt" checked> Nombre, título y frase</label></div>` : ''}
           <div class="field"><label>Nombre del producto</label><input id="imN" type="text" value="${esc((j.titulo || '').slice(0, 80))}"></div>
           <div class="row"><div class="field"><label>Precio de 1 unidad (en soles)</label><input id="imP" type="number" step="any" inputmode="decimal" value="${j.precio && /^(PEN|S\/)?$/.test(j.moneda || '') ? j.precio : ''}" placeholder="0"></div><div class="field"><label>Precio de 2 unidades (opcional)</label><input id="imP2" type="number" step="any" inputmode="decimal" placeholder="0"></div></div>
           <div class="note">Las fotos se enlazan desde la página original; si es tuya, luego puedes subirlas a tu almacén. Los precios de otra moneda no se convierten: ponlos tú en soles.</div>`;
+        const dd = $('#imD'); if (dd) dd.onchange = () => { const e = dd.value !== 'nuevo'; $('#imQ').style.display = e ? '' : 'none'; go.textContent = e ? 'Rellenar ese producto' : 'Agregar a mis productos'; };
         msg(''); go.disabled = false; go.textContent = 'Agregar a mis productos';
       } catch (e) { msg(e.message); go.disabled = false; go.textContent = 'Analizar página'; }
     };
     function agregar() {
+      const dd = $('#imD'), dest = dd && dd.value !== 'nuevo' ? +dd.value : -1;
+      if (dest >= 0 && T().productos[dest]) {
+        const q = T().productos[dest], nom0 = ($('#imN').value || '').trim() || res.titulo || q.nombre, pr0 = num($('#imP').value), p20 = num($('#imP2').value);
+        if ($('#imQf').checked && res.imagenes.length) q.imagenes = res.imagenes.slice(0, 10);
+        if ($('#imQc').checked) { q.contenido = res.contenido.map(x => (x.tipo === 'imagen' ? { tipo: 'imagen', img: x.img } : { tipo: x.tipo, x: x.x })); delete q.bloques; }
+        if ($('#imQp').checked && res.faq.length) { q.faq = res.faq; q.mostrar = Object.assign({}, q.mostrar, { faqGeneral: false }); }
+        if ($('#imQt').checked) { q.nombre = nom0; q.titulo = nom0; if (res.descripcion) q.kicker = res.descripcion.slice(0, 80); }
+        if (pr0 > 0) q.precio = pr0;
+        if (p20 > 0) q.combo2 = p20;
+        q.importadoDe = res.url;
+        pi = dest; tab = 'productos'; Store.save(); d.close(); render(); scrollTo(0, 0); toast('Contenido importado en «' + q.nombre + '»: se conservó su diseño');
+        return;
+      }
       const nom = ($('#imN').value || '').trim() || res.titulo || 'Producto importado', pr = num($('#imP').value), p2 = num($('#imP2').value);
       const base = res.modo === 'codigo' ? nuevoProducto('codigo') : nuevoProducto('producto');
       Object.assign(base, { slug: unico(nom), nombre: nom, titulo: nom, precio: pr, combo2: p2, tachado: 0, nuevo: false, creado: new Date().toISOString(), importadoDe: res.url, imagenes: res.imagenes.slice(0, res.modo === 'codigo' ? 1 : 10) });
