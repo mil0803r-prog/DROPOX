@@ -698,7 +698,8 @@ function aplicarTema() {
 function render() {
   asegurarCuentas();
   const key = VIEWS[vista] ? vista : 'dashboard';
-  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.v === (NAV_ALIAS[key] || key)));
+  if (window.Tienda && JSON.stringify(Tienda.subitems()) !== menuSig) pintarMenu();
+  marcarMenu(key);
   aplicarTema();
   const el = $('#view'); el.className = 'v-' + key; VIEWS[key](el);
   if (S.demo) { el.insertAdjacentHTML('afterbegin', '<div class="demo-bar"><span><b>Datos de ejemplo.</b> Así se ve tu panel con pedidos y gastos.</span><button class="btn btn-sm btn-pri" id="demoOut">Empezar con mis datos</button></div>'); $('#demoOut').onclick = () => ask('Se borrarán los datos de ejemplo para empezar en limpio.', empezarLimpio, 'Empezar limpio'); }
@@ -707,20 +708,33 @@ function render() {
 const CORTO = { tienda: 'Tienda', whatsapp: 'WhatsApp', mensajes: 'Mensajes', tareas: 'Tareas', shalomzonas: 'Zonas', dashboard: 'Panel', calculadora: 'Calcular', meta: 'Meta', tiktok: 'TikTok', publicidad: 'Publi.', radar: 'Radar', prodtiktok: 'Prod. TT', gdia: 'Diarios', shalom: 'Shalom', shalompro: 'PRO', descargar: 'Bajar', caza: 'Caza', dlfb: 'Facebook', dltt: 'TikTok', investigacion: 'Invest.', dropi: 'Dropi', aliclick: 'AliClick', proyeccion: 'Proyec.' };
 // Menú con secciones fijables: la chincheta de cada sección la sube al grupo «Fijados» (se guarda en S.menuFijos).
 const PIN_M = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3zM12 14v7"/></svg>';
+let menuSig = '';
+function marcarMenu(key) {
+  key = key || (VIEWS[vista] ? vista : 'dashboard');
+  document.querySelectorAll('#tabs a').forEach(a => {
+    if (a.dataset.tprod !== undefined) a.classList.toggle('on', key === 'tienda' && window.Tienda && Tienda.actual() === +a.dataset.tprod);
+    else a.classList.toggle('on', a.dataset.v === (NAV_ALIAS[key] || key) && !(key === 'tienda' && window.Tienda && Tienda.actual() >= 0));
+  });
+}
 function pintarMenu() {
+  menuSig = window.Tienda ? JSON.stringify(Tienda.subitems()) : '';
   const t = $('#tabs'), fj = (S.menuFijos = S.menuFijos || []).filter(k => TABS.some(x => x[0] === k));
-  const a = ([k, l]) => `<a href="#${k}" data-v="${k}">${svg(k)}<span class="lg">${l}</span><span class="sh">${CORTO[k] || l}</span><span class="mpin ${fj.includes(k) ? 'on' : ''}" role="button" tabindex="0" data-pin="${k}" aria-pressed="${fj.includes(k)}" aria-label="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}" title="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}">${PIN_M}</span></a>`;
+  const ancla = ([k, l]) => `<a href="#${k}" data-v="${k}">${svg(k)}<span class="lg">${l}</span><span class="sh">${CORTO[k] || l}</span><span class="mpin ${fj.includes(k) ? 'on' : ''}" role="button" tabindex="0" data-pin="${k}" aria-pressed="${fj.includes(k)}" aria-label="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}" title="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}">${PIN_M}</span></a>`;
+  const subs = k => (k === 'tienda' && window.Tienda ? Tienda.subitems().map(x => `<a href="#tienda" class="msub" data-v="tienda-sub" data-tprod="${x.i}" title="${esc(x.nombre)}"><span class="lg">${esc(x.nombre)}${x.creado ? ` <small>${esc(x.tipo)} · ${esc(x.creado)}</small>` : ` <small>${esc(x.tipo)}</small>`}</span></a>`).join('') + '<a href="#tienda" class="msub msub-new" data-v="tienda-sub" data-tnuevo><span class="lg">+ Producto nuevo</span></a>' : '');
+  const a = it => ancla(it) + subs(it[0]);
   const grupos = fj.length ? [['Fijados', fj.map(k => TABS.find(x => x[0] === k))]] : [];
   GRUPOS.forEach(([g, its]) => { const r = its.filter(x => !fj.includes(x[0])); if (r.length) grupos.push([g, r]); });
   const marca = t.querySelector('.dbrand');
   t.innerHTML = grupos.map(([g, its]) => `<div class="tg">${g}</div>` + its.map(a).join('')).join('');
   if (marca) t.prepend(marca);
+  marcarMenu();
 }
 function alternarFijo(k) {
   const fj = (S.menuFijos = S.menuFijos || []), i = fj.indexOf(k);
   if (i < 0) fj.push(k); else fj.splice(i, 1);
   Store.save(); pintarMenu(); render(); toast(i < 0 ? 'Sección fijada arriba' : 'Sección quitada de fijados');
 }
+$('#tabs').addEventListener('click', e => { const sb = e.target.closest('a.msub'); if (sb && window.Tienda) { if (sb.dataset.tnuevo !== undefined) Tienda.nuevo(); else Tienda.abrirProducto(+sb.dataset.tprod); } });
 $('#tabs').addEventListener('click', e => { const p = e.target.closest('.mpin'); if (p) { e.preventDefault(); e.stopImmediatePropagation(); alternarFijo(p.dataset.pin); } });
 $('#tabs').addEventListener('keydown', e => { const p = e.target.closest && e.target.closest('.mpin'); if (p && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopImmediatePropagation(); alternarFijo(p.dataset.pin); } });
 pintarMenu();
