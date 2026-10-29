@@ -19,6 +19,9 @@
     "api/pedido-tienda.js": {
       "maxDuration": 15,
       "includeFiles": "tienda-render.js"
+    },
+    "api/importar.js": {
+      "maxDuration": 30
     }
   },
   "routes": [

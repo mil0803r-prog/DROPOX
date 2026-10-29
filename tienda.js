@@ -234,7 +234,7 @@
     lista(t) {
       const ps = t.productos || [];
       let h = card('Mis productos', ps.length ? ps.length + (ps.length === 1 ? ' producto' : ' productos') + ' · cada uno tiene su propia página y enlace.' : 'Todavía no hay productos.', `
-        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button>${ps.length ? '<button class="btn btn-del" id="tnPZero">Dejar todo en cero</button>' : ''}</div>${ps.length ? '' : '<p class="note">Pulsa «+ Producto nuevo» y elige el tipo de página (producto, landing, código o la plantilla lista).</p>'}`);
+        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnImpUrl">⬇ Importar landing desde URL</button>${ps.length ? '<button class="btn btn-del" id="tnPZero">Dejar todo en cero</button>' : ''}</div>${ps.length ? '' : '<p class="note">Pulsa «+ Producto nuevo» y elige el tipo de página (producto, landing, código o la plantilla lista).</p>'}`);
       h += ps.map((q, i) => { const x = R().precios(t, q), lk = urlProducto(t, q); return `<div class="card tn-row">
         <div class="tn-rowi">${thumb((q.imagenes || [])[0])}<div class="tn-rowt"><b>${esc(q.nombre || 'Sin nombre')}</b><small>${TIPO[q.tipo || 'producto'][0]} · ${R().q(t, x.pr)}${x.c2 ? ' · 2 por ' + R().q(t, x.c2) : ''} · ${q.activo === false ? 'Oculto' : 'Visible'}${q.creado ? ' · ' + fechaCorta(q.creado) : ''}</small></div></div>
         <div class="tn-rowa"><button class="btn btn-pri btn-sm" data-edit="${i}">Editar</button><button class="btn btn-sm" data-dup="${i}">Duplicar</button><a class="btn btn-sm tn-ver" href="${esc(lk.url)}" target="_blank" rel="noopener">Ver ↗</a><button class="btn btn-sm btn-del" data-del="${i}">Eliminar</button><button class="btn btn-sm" data-mv="${i}:-1" aria-label="Subir" ${i === 0 ? 'disabled' : ''}>↑</button><button class="btn btn-sm" data-mv="${i}:1" aria-label="Bajar" ${i === ps.length - 1 ? 'disabled' : ''}>↓</button></div></div>`; }).join('');
@@ -461,6 +461,53 @@
     if (T().autoPublicar) tmrAuto = setTimeout(() => publicar(true), 2500);
   }
 
+
+  // ───────── Importar una landing desde una URL ─────────
+  function importarLanding() {
+    const f = $('#dlgForm'), d = $('#dlg');
+    let res = null;
+    f.innerHTML = `<h2>Importar landing desde una URL</h2><p class="sub" style="margin-top:-6px;color:var(--mut)">Pega la dirección de la página. La leo y la convierto en un producto que puedes editar.</p>
+      <div class="field"><label>Dirección de la página (URL)</label><input id="imU" type="url" inputmode="url" placeholder="https://www.tutienda.com/producto" autocomplete="off"></div>
+      <div class="field"><label>Cómo importarla</label><select id="imM" style="width:100%"><option value="producto">Como producto editable (título, fotos, textos y preguntas)</option><option value="codigo">Como código (copia exacta del diseño de la página)</option></select></div>
+      <div class="note" id="imMsg" style="min-height:18px"></div><div id="imRes"></div>
+      <div class="dlg-foot"><button type="button" class="btn" id="imNo">Cancelar</button><button type="button" class="btn btn-pri" id="imGo">Analizar página</button></div>`;
+    f.onsubmit = e => e.preventDefault();
+    const msg = t => { $('#imMsg').textContent = t; };
+    $('#imNo').onclick = () => d.close();
+    const go = $('#imGo');
+    const unico = nom => { const b = slugify(nom) || 'producto', usados = (T().productos || []).map(q => q.slug); let sl = b, i = 2; while (usados.includes(sl)) sl = b + '-' + i++; return sl; };
+    go.onclick = async () => {
+      if (res) return agregar();
+      const u = $('#imU').value.trim();
+      if (!u) return msg('Escribe la dirección de la página.');
+      const modo = $('#imM').value;
+      go.disabled = true; go.textContent = 'Analizando…'; msg('Leyendo la página, puede tardar unos segundos…');
+      try {
+        const tk = window.Nube && (await Nube.token());
+        if (!tk) throw new Error('Inicia sesión para importar.');
+        const r = await fetch('/api/importar', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk }, body: JSON.stringify({ url: u, copia: modo === 'codigo' }) });
+        const j = await r.json().catch(() => ({}));
+        if (!j.ok) throw new Error(j.error || 'No se pudo importar esa página.');
+        res = j; res.modo = modo;
+        const poco = !j.contenido.length && modo === 'producto';
+        $('#imRes').innerHTML = `<div class="tn-calc" style="margin:8px 0 10px"><span>✓ <b>${esc(j.titulo || 'Sin título')}</b></span><span>${j.imagenes.length} foto(s) · ${j.contenido.length} elemento(s) de contenido · ${j.faq.length} pregunta(s)${j.precio ? ' · precio detectado: ' + esc(j.precio) + ' ' + esc(j.moneda || '') : ''}</span>${modo === 'codigo' ? `<span>Se copia el diseño completo (${Math.round(((j.copia || {}).html || '').length / 1024)} KB de HTML).</span>` : ''}${poco ? '<span style="color:var(--warn)">Esta página trae poco contenido legible; prueba «Como código».</span>' : ''}</div>
+          <div class="field"><label>Nombre del producto</label><input id="imN" type="text" value="${esc((j.titulo || '').slice(0, 80))}"></div>
+          <div class="row"><div class="field"><label>Precio de 1 unidad (en soles)</label><input id="imP" type="number" step="any" inputmode="decimal" value="${j.precio && /^(PEN|S\/)?$/.test(j.moneda || '') ? j.precio : ''}" placeholder="0"></div><div class="field"><label>Precio de 2 unidades (opcional)</label><input id="imP2" type="number" step="any" inputmode="decimal" placeholder="0"></div></div>
+          <div class="note">Las fotos se enlazan desde la página original; si es tuya, luego puedes subirlas a tu almacén. Los precios de otra moneda no se convierten: ponlos tú en soles.</div>`;
+        msg(''); go.disabled = false; go.textContent = 'Agregar a mis productos';
+      } catch (e) { msg(e.message); go.disabled = false; go.textContent = 'Analizar página'; }
+    };
+    function agregar() {
+      const nom = ($('#imN').value || '').trim() || res.titulo || 'Producto importado', pr = num($('#imP').value), p2 = num($('#imP2').value);
+      const base = res.modo === 'codigo' ? nuevoProducto('codigo') : nuevoProducto('producto');
+      Object.assign(base, { slug: unico(nom), nombre: nom, titulo: nom, precio: pr, combo2: p2, tachado: 0, nuevo: false, creado: new Date().toISOString(), importadoDe: res.url, imagenes: res.imagenes.slice(0, res.modo === 'codigo' ? 1 : 10) });
+      if (res.modo === 'codigo') Object.assign(base, { html: (res.copia || {}).html || '', css: (res.copia || {}).css || '', js: '', codigoPuro: true });
+      else Object.assign(base, { kicker: (res.descripcion || '').slice(0, 80), contenido: res.contenido.map(x => (x.tipo === 'imagen' ? { tipo: 'imagen', img: x.img } : { tipo: x.tipo, x: x.x })), faq: res.faq });
+      T().productos.push(base); pi = T().productos.length - 1; tab = 'productos'; Store.save(); d.close(); render(); scrollTo(0, 0); toast('Landing importada: revísala y ajusta el precio');
+    }
+    d.showModal();
+  }
+
   // ───────── Nube ─────────
   const sb = async (ruta, opt = {}) => {
     const tk = window.Nube && (await Nube.token());
@@ -581,6 +628,7 @@
     const arr = () => T().productos;
     on('#tnPNew', () => elegirTipo(tp => { arr().push(tp.startsWith('plantilla-') ? desdePlantilla(tp.slice(10)) : nuevoProducto(tp)); pi = arr().length - 1; tab = 'productos'; abiertas.add('basico'); Store.save(); render(); scrollTo(0, 0); }));
     on('#tnPDup', () => { const c = clon(arr()[pi]), base = c.slug.replace(/-\d+$/, ''), usados = arr().map(z => z.slug); let n = 2; while (usados.includes(base + '-' + n)) n++; c.slug = base + '-' + n; c.nombre += ' (copia)'; c.creado = new Date().toISOString(); arr().splice(pi + 1, 0, c); pi++; Store.save(); render(); toast('Producto duplicado'); });
+    on('#tnImpUrl', importarLanding);
     on('#tnBack', () => { tab = 'lista'; render(); scrollTo(0, 0); });
     el.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { pi = +b.dataset.edit; tab = 'productos'; render(); scrollTo(0, 0); });
     el.querySelectorAll('[data-dup]').forEach(b => b.onclick = () => { const i = +b.dataset.dup, c = clon(arr()[i]), base = c.slug.replace(/-\d+$/, ''), usados = arr().map(z => z.slug); let n = 2; while (usados.includes(base + '-' + n)) n++; c.slug = base + '-' + n; c.nombre += ' (copia)'; c.creado = new Date().toISOString(); arr().splice(i + 1, 0, c); Store.save(); render(); toast('Producto duplicado'); });
