@@ -24,12 +24,13 @@ module.exports = async (req, res) => {
       const alt = host.startsWith('www.') ? host.slice(4) : 'www.' + host;
       fila = await buscar('dominios=ov.' + encodeURIComponent(`{"${host}","${alt}"}`));
     }
-    if (!fila) { res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8'); return res.send(pagina('Tienda no encontrada', 'Este dominio todavía no está conectado a una tienda.')); }
+    if (!fila) { res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8'); res.setHeader('Cache-Control', 'no-store'); return res.send(pagina('Tienda no encontrada', 'Este dominio todavía no está conectado a una tienda.')); }
     slugTienda = slugTienda || fila.slug;
     const out = R.renderizar(Object.assign({}, fila.config, { slug: fila.slug }), ruta, { base, slugTienda, canon: host && !q.t ? `https://${host}${ruta ? '/' + ruta : '/'}` : '' });
     res.status(out.status);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    // Solo se guarda unos segundos lo que sí existe; un «no encontrado» nunca se guarda, para que un producto recién publicado aparezca al instante
+    res.setHeader('Cache-Control', out.status === 200 ? 'public, max-age=0, s-maxage=10, stale-while-revalidate=50' : 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.send(out.html);
   } catch (e) {
