@@ -382,6 +382,18 @@
     document.querySelectorAll('iframe').forEach(f => { try { f.contentDocument.documentElement.classList.toggle('guia', on); } catch (e) {} });
   }
 
+  // ───────── Guardado automático ─────────
+  // Cada cambio ya se guarda solo en tu cuenta. Con el interruptor activo, además se publica en la tienda real unos segundos después de dejar de editar.
+  let sucio = false, publicando = false, errPub = '', ultimaPub = '', tmrAuto = 0;
+  const estadoTxt = () => publicando ? '⏳ Publicando…' : errPub ? '⚠ ' + errPub : sucio ? (T().autoPublicar ? '● Guardado · publicando en unos segundos…' : '● Guardado en tu cuenta · sin publicar en la tienda') : ultimaPub ? '✓ Publicado a las ' + ultimaPub : '✓ Todo guardado';
+  const pintarEstado = () => { const e = document.getElementById('tnSt'); if (e) { e.textContent = estadoTxt(); e.dataset.e = publicando ? 'p' : errPub ? 'e' : sucio ? 's' : 'ok'; } };
+  function cambio() {
+    if (publicando) return;
+    sucio = true; errPub = ''; pintarEstado();
+    clearTimeout(tmrAuto);
+    if (T().autoPublicar) tmrAuto = setTimeout(() => publicar(true), 2500);
+  }
+
   // ───────── Nube ─────────
   const sb = async (ruta, opt = {}) => {
     const tk = window.Nube && (await Nube.token());
@@ -393,19 +405,23 @@
   };
   const msg = t => { S.tiendaMsg = t; document.querySelectorAll('#tnMsg').forEach(e => { e.textContent = t; }); };
   async function publicar(publicada) {
+    clearTimeout(tmrAuto);
     const t = T();
     t.dominios = (t.dominios || []).map(d => d.toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()).filter(Boolean);
-    if (!R().slugOk(t.slug)) return msg('La dirección de prueba no es válida (usa minúsculas, números y guiones).');
+    const falla = m => { errPub = m; msg(m); pintarEstado(); };
+    if (!R().slugOk(t.slug)) return falla('La dirección de prueba no es válida (usa minúsculas, números y guiones).');
     const malos = (t.productos || []).filter(p => !R().slugOk(p.slug)).map(p => p.nombre);
-    if (malos.length) return msg('Revisa la dirección (slug) de: ' + malos.join(', '));
+    if (malos.length) return falla('Revisa la dirección (slug) de: ' + malos.join(', '));
     const dup = (t.productos || []).map(p => p.slug).filter((s, i, a) => a.indexOf(s) !== i);
-    if (dup.length) return msg('Hay productos con la misma dirección: ' + [...new Set(dup)].join(', '));
-    msg('Publicando…');
+    if (dup.length) return falla('Hay productos con la misma dirección: ' + [...new Set(dup)].join(', '));
+    msg('Publicando…'); publicando = true; errPub = ''; pintarEstado();
     try {
       await sb('tiendas?on_conflict=slug', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ slug: t.slug, dominios: t.dominios, config: t, publicada, actualizado: new Date().toISOString() }) });
       Store.save();
+      sucio = false; ultimaPub = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       msg(publicada ? 'Publicada ✓ ' + new Date().toLocaleTimeString() + '. Puede tardar hasta 1 minuto en verse en el dominio.' : 'Tienda despublicada.');
-    } catch (e) { msg('No se pudo publicar: ' + e.message + (/relation|does not exist|schema cache/i.test(e.message) ? ' — ejecuta supabase/tienda.sql en Supabase.' : '')); }
+    } catch (e) { errPub = 'No se pudo publicar: ' + e.message + (/relation|does not exist|schema cache/i.test(e.message) ? ' — ejecuta supabase/tienda.sql en Supabase.' : ''); msg(errPub); }
+    publicando = false; pintarEstado();
   }
   async function cargarPedidos() {
     try { lista = await sb('tienda_pedidos?select=*&slug=eq.' + encodeURIComponent(T().slug) + '&order=creado.desc&limit=100'); errLista = ''; }
@@ -426,6 +442,7 @@
     if (!R()) { el.innerHTML = secH('tienda', 'Landing / Tienda', 'No se cargó el motor de la tienda.'); return; }
     el.innerHTML = `${secH('tienda', 'Landing / Tienda', 'Tu tienda estilo millora.shop: configúrala, publícala y conecta tus dominios.')}
       <div class="tn-tabs" role="tablist">${TABS.map(([k, l]) => `<button type="button" class="${k === tab ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('')}</div>
+      <div class="tn-save"><span id="tnSt" data-e="ok">${esc(estadoTxt())}</span><label class="chk tn-auto"><input type="checkbox" id="tnAuto" ${t.autoPublicar ? 'checked' : ''}> Guardado automático</label></div>
       <div class="tn-body">${pantalla[tab](t)}</div>`;
     if (tab === 'previa') pintarPrevia();
     if (tab === 'productos') pintarCelular();
@@ -475,6 +492,7 @@
     });
     el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => pedirArchivos(b.dataset.up, b.dataset.upmodo));
     el.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copiar(b.dataset.copy));
+    const au = q('#tnAuto'); if (au) au.onchange = () => { T().autoPublicar = au.checked; Store.save(); if (au.checked) { sucio = true; clearTimeout(tmrAuto); tmrAuto = setTimeout(() => publicar(true), 600); toast('Guardado automático activado: tus cambios se publican solos'); } else toast('Guardado automático apagado: publica con el botón'); pintarEstado(); };
     on('#tnCelRef', pintarCelular);
     const gs = q('#tnGuia'); if (gs) gs.onchange = () => guia(gs.checked);
     on('#tnVer', () => { pagPrev = (T().productos[pi] || {}).slug || ''; tab = 'previa'; render(); scrollTo(0, 0); });
@@ -499,5 +517,6 @@
   let pendienteNuevo = false;
   const abrirProducto = i => { tab = 'productos'; pi = i; };
   const nuevo = () => { tab = 'productos'; pendienteNuevo = true; };
+  if (!Store.__tn) { const o = Store.save; Store.save = function () { const r = o.apply(this, arguments); try { if (/^#tienda/.test(location.hash) && !publicando) cambio(); } catch (e) {} return r; }; Store.__tn = true; }
   window.Tienda = { vista, ir, guia, subitems, actual, abrirProducto, nuevo };
 })();

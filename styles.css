@@ -553,3 +553,7 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .tn-up{border-style:dashed}
 
 .tn-url{padding:14px 16px}.tn-urlt{display:grid;gap:3px;margin-bottom:4px}.tn-urlt a{color:var(--acc2);font-weight:600;font-size:14px;word-break:break-all}
+
+.tn-save{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:9px 14px;border:1px solid var(--line);border-radius:14px;background:var(--card);font-size:13px}
+.tn-save #tnSt{font-weight:600;color:var(--ok)}.tn-save #tnSt[data-e=s]{color:var(--warn)}.tn-save #tnSt[data-e=p]{color:var(--acc2)}.tn-save #tnSt[data-e=e]{color:var(--bad)}
+.tn-auto{font-weight:700;font-size:13px}.tn-auto input{width:18px;height:18px}
