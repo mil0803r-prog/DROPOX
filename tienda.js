@@ -111,6 +111,7 @@
     const d = ds.find(x => x.startsWith('www.')) || ds[0];
     return d ? { url: `https://${d}/${p.slug}`, dominio: true } : { url: `${location.origin}/t/${t.slug}/${p.slug}`, dominio: false };
   };
+  const urlTienda = t => { const lk = urlProducto(t, { slug: '' }); return lk.dominio ? { url: lk.url, dominio: true } : { url: `${location.origin}/t/${t.slug}`, dominio: false }; };
   const copiar = async txt => { try { await navigator.clipboard.writeText(txt); } catch (e) { const a = document.createElement('textarea'); a.value = txt; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); } catch (x) {} a.remove(); } toast('Enlace copiado'); };
   const TIPO = { producto: ['Producto', 'Página de producto completa'], landing: ['Landing', 'Título, imagen y botón'], codigo: ['Código', 'Tu propio HTML'] };
   const nuevoProducto = tipo => {
@@ -152,8 +153,9 @@
         <li><b>Publica</b> con el botón de abajo (guarda la tienda en la nube).</li>
         <li><b>Agrega tus dominios</b> en la pestaña Dominios y conéctalos en Vercel.</li></ol>`) +
         card('Estado de «' + esc(t.nombre) + '»', '', `<div class="row"><div class="t"><small>Productos activos</small><b>${act}</b></div><div class="t"><small>Dominios</small><b>${dom}</b></div></div>
-        <div class="tn-act"><button class="btn btn-pri" id="tnPub">Publicar tienda</button><button class="btn" id="tnDes">Despublicar</button><a class="btn" href="/t/${esc(t.slug)}" target="_blank" rel="noopener">Abrir tienda publicada ↗</a></div>
+        <div class="tn-act"><button class="btn btn-pri" id="tnPub">Publicar tienda</button><button class="btn" id="tnDes">Despublicar</button><a class="btn tn-abrir" href="${esc(urlTienda(t).url)}" target="_blank" rel="noopener" title="${esc(urlTienda(t).url)}">Abrir tienda publicada ↗</a></div>
         <div class="note" id="tnMsg">${esc(S.tiendaMsg || '')}</div>
+        <div class="note">${urlTienda(t).dominio ? 'Tu tienda en vivo: <b>' + esc(urlTienda(t).url) + '</b>' : 'Todavía no tienes dominio: se abre la dirección de prueba. Agrégalo en la pestaña <b>Dominios</b>.'}</div>
         <div class="note">Antes de publicar la primera vez, ejecuta <b>supabase/tienda.sql</b> en Supabase (SQL Editor). Solo se hace una vez.</div>`) +
         card('Tus tiendas', 'Cada tienda tiene su propia configuración y sus propios dominios. «Duplicar» copia todo para crear otra con la misma estructura.', `
         <div class="field"><select id="tnSel" style="width:100%">${S.tiendas.map((x, i) => `<option value="${i}" ${i === ti ? 'selected' : ''}>${esc(x.nombre)} · /t/${esc(x.slug)}</option>`).join('')}</select></div>
@@ -492,12 +494,12 @@
     });
     el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => pedirArchivos(b.dataset.up, b.dataset.upmodo));
     el.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copiar(b.dataset.copy));
-    // «Ver producto»: si hay cambios sin publicar, se publican primero y luego se abre el enlace (así nunca llegas a un «no encontrado»)
-    el.querySelectorAll('.tn-url a.btn').forEach(b => b.onclick = async e => {
+    // «Ver producto» y «Abrir tienda»: si hay cambios sin publicar, se publican primero y luego se abre el enlace
+    el.querySelectorAll('.tn-url a.btn, a.tn-abrir').forEach(b => b.onclick = async e => {
       if (!sucio && !publicando) return;
       e.preventDefault();
       const w = window.open('about:blank', '_blank');
-      toast('Publicando antes de abrir el producto…');
+      toast('Publicando antes de abrir…');
       if (publicando) { for (let i = 0; i < 40 && publicando; i++) await new Promise(r => setTimeout(r, 250)); } else await publicar(true);
       if (errPub) { if (w) w.close(); return toast(errPub); }
       if (w) w.location = b.href; else location.href = b.href;
