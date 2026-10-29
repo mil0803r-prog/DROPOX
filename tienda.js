@@ -319,7 +319,7 @@
     lista(t) {
       const ps = t.productos || [];
       let h = card('Mis productos', ps.length ? ps.length + (ps.length === 1 ? ' producto' : ' productos') + ' · cada uno tiene su propia página y enlace.' + (window.Nube && Nube.estado ? ' · ☁ ' + Nube.estado : '') : 'Todavía no hay productos.', `
-        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnImpUrl">⬇ Importar landing desde URL</button>${ps.length ? '<button class="btn btn-del" id="tnPZero">Dejar todo en cero</button>' : ''}</div>${ps.length ? '' : '<p class="note">Pulsa «+ Producto nuevo» y elige el tipo de página (producto, landing, código o la plantilla lista).</p>'}`);
+        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnImpUrl">⬇ Importar landing desde URL</button>${ps.length ? '<button class="btn btn-del" id="tnPZero">Dejar todo en cero</button>' : ''}<button class="btn" id="tnRecup">🛟 Recuperar productos</button></div><p class="note" id="tnRecMsg"></p>${ps.length ? '' : '<p class="note">Pulsa «+ Producto nuevo» y elige el tipo de página (producto, landing, código o la plantilla lista).</p>'}`);
       h += ps.map((q, i) => { const x = R().precios(t, q), lk = urlProducto(t, q); return `<div class="card tn-row">
         <div class="tn-rowi">${thumb((q.imagenes || [])[0])}<div class="tn-rowt"><b>${esc(q.nombre || 'Sin nombre')}</b><small>${TIPO[q.tipo || 'producto'][0]} · ${R().q(t, x.pr)}${x.c2 ? ' · 2 por ' + R().q(t, x.c2) : ''} · ${q.activo === false ? 'Oculto' : 'Visible'}${q.creado ? ' · ' + fechaCorta(q.creado) : ''}</small></div></div>
         <div class="tn-rowa"><button class="btn btn-pri btn-sm" data-edit="${i}">Editar</button><button class="btn btn-sm" data-dup="${i}">Duplicar</button><a class="btn btn-sm tn-ver" href="${esc(lk.url)}" target="_blank" rel="noopener">Ver ↗</a><button class="btn btn-sm btn-del" data-del="${i}">Eliminar</button><button class="btn btn-sm" data-mv="${i}:-1" aria-label="Subir" ${i === 0 ? 'disabled' : ''}>↑</button><button class="btn btn-sm" data-mv="${i}:1" aria-label="Bajar" ${i === ps.length - 1 ? 'disabled' : ''}>↓</button></div></div>`; }).join('');
@@ -751,6 +751,20 @@
     on('#tnVer', () => { pagPrev = (T().productos[pi] || {}).slug || ''; irTab('previa'); });
     const ps = q('#tnProd'); if (ps) ps.onchange = () => { pi = +ps.value; render(); };
     const arr = () => T().productos;
+
+    on('#tnRecup', async () => {
+      const m = q('#tnRecMsg'), say = x => { if (m) m.innerHTML = x; }, n = () => (T().productos || []).length;
+      const cnt = o => o && Array.isArray(o.tiendas) ? ((o.tiendas.find(x => x.slug === T().slug) || {}).productos || []).length : 0;
+      say('Buscando en todas las copias…');
+      const f = [`Este dispositivo: <b>${n()}</b>`];
+      const bk = await Resp.leer(); f.push(`Respaldo del navegador: <b>${cnt(bk)}</b>`); if (bk) fusionar(S, bk);
+      try { const r = await Nube.leerNube(); if (r.error) f.push('Nube: error (' + esc(r.error) + ')'); else { f.push(`Nube: <b>${cnt(r.contenido)}</b>`); if (r.contenido) fusionar(S, r.contenido); } } catch (e) { f.push('Nube: error (' + esc(e.message) + ')'); }
+      try { const r = await sb('tiendas?select=config&slug=eq.' + encodeURIComponent(T().slug)); const c = r && r[0] && r[0].config; f.push(`Publicada: <b>${c ? (c.productos || []).length : 0}</b>`); if (c) fusionar(S, { tiendas: [c] }); } catch (e) { f.push('Publicada: error (' + esc(e.message) + ')'); }
+      Store.save();
+      let err = ''; try { err = window.Nube && Nube.subirYa ? await Nube.subirYa() : ''; } catch (e) { err = e.message; }
+      say(f.join(' · ') + `<br>Ahora tienes <b>${n()}</b> productos. ` + (err ? '⚠ No se pudo guardar en la nube: ' + esc(err) : '✓ Guardado en tu cuenta.'));
+      render(); const m2 = q('#tnRecMsg'); if (m2) m2.innerHTML = f.join(' · ') + `<br>Ahora tienes <b>${n()}</b> productos. ` + (err ? '⚠ No se pudo guardar en la nube: ' + esc(err) : '✓ Guardado en tu cuenta.');
+    });
     on('#tnPNew', () => elegirTipo(tp => { arr().push(tp.startsWith('plantilla-') ? desdePlantilla(tp.slice(10)) : nuevoProducto(tp)); pi = arr().length - 1; tab = 'productos'; abiertas.add('basico'); Store.save(); render(); scrollTo(0, 0); }));
     on('#tnPDup', () => { const c = clon(arr()[pi]), base = c.slug.replace(/-\d+$/, ''), usados = arr().map(z => z.slug); let n = 2; while (usados.includes(base + '-' + n)) n++; c.slug = base + '-' + n; c.nombre += ' (copia)'; c.creado = new Date().toISOString(); arr().splice(pi + 1, 0, c); pi++; Store.save(); render(); toast('Producto duplicado'); });
     on('#tnImpUrl', importarLanding);
