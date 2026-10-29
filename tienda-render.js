@@ -317,12 +317,15 @@ ${scriptsPedido(cfg, p, x, imgs, opt)}${opt.preview ? '' : pixeles(cfg, 'product
   // ───────── Código: HTML, CSS y JS propios (con {{precio}}, {{nombre}}…) ─────────
   function codigo(cfg, p, opt) {
     const m = cfg.marca || {}, x = precios(cfg, p), imgs = (p.imagenes || []).filter(i => url(i));
-    const vars = { precio: q(cfg, x.pr), tachado: x.tach ? q(cfg, x.tach) : '', precio2: x.c2 ? q(cfg, x.c2) : '', ahorro: x.ahorro1 ? q(cfg, x.ahorro1) : '', descuento: x.pct1 ? x.pct1 + '%' : '', nombre: esc(p.nombre), whatsapp: waLink(cfg, p, '', '') };
+    const vars = { precio: q(cfg, x.pr), tachado: x.tach ? q(cfg, x.tach) : '', precio2: x.c2 ? q(cfg, x.c2) : '', ahorro: x.ahorro1 ? q(cfg, x.ahorro1) : '', descuento: x.pct1 ? x.pct1 + '%' : '', nombre: esc(p.nombre), whatsapp: waLink(cfg, p, '', ''), base2: x.c2 ? q(cfg, x.base2) : '', unidad2: x.c2 ? q(cfg, x.c2 / 2) : '', ahorro2: x.c2 ? q(cfg, Math.max(0, x.base2 - x.c2)) : '', descuento2: x.c2 ? pctOff(x.base2, x.c2) + '%' : '' };
     const sub = t => String(t || '').replace(/\{\{\s*([a-z0-9]+)\s*\}\}/gi, (a, k) => (k in vars ? vars[k] : a));
     const wa = vars.whatsapp;
     return `<!doctype html><html lang="es"><head>${head(cfg, p.titulo || p.nombre, p.kicker || m.lema || p.nombre, imgs[0], opt.canon, 'product', p)}<style>${String(p.css || '').replace(/<\/style/gi, '<\\/style')}</style></head><body><div class="wrap" id="app">
-    ${barra(cfg, opt)}<div class="cod"${ed(opt, 'p:codigo:html')}>${sub(p.html)}</div>${pie(cfg, { faq: false })}</div>
-    ${pedidoHtml(cfg, x)}${scriptsPedido(cfg, p, x, imgs, opt)}
+    ${p.codigoPuro ? '' : barra(cfg, opt)}<div class="cod"${ed(opt, 'p:codigo:html')}>${sub(p.html)}</div>${p.codigoPuro ? '' : pie(cfg, { faq: false })}</div>
+    ${pedidoHtml(cfg, x)}
+    <dialog id="pol"><div class="ped"><button class="x" type="button" id="polX" aria-label="Cerrar">×</button><h2 id="polT"></h2><div id="polB" style="white-space:pre-line;font-size:14px;line-height:1.6"></div></div></dialog>
+    <script>window.__POL=${JSON.stringify((cfg.politicas || []).filter(z => z && z[0])).replace(/</g, '\\u003c')};</script>
+    ${scriptsPedido(cfg, p, x, imgs, opt)}
     <script>[].forEach.call(document.querySelectorAll('[data-wa]'),function(a){var w=window.__T.wa;if(w){a.href=w;a.target='_blank';a.rel='noopener'}else{a.addEventListener('click',function(e){e.preventDefault();var b=document.querySelector('[data-abrir]');if(b)b.click()})}});</script>
     ${p.js ? `<script>${String(p.js).replace(/<\/script/gi, '<\\/script')}</script>` : ''}${opt.preview ? '' : pixeles(cfg, 'producto', p)}</body></html>`;
   }
@@ -356,11 +359,11 @@ var els=$$('.lk-rv,.sr');if('IntersectionObserver' in window){var io=new Interse
 var pol=$('#pol');$$('[data-pol]').forEach(function(b){b.addEventListener('click',function(){var p=(window.__POL||[])[+b.dataset.pol];if(!p||!pol)return;$('#polT').textContent=p[0];$('#polB').textContent=p[1];pol.showModal()})});
 if(pol){$('#polX').addEventListener('click',function(){pol.close()});pol.addEventListener('click',function(e){if(e.target===pol)pol.close()})}
 /* pedido */
-function directo(){var qn=+qty.value||1,total=tot(),L=[T.wam,'','*Producto:* '+T.nom,'*Cantidad:* '+qn+(qn===1?' unidad':' unidades'),'*Total a pagar al recibir:* '+fm(total)+(T.env?'':' (envío gratis)'),'','Te comparto mi nombre, ciudad y dirección de entrega a continuación:'],u='https://wa.me/'+T.wao+'?text='+encodeURIComponent(L.join('\\n'));
+function directo(){var qn=+qty.value||1,total=tot(),L=[T.wam,'','*Producto:* '+T.nom,'*Cantidad:* '+qn+(qn===1?' unidad':' unidades'),'*Total a pagar al recibir:* '+fm(total)+(T.env?'':' (envío gratis)')].concat(window.__nota?['*'+window.__nota.replace(/:/,':*')]:[],['','Te comparto mi nombre, ciudad y dirección de entrega a continuación:']),u='https://wa.me/'+T.wao+'?text='+encodeURIComponent(L.join('\\n'));
 if(T.prev){try{window.parent.toast('Vista previa: aquí se abriría WhatsApp con el resumen del pedido')}catch(x){}return}
 if(window.fbq)fbq('track','Lead',{value:total,currency:T.cod});if(window.ttq)ttq.track('Contact');
 try{var w=window.open(u,'_blank');if(!w)location.href=u}catch(x){location.href=u}}
-$$('[data-abrir]').forEach(function(b){b.addEventListener('click',function(e){if(T.wao&&T.wad){e.preventDefault();directo();return}tot();if(!dlg.open)dlg.showModal();if(window.fbq)fbq('track','InitiateCheckout');if(window.ttq)ttq.track('InitiateCheckout')})});
+$$('[data-abrir]').forEach(function(b){b.addEventListener('click',function(e){if(b.tagName==='A')e.preventDefault();window.__nota=b.getAttribute('data-nota')||'';if(b.getAttribute('data-cant')){if($('.bopt'))selB(+b.getAttribute('data-cant'));else{qty.value=b.getAttribute('data-cant');tot()}}else if(!$('.bopt')){qty.value='1';tot()}if(T.wao&&T.wad){e.preventDefault();directo();return}tot();if(!dlg.open)dlg.showModal();if(window.fbq)fbq('track','InitiateCheckout');if(window.ttq)ttq.track('InitiateCheckout')})});
 $('#pedX').addEventListener('click',function(){dlg.close()});dlg.addEventListener('click',function(e){if(e.target===dlg)dlg.close()});
 f.addEventListener('submit',function(e){e.preventDefault();err.textContent='';var d2=Object.fromEntries(new FormData(f).entries());
 if(!d2.nombre.trim()||!d2.telefono.trim()||!d2.departamento||!d2.ciudad.trim()||!d2.direccion.trim()){err.textContent='Completa nombre, teléfono, departamento, ciudad y dirección.';return}
