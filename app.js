@@ -116,6 +116,8 @@ IC.whatsapp = '<path d="M4 20l1.500-4.500A8 8 0 1 1 8.500 18.500z"/><path d="M9 
 IC.gdia = '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4M9 15h6"/>';
 IC.prodtiktok = '<path d="M14 3v11.500a3.500 3.500 0 1 1-3.500-3.500M14 3c.300 2.600 2 4.200 5 4.500"/>';
 IC.tienda = '<path d="M3 9l2-5h14l2 5M4 9v11h16V9M3 9h18"/><path d="M9 20v-6h6v6"/>';
+IC.tiendahome = '<path d="M3 11l9-8 9 8M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>';
+IC.tiendaprod = '<path d="M12 2l9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10"/>';
 IC.radar = '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12l6-6"/>';
 const svg = (k, w = 1.9) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`;
 
@@ -296,7 +298,7 @@ function insights(A) {
 const alertasHtml = L => L.length ? L.map(a => `<div class="al"><i class="dot ${a.c}"></i><div><b>${esc(a.t)}</b><span>${esc(a.d)}</span></div></div>`).join('') : '<div class="empty">Todo en orden. Sin alertas.</div>';
 
 // ───────── Vistas ─────────
-const VIEWS = { tienda: el => window.Tienda && Tienda.vista(el), whatsapp: el => window.WhatsApp && WhatsApp.vista(el), mensajes: el => window.Mensajes && Mensajes.vista(el), tareas: el => window.Tareas && Tareas.vista(el), shalomzonas: el => window.ShalomZonas && ShalomZonas.vista(el), dashboard: vDashboard, calculadora: vCalc, pedidos: vPedidos, gastos: vGastos, meta: el => { if (!(window.Meta && Meta.vista(el))) vAdsPlat(el, 'meta'); }, tiktok: el => vAdsPlat(el, 'tiktok'), ads: el => vAdsPlat(el, 'meta'), publicidad: vPublicidad, caza: el => window.Caza && Caza.vista(el, Caza.ultimo || 'dropi'), dlfb: el => window.Descargador && Descargador.vista(el, 'facebook'), dltt: el => window.Descargador && Descargador.vista(el, 'tiktok'), descargar: el => window.Descargador && Descargador.vista(el, 'tiktok'), gdia: el => window.Gdia && Gdia.vista(el), shalom: el => window.Shalom && Shalom.vista(el, 'ag'), shalompro: el => window.Shalom && Shalom.vista(el, 'pro'), prodtiktok: el => window.Caza && Caza.vista(el, 'tiktok'), radar: el => window.Radar && Radar.vista(el), investigacion: el => window.Caza && Caza.vista(el, 'invest'), dropi: el => window.Caza && Caza.vista(el, 'dropi'), aliclick: el => window.Caza && Caza.vista(el, 'aliclick'), proyeccion: vProy, ajustes: vAjustes };
+const VIEWS = { tienda: el => window.Tienda && Tienda.vista(el, 'ajustes'), tiendahome: el => window.Tienda && Tienda.vista(el, 'home'), tiendaprod: el => window.Tienda && Tienda.vista(el, 'lista'), whatsapp: el => window.WhatsApp && WhatsApp.vista(el), mensajes: el => window.Mensajes && Mensajes.vista(el), tareas: el => window.Tareas && Tareas.vista(el), shalomzonas: el => window.ShalomZonas && ShalomZonas.vista(el), dashboard: vDashboard, calculadora: vCalc, pedidos: vPedidos, gastos: vGastos, meta: el => { if (!(window.Meta && Meta.vista(el))) vAdsPlat(el, 'meta'); }, tiktok: el => vAdsPlat(el, 'tiktok'), ads: el => vAdsPlat(el, 'meta'), publicidad: vPublicidad, caza: el => window.Caza && Caza.vista(el, Caza.ultimo || 'dropi'), dlfb: el => window.Descargador && Descargador.vista(el, 'facebook'), dltt: el => window.Descargador && Descargador.vista(el, 'tiktok'), descargar: el => window.Descargador && Descargador.vista(el, 'tiktok'), gdia: el => window.Gdia && Gdia.vista(el), shalom: el => window.Shalom && Shalom.vista(el, 'ag'), shalompro: el => window.Shalom && Shalom.vista(el, 'pro'), prodtiktok: el => window.Caza && Caza.vista(el, 'tiktok'), radar: el => window.Radar && Radar.vista(el), investigacion: el => window.Caza && Caza.vista(el, 'invest'), dropi: el => window.Caza && Caza.vista(el, 'dropi'), aliclick: el => window.Caza && Caza.vista(el, 'aliclick'), proyeccion: vProy, ajustes: vAjustes };
 let metrica = 'ventas', tabla = { dia: false, sem: false };
 
 function vDashboard(el) {
@@ -675,7 +677,7 @@ const GRUPOS = [
   ['Organización', [['tareas', 'Tareas diarias'], ['whatsapp', 'WhatsApp'], ['mensajes', 'Estructura de mensajes']]],
   ['Finanzas', [['dashboard', 'Dashboard'], ['calculadora', 'Calculadora'], ['pedidos', 'Pedidos'], ['gastos', 'Gastos'], ['gdia', 'Gastos diarios'], ['proyeccion', 'Proyección']]],
   ['Publicidad', [['meta', 'Meta Ads'], ['tiktok', 'TikTok Ads'], ['publicidad', 'Publicidad']]],
-  ['Tienda', [['tienda', 'Landing / Tienda']]],
+  ['Tienda', [['tienda', 'Landing / Tienda'], ['tiendahome', 'Página principal'], ['tiendaprod', 'Mis productos']]],
   ['Productos', [['radar', 'Radar diario'], ['investigacion', 'Investigación de mercado'], ['caza', 'Caza diaria'], ['prodtiktok', 'Productos TikTok']]],
   ['Descargadores', [['dlfb', 'Facebook'], ['dltt', 'TikTok']]],
   ['Shalom', [['shalom', 'Agencias Shalom'], ['shalompro', 'Puntos PRO'], ['shalomzonas', 'Públicos por zona']]],
@@ -698,30 +700,23 @@ function aplicarTema() {
 function render() {
   asegurarCuentas();
   const key = VIEWS[vista] ? vista : 'dashboard';
-  if (window.Tienda && JSON.stringify(Tienda.subitems()) !== menuSig) pintarMenu();
   marcarMenu(key);
   aplicarTema();
   const el = $('#view'); el.className = 'v-' + key; VIEWS[key](el);
   if (S.demo) { el.insertAdjacentHTML('afterbegin', '<div class="demo-bar"><span><b>Datos de ejemplo.</b> Así se ve tu panel con pedidos y gastos.</span><button class="btn btn-sm btn-pri" id="demoOut">Empezar con mis datos</button></div>'); $('#demoOut').onclick = () => ask('Se borrarán los datos de ejemplo para empezar en limpio.', empezarLimpio, 'Empezar limpio'); }
   countUp(el);
 }
-const CORTO = { tienda: 'Tienda', whatsapp: 'WhatsApp', mensajes: 'Mensajes', tareas: 'Tareas', shalomzonas: 'Zonas', dashboard: 'Panel', calculadora: 'Calcular', meta: 'Meta', tiktok: 'TikTok', publicidad: 'Publi.', radar: 'Radar', prodtiktok: 'Prod. TT', gdia: 'Diarios', shalom: 'Shalom', shalompro: 'PRO', descargar: 'Bajar', caza: 'Caza', dlfb: 'Facebook', dltt: 'TikTok', investigacion: 'Invest.', dropi: 'Dropi', aliclick: 'AliClick', proyeccion: 'Proyec.' };
+const CORTO = { tienda: 'Tienda', tiendahome: 'Inicio', tiendaprod: 'Prod.', whatsapp: 'WhatsApp', mensajes: 'Mensajes', tareas: 'Tareas', shalomzonas: 'Zonas', dashboard: 'Panel', calculadora: 'Calcular', meta: 'Meta', tiktok: 'TikTok', publicidad: 'Publi.', radar: 'Radar', prodtiktok: 'Prod. TT', gdia: 'Diarios', shalom: 'Shalom', shalompro: 'PRO', descargar: 'Bajar', caza: 'Caza', dlfb: 'Facebook', dltt: 'TikTok', investigacion: 'Invest.', dropi: 'Dropi', aliclick: 'AliClick', proyeccion: 'Proyec.' };
 // Menú con secciones fijables: la chincheta de cada sección la sube al grupo «Fijados» (se guarda en S.menuFijos).
 const PIN_M = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3zM12 14v7"/></svg>';
-let menuSig = '';
 function marcarMenu(key) {
   key = key || (VIEWS[vista] ? vista : 'dashboard');
-  document.querySelectorAll('#tabs a').forEach(a => {
-    if (a.dataset.tsub !== undefined) a.classList.toggle('on', key === 'tienda' && window.Tienda && Tienda.actual() === a.dataset.tsub);
-    else a.classList.toggle('on', a.dataset.v === (NAV_ALIAS[key] || key) && !(key === 'tienda' && window.Tienda && Tienda.actual() !== ''));
-  });
+  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.v === (NAV_ALIAS[key] || key)));
 }
 function pintarMenu() {
-  menuSig = window.Tienda ? JSON.stringify(Tienda.subitems()) : '';
   const t = $('#tabs'), fj = (S.menuFijos = S.menuFijos || []).filter(k => TABS.some(x => x[0] === k));
   const ancla = ([k, l]) => `<a href="#${k}" data-v="${k}">${svg(k)}<span class="lg">${l}</span><span class="sh">${CORTO[k] || l}</span><span class="mpin ${fj.includes(k) ? 'on' : ''}" role="button" tabindex="0" data-pin="${k}" aria-pressed="${fj.includes(k)}" aria-label="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}" title="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}">${PIN_M}</span></a>`;
-  const subs = k => (k === 'tienda' && window.Tienda ? Tienda.subitems().map(x => `<a href="#tienda" class="msub" data-v="tienda-sub" data-tsub="${x.id}" title="${esc(x.nombre)}"><span class="lg">${esc(x.nombre)} <small>${esc(x.detalle)}</small></span></a>`).join('') : '');
-  const a = it => ancla(it) + subs(it[0]);
+  const a = ancla;
   const grupos = fj.length ? [['Fijados', fj.map(k => TABS.find(x => x[0] === k))]] : [];
   GRUPOS.forEach(([g, its]) => { const r = its.filter(x => !fj.includes(x[0])); if (r.length) grupos.push([g, r]); });
   const marca = t.querySelector('.dbrand');
@@ -734,7 +729,6 @@ function alternarFijo(k) {
   if (i < 0) fj.push(k); else fj.splice(i, 1);
   Store.save(); pintarMenu(); render(); toast(i < 0 ? 'Sección fijada arriba' : 'Sección quitada de fijados');
 }
-$('#tabs').addEventListener('click', e => { const sb = e.target.closest('a.msub'); if (sb && window.Tienda) Tienda.abrir(sb.dataset.tsub); });
 $('#tabs').addEventListener('click', e => { const p = e.target.closest('.mpin'); if (p) { e.preventDefault(); e.stopImmediatePropagation(); alternarFijo(p.dataset.pin); } });
 $('#tabs').addEventListener('keydown', e => { const p = e.target.closest && e.target.closest('.mpin'); if (p && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopImmediatePropagation(); alternarFijo(p.dataset.pin); } });
 pintarMenu();
