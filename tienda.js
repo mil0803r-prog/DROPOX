@@ -124,7 +124,7 @@
       const x = p ? R().precios(t, p) : null;
       const head = card('Productos', 'Elige un producto y edítalo sección por sección. Cada uno tiene su página: tudominio.com/<dirección>.', `
         <div class="field"><select id="tnProd" style="width:100%">${ps.map((q, i) => `<option value="${i}" ${i === pi ? 'selected' : ''}>${q.activo === false ? '⏸ ' : ''}[${TIPO[q.tipo || 'producto'][0]}] ${esc(q.nombre)}</option>`).join('')}</select></div>
-        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnPDup">Duplicar</button><button class="btn" id="tnPUp">↑</button><button class="btn" id="tnPDn">↓</button><button class="btn btn-del" id="tnPDel">Eliminar</button></div>`);
+        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnPDup">Duplicar</button><button class="btn" id="tnPUp">↑</button><button class="btn" id="tnPDn">↓</button><button class="btn btn-del" id="tnPDel">Eliminar</button><button class="btn btn-del" id="tnPZero">Dejar todo en cero</button></div>${ps.length ? '' : '<p class="note">No hay productos. Pulsa «+ Producto nuevo» y elige el tipo de página.</p>'}`);
       if (!p) return head;
       const chk = (path, label) => `<div class="field"><label class="chk"><input type="checkbox" data-p="${path}" data-k="check" ${getP(T(), path) !== false ? 'checked' : ''}> ${esc(label)}</label></div>`;
       const imgs = p.imagenes || [];
@@ -355,6 +355,7 @@
     on('#tnPDup', () => { const c = clon(arr()[pi]); c.slug += '-2'; c.nombre += ' (copia)'; arr().splice(pi + 1, 0, c); pi++; Store.save(); render(); });
     on('#tnPUp', () => { if (pi > 0) { [arr()[pi - 1], arr()[pi]] = [arr()[pi], arr()[pi - 1]]; pi--; Store.save(); render(); } });
     on('#tnPDn', () => { if (pi < arr().length - 1) { [arr()[pi + 1], arr()[pi]] = [arr()[pi], arr()[pi + 1]]; pi++; Store.save(); render(); } });
+    on('#tnPZero', () => ask('Se borran TODOS los productos de «' + T().nombre + '» (' + arr().length + '). La tienda publicada no cambia hasta que pulses Publicar. ¿Dejar todo en cero?', () => { T().productos = []; pi = 0; Store.save(); render(); toast('Productos en cero'); }, 'Borrar todos'));
     on('#tnPDel', () => { const p = arr()[pi]; if (p) ask('¿Eliminar «' + p.nombre + '»?', () => { arr().splice(pi, 1); pi = 0; Store.save(); render(); }, 'Eliminar'); });
     on('#tnRef', () => { lista = null; render(); });
     el.querySelectorAll('[data-pasar]').forEach(b => b.onclick = () => pasar(b.dataset.pasar));
