@@ -211,7 +211,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
       </form></div></dialog>`;
   }
   const telWa = v => { let d = String(v || '').replace(/\D/g, ''); if (d.length === 9 && d[0] === '9') d = '51' + d; return d; };
-  const waPedido = cfg => { const w = cfg.pedidoWa || {}; return w.activo && telWa(w.numero) ? { tel: telWa(w.numero), msg: String(w.mensaje || 'Hola, quiero hacer este pedido:') } : null; };
+  const waPedido = cfg => { const w = cfg.pedidoWa || {}; return w.activo && telWa(w.numero) ? { tel: telWa(w.numero), msg: String(w.mensaje || 'Hola, quiero hacer este pedido:'), directo: w.directo !== false } : null; };
   function waLink(cfg, p, numero, msg) {
     const tel = telWa(numero || (cfg.pedidoWa || {}).numero || (cfg.contacto || {}).whatsapp);
     if (!tel) return '';
@@ -219,7 +219,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
   }
   function scriptsPedido(cfg, p, x, imgs, opt) {
     const e = cfg.envio || {}, pais = cfg.pais || {};
-    const datos = { t: cfg._slugTienda || '', p: p.slug, pr: x.pr, c2: x.c2, env: e.gratis === false ? n(e.costo) : 0, mon: pais.moneda || 'S/', cod: pais.codigo || 'PEN', prev: !!opt.preview, nom: p.nombre, img: imgs[0] || '', wa: waLink(cfg, p, '', ''), wao: (waPedido(cfg) || {}).tel || '', wam: (waPedido(cfg) || {}).msg || '' };
+    const datos = { t: cfg._slugTienda || '', p: p.slug, pr: x.pr, c2: x.c2, env: e.gratis === false ? n(e.costo) : 0, mon: pais.moneda || 'S/', cod: pais.codigo || 'PEN', prev: !!opt.preview, nom: p.nombre, img: imgs[0] || '', wa: waLink(cfg, p, '', ''), wao: (waPedido(cfg) || {}).tel || '', wam: (waPedido(cfg) || {}).msg || '', wad: (waPedido(cfg) || {}).directo ? 1 : 0 };
     return `<script>window.__T=${JSON.stringify(datos).replace(/</g, '\\u003c')};</script><script>${clienteProducto()}</script>`;
   }
 
@@ -239,7 +239,7 @@ ${prod ? `<meta property="product:price:amount" content="${n(prod.precio)}"><met
     const sel = x.c2 && (p.sel === 2 || (p.sel == null && o2.sel !== false)) ? 2 : 1;
     const pack = (qn, label, badge, now, was) => `<label class="bopt sr${qn === sel ? ' sel' : ''}" data-q="${qn}" data-price="${now}" data-cmp="${was}"><input type="radio" name="_bundle" value="${qn}"${qn === sel ? ' checked' : ''}><span class="bcheck" aria-hidden="true">${SV.check}</span>${badge ? `<span class="bbadge bba-left">${esc(badge)}</span>` : ''}${imgs[0] ? `<img class="bopt-img" src="${url(imgs[0])}" alt="" loading="lazy">` : ''}<div class="binfo"><div class="blabel">${esc(label)}</div>${was > now ? `<span class="bpct">-${pctOff(was, now)}%</span>` : ''}${qn === 2 ? `<span class="bunit-row">${x.tach || x.pr ? `<s class="bunit-was">${q(cfg, x.tach || x.pr)}</s>` : ''}<span class="bunit">c/u ${q(cfg, now / 2)}</span></span>` : ''}</div><div class="bprice">${was > now ? `<s class="b-was">${q(cfg, was)}</s>` : ''}<b class="b-now">${q(cfg, now)}</b>${was > now ? `<span class="bsave">Ahorras ${q(cfg, was - now)}</span>` : ''}</div></label>`;
     const precioSel = sel === 2 ? x.c2 : x.pr, antesSel = sel === 2 ? x.base2 : x.tach;
-    const cta = p.cta || 'Quiero el mío';
+    const cta = waPedido(cfg) ? 'Pedir por WhatsApp' : (p.cta || 'Quiero el mío');
     const garTit = p.garantiaTitulo || e.garantiaTitulo || 'Garantía de satisfacción', garTxt = p.garantiaTexto || e.garantia || '';
     const sg = (e.sellosGarantia && e.sellosGarantia.length ? e.sellosGarantia : ['Pago contraentrega', 'Producto sellado']).filter(Boolean);
     const pg = e.pagos || {};
@@ -305,7 +305,7 @@ ${scriptsPedido(cfg, p, x, imgs, opt)}${opt.preview ? '' : pixeles(cfg, 'product
       if (s.tipo === 'imagen') return url(s.img) ? `<img class="lp-i"${ed(opt, 'p:secciones:secciones.' + s._i + '.img')} src="${url(s.img)}" alt="${esc(s.alt || p.nombre)}" loading="lazy">` : '';
       if (s.tipo === 'boton') {
         const wa = s.accion === 'whatsapp' ? waLink(cfg, p, s.wa, s.msg) : '';
-        return wa ? `<a class="cta lp-b"${ed(opt, 'p:secciones:secciones.' + s._i + '.x')} href="${esc(wa)}" target="_blank" rel="noopener">${esc(s.x || 'Escríbenos por WhatsApp')}</a>` : `<button class="cta lp-b"${ed(opt, 'p:secciones:secciones.' + s._i + '.x')} type="button" data-abrir>${esc(s.x || 'Quiero el mío')}</button>`;
+        return wa ? `<a class="cta lp-b"${ed(opt, 'p:secciones:secciones.' + s._i + '.x')} href="${esc(wa)}" target="_blank" rel="noopener">${esc(s.x || 'Escríbenos por WhatsApp')}</a>` : `<button class="cta lp-b"${ed(opt, 'p:secciones:secciones.' + s._i + '.x')} type="button" data-abrir>${esc(waPedido(cfg) ? 'Pedir por WhatsApp' : (s.x || 'Quiero el mío'))}</button>`;
       }
       return '';
     }).join('');
@@ -356,7 +356,11 @@ var els=$$('.lk-rv,.sr');if('IntersectionObserver' in window){var io=new Interse
 var pol=$('#pol');$$('[data-pol]').forEach(function(b){b.addEventListener('click',function(){var p=(window.__POL||[])[+b.dataset.pol];if(!p||!pol)return;$('#polT').textContent=p[0];$('#polB').textContent=p[1];pol.showModal()})});
 if(pol){$('#polX').addEventListener('click',function(){pol.close()});pol.addEventListener('click',function(e){if(e.target===pol)pol.close()})}
 /* pedido */
-$$('[data-abrir]').forEach(function(b){b.addEventListener('click',function(){tot();if(!dlg.open)dlg.showModal();if(window.fbq)fbq('track','InitiateCheckout');if(window.ttq)ttq.track('InitiateCheckout')})});
+function directo(){var qn=+qty.value||1,total=tot(),L=[T.wam,'','*Producto:* '+T.nom,'*Cantidad:* '+qn+(qn===1?' unidad':' unidades'),'*Total a pagar al recibir:* '+fm(total)+(T.env?'':' (envío gratis)'),'','Te comparto mi nombre, ciudad y dirección de entrega a continuación:'],u='https://wa.me/'+T.wao+'?text='+encodeURIComponent(L.join('\\n'));
+if(T.prev){try{window.parent.toast('Vista previa: aquí se abriría WhatsApp con el resumen del pedido')}catch(x){}return}
+if(window.fbq)fbq('track','Lead',{value:total,currency:T.cod});if(window.ttq)ttq.track('Contact');
+try{var w=window.open(u,'_blank');if(!w)location.href=u}catch(x){location.href=u}}
+$$('[data-abrir]').forEach(function(b){b.addEventListener('click',function(e){if(T.wao&&T.wad){e.preventDefault();directo();return}tot();if(!dlg.open)dlg.showModal();if(window.fbq)fbq('track','InitiateCheckout');if(window.ttq)ttq.track('InitiateCheckout')})});
 $('#pedX').addEventListener('click',function(){dlg.close()});dlg.addEventListener('click',function(e){if(e.target===dlg)dlg.close()});
 f.addEventListener('submit',function(e){e.preventDefault();err.textContent='';var d2=Object.fromEntries(new FormData(f).entries());
 if(!d2.nombre.trim()||!d2.telefono.trim()||!d2.departamento||!d2.ciudad.trim()||!d2.direccion.trim()){err.textContent='Completa nombre, teléfono, departamento, ciudad y dirección.';return}
