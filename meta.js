@@ -288,20 +288,21 @@ const Meta = (() => {
     if (!rows.length) return `<div class="mt-niv">${tabs}</div>${barra}<div class="empty">No hay ${nombre.toLowerCase()} con este filtro en el periodo.</div>`;
     const sel = rows.filter(r => selFilas.has(r.id)), base = sel.length ? sel : rows;
     const sumM = sumarM(base.map(r => r.m)), tot = { nombre: '', m: sumM };
+    const idEtiq = { campaign: 'ID de campaña', adset: 'ID de conjunto', ad: 'ID de anuncio' }[nivelT];
     const flecha = k => (orden.k === k ? (orden.d > 0 ? ' ▲' : ' ▼') : '');
     const th = (k, l, cls, mover) => `<th class="${cls || 'num'} mt-so" data-so="${k}" ${mover ? `draggable="true" data-ck="${k}" title="Arrastra para cambiar de posición"` : ''}>${l}${flecha(k)}</th>`;
     const celda = (k, r) => { const c = COLM[k]; return `<td class="num">${c.f(c.g(r), r)}</td>`; };
     const celdaTot = k => { if (k === 'alcance' || k === 'frecuencia') return '<td class="num">—</td>'; const c = COLM[k]; return `<td class="num"><b>${c.f(c.g(tot), tot)}</b></td>`; };
     return `<div class="mt-niv">${tabs}</div>${barra}<div class="tw mt-ads"><table class="mt-tabla mt-am"><thead><tr>
       <th class="mt-nm mt-so" data-so="nombre"><div class="mt-nw"><label class="mt-ck"><input type="checkbox" id="mselall" ${sel.length === rows.length ? 'checked' : ''}></label><span>${nombre.replace(/s$/, '')}${flecha('nombre')}</span></div></th>
-      ${th('estado', 'Entrega', 'mt-ent')}${th('presupuesto', 'Presupuesto')}${cols.map(k => th(k, COLM[k].l, '', true)).join('')}</tr></thead>
-      <tbody>${rows.map(r => `<tr class="${selFilas.has(r.id) ? 'sel' : ''}"><td class="mt-nm"><div class="mt-nw"><label class="mt-ck"><input type="checkbox" data-sel="${esc(r.id)}" ${selFilas.has(r.id) ? 'checked' : ''}></label><span class="mt-sw ${r.estado === 'ACTIVE' ? 'on' : ''}" title="${r.estado === 'ACTIVE' ? 'Activada' : 'Desactivada'} (se cambia en Meta)"></span><span class="mt-nt"><b>${esc(r.nombre)}</b>${r.padre ? `<small class="mt-padre">${esc(r.padre)}</small>` : ''}</span></div></td><td class="mt-ent">${tag(r.estado)}</td><td class="num">${r.presupuesto_diario ? `${money(r.presupuesto_diario)}<small>Diario</small>` : '<small>Usa presupuesto de la campaña</small>'}</td>${cols.map(k => celda(k, r)).join('')}</tr>`).join('')}</tbody>
-      <tfoot><tr><td class="mt-nm"><b>${sel.length ? `Resultados de ${sel.length} seleccionad${sel.length === 1 ? 'a' : 'as'}` : `Resultados de ${rows.length} ${nombre.toLowerCase()}`}</b><small class="mt-padre">Excluye las eliminadas</small></td><td></td><td></td>${cols.map(celdaTot).join('')}</tr></tfoot></table></div>`;
+      ${th('estado', 'Entrega', 'mt-ent')}<th class="mt-idh">${idEtiq}</th>${th('presupuesto', 'Presupuesto')}${cols.map(k => th(k, COLM[k].l, '', true)).join('')}</tr></thead>
+      <tbody>${rows.map(r => `<tr class="${selFilas.has(r.id) ? 'sel' : ''}"><td class="mt-nm"><div class="mt-nw"><label class="mt-ck"><input type="checkbox" data-sel="${esc(r.id)}" ${selFilas.has(r.id) ? 'checked' : ''}></label><span class="mt-sw ${r.estado === 'ACTIVE' ? 'on' : ''}" title="${r.estado === 'ACTIVE' ? 'Activada' : 'Desactivada'} (se cambia en Meta)"></span><span class="mt-nt"><b>${esc(r.nombre)}</b>${r.padre ? `<small class="mt-padre">${esc(r.padre)}</small>` : ''}</span></div></td><td class="mt-ent">${tag(r.estado)}</td><td class="mt-id"><code data-copiar="${esc(r.id)}" title="Toca para copiar">${esc(r.id)}</code></td><td class="num">${r.presupuesto_diario ? `${money(r.presupuesto_diario)}<small>Diario</small>` : '<small>Usa presupuesto de la campaña</small>'}</td>${cols.map(k => celda(k, r)).join('')}</tr>`).join('')}</tbody>
+      <tfoot><tr><td class="mt-nm"><b>${sel.length ? `Resultados de ${sel.length} seleccionad${sel.length === 1 ? 'a' : 'as'}` : `Resultados de ${rows.length} ${nombre.toLowerCase()}`}</b><small class="mt-padre">Excluye las eliminadas</small></td><td></td><td></td><td></td>${cols.map(celdaTot).join('')}</tr></tfoot></table></div>`;
   }
   function exportarTabla() {
     const A = filtrado(datos), rows = filasNivel(A).sort((a, b) => valOrden(b, orden.k) - valOrden(a, orden.k)), cols = PRESET[preset][1];
     const num = v => (v == null ? '' : (typeof v === 'number' ? String(Math.round(v * 100) / 100) : v));
-    const csv = [['Nombre', 'Entrega', 'Presupuesto diario', ...cols.map(k => COLM[k].l)], ...rows.map(r => [r.nombre, (ESTADOS[r.estado] || [r.estado])[0], r.presupuesto_diario || '', ...cols.map(k => num(COLM[k].g(r)))])].map(f => f.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')).join('\n');
+    const csv = [['Nombre', 'ID', 'Entrega', 'Presupuesto diario', ...cols.map(k => COLM[k].l)], ...rows.map(r => [r.nombre, r.id, (ESTADOS[r.estado] || [r.estado])[0], r.presupuesto_diario || '', ...cols.map(k => num(COLM[k].g(r)))])].map(f => f.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')).join('\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); a.download = 'meta-ads-' + nivelT + '.csv'; a.click(); URL.revokeObjectURL(a.href);
   }
   function tablaDias(A) {
@@ -353,7 +354,6 @@ const Meta = (() => {
     ${otro ? `<div class="nota-pub">Estás viendo ${f1(A.desde)} al ${f1(A.hasta)}. Toca <b>Actualizar</b> para traer el periodo que elegiste.</div>` : ''}
     ${fechaCtl}
     <div class="tiles">${tile('Importe gastado', money(g), `${dias.length} días`)}${tile('Compras', n0(c), 'según el píxel')}${tile('Costo por compra', c > 0 ? money(g / c) : '—')}${tile('ROAS de compras', g > 0 && v > 0 ? n2(v / g) + 'x' : '—', 'valor ÷ gasto')}${tile('CTR (enlace)', im > 0 ? n2(cl / im * 100) + '%' : '—')}${tile('CPM', im > 0 ? money(g / im * 1000) : '—')}</div>
-    <div class="card"><h3>Gasto por día</h3><p class="sub">Cuenta completa en el periodo</p>${chart}</div>
     <div class="card"><h3>Campañas, conjuntos y anuncios</h3><p class="sub">Toca una campaña para ver sus conjuntos y anuncios. Las métricas son las de Meta.</p>
       <div class="chips" style="margin-top:6px">${[['activas', 'Activas'], ['conGasto', 'Con gasto'], ['todas', 'Todas']].map(([k, l]) => `<button class="chip ${filtro === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
       <div class="mt-vista"><button class="chip ${vistaM === 'arbol' ? 'on' : ''}" data-vm="arbol">Árbol</button><button class="chip ${vistaM === 'tabla' ? 'on' : ''}" data-vm="tabla">Tabla</button></div>
@@ -424,6 +424,7 @@ const Meta = (() => {
       if (e.target.value === '__custom') { e.target.value = preset; ventanaColumnas(); return; }
       preset = e.target.value; try { localStorage.setItem('dropox.metaPreset', preset); } catch (x) { /* sin almacenamiento */ } render(); };
     const mx = $('#mexp'); if (mx) mx.onclick = exportarTabla;
+    el.querySelectorAll('[data-copiar]').forEach(c => c.onclick = ev => { ev.stopPropagation(); const v = c.dataset.copiar; (navigator.clipboard ? navigator.clipboard.writeText(v).then(() => toast('ID copiado: ' + v), () => toast('No se pudo copiar')) : toast('No se pudo copiar')); });
     let colArr = null;
     el.querySelectorAll('th[data-ck]').forEach(h => {
       h.ondragstart = e => { colArr = h.dataset.ck; try { e.dataTransfer.setData('text/plain', colArr); e.dataTransfer.effectAllowed = 'move'; } catch (x) { /* sin dataTransfer */ } h.classList.add('arr'); };

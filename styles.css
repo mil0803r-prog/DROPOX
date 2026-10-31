@@ -736,3 +736,5 @@ body.wa-full .wa+.note,body.wa-full #view>p.note{display:none}
 .mt-fl input[type=radio],.mt-fr input[type=checkbox]{width:16px;height:16px;min-width:16px;flex:none;margin:0;padding:0}
 .mt-fl label{white-space:nowrap}.mt-fp{background:var(--card)}
 .mt-fl{max-height:470px}
+.mt-am .mt-id code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--mut);background:var(--tile);border-radius:6px;padding:3px 7px;cursor:copy;user-select:all}.mt-am .mt-id code:hover{color:#1877f2}
+.mt-am .mt-idh{min-width:150px;text-align:left}
