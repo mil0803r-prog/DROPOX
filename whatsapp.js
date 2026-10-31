@@ -215,12 +215,39 @@
     });
   }
   // ── Tableros (estilo Kanban): cada chat está en un tablero a la vez, aparte de las etiquetas ──
-  const tabs = () => { const w = W(); if (!Array.isArray(w.tabs)) w.tabs = [{ id: 't0', n: 'Datos recibidos', c: '#7a8794' }, { id: 't1', n: 'Guía generada en Shalom', c: '#e0a02f' }, { id: 't2', n: 'En ruta', c: '#2f7fe0' }, { id: 't3', n: 'Entregado', c: '#25a35a' }, { id: 't4', n: 'Recompra', c: '#8a6fd1' }]; if (!w.tabsV2) { w.tabsV2 = 1; if (!w.tabs.some(t => t.id === 't0')) w.tabs.unshift({ id: 't0', n: 'Datos recibidos', c: '#7a8794' }); } return w.tabs; };
+  const tabs = () => { const w = W(); if (!Array.isArray(w.tabs)) w.tabs = [{ id: 't0', n: 'Datos recibidos', c: '#7a8794' }, { id: 't1', n: 'Guía generada en Shalom', c: '#e0a02f' }, { id: 't2', n: 'En ruta', c: '#2f7fe0' }, { id: 't3', n: 'Entregado', c: '#25a35a' }, { id: 't4', n: 'Recompra', c: '#8a6fd1' }]; if (!w.tabsV3) { w.tabsV3 = 1; const E = { t0: 'pendiente', t1: 'pendiente', t2: 'enruta', t3: 'entregado' }; w.tabs.forEach(t => { if (t.e === undefined && E[t.id]) t.e = E[t.id]; }); }
+    if (!w.tabsV2) { w.tabsV2 = 1; if (!w.tabs.some(t => t.id === 't0')) w.tabs.unshift({ id: 't0', n: 'Datos recibidos', c: '#7a8794' }); } return w.tabs; };
   const tabDe = c => tabs().find(t => t.id === c.tab);
-  const mover = (c, id) => { if (id) { c.tab = id; delete c.tabOut; } else { delete c.tab; c.tabOut = 1; } c.tabTs = Date.now(); Store.save(); };
+  const EOPTS = { '': 'Ninguno (no cambia pedidos)', pendiente: 'Pendiente', enruta: 'En ruta', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
+  const PED = { pendiente: 'Pendiente', enruta: 'En ruta', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
+  const pedidoDe = c => (c.pedidoId ? S.pedidos.find(p => p.id === c.pedidoId) : null);
+  // al mover la tarjeta, el pedido toma el estado del tablero (si el tablero está vinculado a un estado)
+  const mover = (c, id) => {
+    if (id) { c.tab = id; delete c.tabOut; } else { delete c.tab; c.tabOut = 1; }
+    c.tabTs = Date.now();
+    const t = tabDe(c), p = pedidoDe(c);
+    if (t && t.e && p) { p.estado = t.e; c.lastPed = t.e; }
+    Store.save();
+  };
+  // al cambiar el estado en «Pedidos», la tarjeta pasa al tablero vinculado a ese estado
+  function reconciliar() {
+    let cambio = false;
+    chats().forEach(c => {
+      const p = pedidoDe(c); if (!p) return;
+      if (c.lastPed === undefined) { c.lastPed = p.estado; return; }
+      if (p.estado === c.lastPed) return;
+      c.lastPed = p.estado;
+      const t = tabDe(c);
+      if (t && t.e === p.estado) return;
+      const dest = tabs().find(x => x.e === p.estado);
+      if (dest) { c.tab = dest.id; delete c.tabOut; c.tabTs = Date.now(); cambio = true; }
+    });
+    if (cambio) Store.save();
+    return cambio;
+  }
   // solo entran al tablero los clientes que ya enviaron sus datos de pedido (o ya tienen pedido); los chats anteriores quedan normales
   function entranTablero() {
-    let cambio = false;
+    let cambio = reconciliar();
     chats().forEach(c => {
       if (c.grupo || c.tab || c.tabOut) return;
       const n = (c.msgs || []).length; if (c._tn === n && !c.pedidoId) return; c._tn = n;
@@ -234,10 +261,10 @@
     const T = tabs(), L = chats().filter(c => !c.grupo && tabDe(c) && (!fet || (c.etq || []).includes(fet)) && (!q || [c.nombre, c.tel, c.ciudad, c.producto].join(' ').toLowerCase().includes(q))).sort((a, b) => (b.ult || 0) - (a.ult || 0));
     const card = c => `<div class="kb-c" draggable="true" data-kc="${c.id}">
       <div class="kb-ct" data-abrir="${c.id}">${av(c)}<div class="kb-cn"><b>${esc(c.nombre)}</b><small>${c.tel ? '+' + esc(String(c.tel).replace(/\D/g, '')) : 'sin celular'}${c.ciudad ? ' · ' + esc(c.ciudad) : ''}</small></div></div>
-      ${c.producto ? `<div class="kb-p">${esc(c.producto)}</div>` : ''}<div class="kb-m">${esc(prev(c)).slice(0, 70)}</div>
+      ${c.producto ? `<div class="kb-p">${esc(c.producto)}</div>` : ''}${pedidoDe(c) ? `<div class="kb-p">📦 Pedido: <b>${esc(PED[pedidoDe(c).estado] || pedidoDe(c).estado)}</b></div>` : ''}<div class="kb-m">${esc(prev(c)).slice(0, 70)}</div>
       ${(c.etq || []).length ? `<div class="kb-e">${c.etq.map(pill).join('')}</div>` : ''}
       <div class="kb-a"><select data-mv="${c.id}" aria-label="Mover a otro tablero"><option value="">Mover a…</option>${T.map(t => `<option value="${t.id}" ${c.tab === t.id ? 'disabled' : ''}>${esc(t.n)}</option>`).join('')}<option value="__ninguno">Quitar del tablero</option></select></div></div>`;
-    const col = (t, i) => { const l = L.filter(c => c.tab === t.id); return `<div class="kb-col" data-col="${t.id}"><div class="kb-h" style="border-top-color:${t.c}"><b>${esc(t.n)}</b><i>${l.length}</i><span class="kb-hb"><button class="btn btn-sm" data-ml="${t.id}:-1" ${i === 0 ? 'disabled' : ''} aria-label="Mover tablero a la izquierda">◀</button><button class="btn btn-sm" data-ml="${t.id}:1" ${i === T.length - 1 ? 'disabled' : ''} aria-label="Mover tablero a la derecha">▶</button><button class="btn btn-sm" data-te="${t.id}" aria-label="Editar tablero">✎</button></span></div><div class="kb-b">${l.length ? l.map(card).join('') : '<p class="note kb-v">Suelta aquí</p>'}</div></div>`; };
+    const col = (t, i) => { const l = L.filter(c => c.tab === t.id); return `<div class="kb-col" data-col="${t.id}"><div class="kb-h" style="border-top-color:${t.c}"><b>${esc(t.n)}${t.e ? `<small class="kb-vi" title="Vinculado al estado «${esc(PED[t.e] || t.e)}» de Pedidos">🔗 ${esc(PED[t.e] || t.e)}</small>` : ''}</b><i>${l.length}</i><span class="kb-hb"><button class="btn btn-sm" data-ml="${t.id}:-1" ${i === 0 ? 'disabled' : ''} aria-label="Mover tablero a la izquierda">◀</button><button class="btn btn-sm" data-ml="${t.id}:1" ${i === T.length - 1 ? 'disabled' : ''} aria-label="Mover tablero a la derecha">▶</button><button class="btn btn-sm" data-te="${t.id}" aria-label="Editar tablero">✎</button></span></div><div class="kb-b">${l.length ? l.map(card).join('') : '<p class="note kb-v">Suelta aquí</p>'}</div></div>`; };
     return `<div class="kb-top"><input class="search" id="wq" type="search" placeholder="Buscar nombre, celular, ciudad…" value="${esc(q)}"><select id="kbet"><option value="">Todas las etiquetas</option>${etqs().map(e => `<option value="${esc(e.n)}" ${fet === e.n ? 'selected' : ''}>${esc(e.n)}</option>`).join('')}</select><button class="btn btn-pri" id="kbnew">+ Tablero</button></div>
       <div class="kb">${T.map(col).join('')}
       <p class="note">Aquí entran solos los clientes <b>cuando envían sus datos de pedido</b>. Muévelos arrastrando cada tarjeta (en el celular usa «Mover a…»). Los chats anteriores siguen normales en «Chats»; si quieres meter uno a mano, ábrelo y elige su tablero. Los tableros son aparte de las etiquetas.</p>`;
@@ -246,11 +273,11 @@
     const g = i => el.querySelector(i), refrescar = () => vista(el);
     g('#wq').oninput = e => { q = e.target.value.toLowerCase(); const p = e.target.selectionStart; refrescar(); const i = el.querySelector('#wq'); i.focus(); i.setSelectionRange(p, p); };
     g('#kbet').onchange = e => { fet = e.target.value; refrescar(); };
-    g('#kbnew').onclick = () => openForm('Nuevo tablero', [{ k: 'n', l: 'Nombre', req: 1, full: 1 }, { k: 'c', l: 'Color', t: 'select', opts: Object.fromEntries(COL.map((x, i) => [x, ['Verde', 'Azul', 'Amarillo', 'Turquesa', 'Morado', 'Naranja', 'Rosa', 'Gris'][i]])) }], {}, v => { tabs().push({ id: 't' + Date.now().toString(36), n: v.n, c: v.c || COL[0] }); });
+    g('#kbnew').onclick = () => openForm('Nuevo tablero', [{ k: 'n', l: 'Nombre', req: 1, full: 1 }, { k: 'c', l: 'Color', t: 'select', opts: Object.fromEntries(COL.map((x, i) => [x, ['Verde', 'Azul', 'Amarillo', 'Turquesa', 'Morado', 'Naranja', 'Rosa', 'Gris'][i]])) }, { k: 'e', l: 'Estado de Pedidos vinculado', t: 'select', opts: EOPTS, full: 1 }], {}, v => { tabs().push({ id: 't' + Date.now().toString(36), n: v.n, c: v.c || COL[0], e: v.e || '' }); });
     el.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => { sel = b.dataset.abrir; modo = 'lista'; vista(el); });
     el.querySelectorAll('[data-mv]').forEach(b => b.onchange = () => { const c = chats().find(x => x.id === b.dataset.mv); if (!c || !b.value) return; mover(c, b.value === '__ninguno' ? '' : b.value); refrescar(); });
     el.querySelectorAll('[data-ml]').forEach(b => b.onclick = () => { const [id, d] = b.dataset.ml.split(':'), T = tabs(), i = T.findIndex(t => t.id === id), j = i + +d; if (i < 0 || j < 0 || j >= T.length) return; [T[i], T[j]] = [T[j], T[i]]; Store.save(); refrescar(); });
-    el.querySelectorAll('[data-te]').forEach(b => b.onclick = () => { const t = tabs().find(x => x.id === b.dataset.te); if (!t) return; openForm('Editar tablero', [{ k: 'n', l: 'Nombre', req: 1, full: 1 }, { k: 'c', l: 'Color', t: 'select', opts: Object.fromEntries(COL.map((x, i) => [x, ['Verde', 'Azul', 'Amarillo', 'Turquesa', 'Morado', 'Naranja', 'Rosa', 'Gris'][i]])) }], t, v => Object.assign(t, v));
+    el.querySelectorAll('[data-te]').forEach(b => b.onclick = () => { const t = tabs().find(x => x.id === b.dataset.te); if (!t) return; openForm('Editar tablero', [{ k: 'n', l: 'Nombre', req: 1, full: 1 }, { k: 'c', l: 'Color', t: 'select', opts: Object.fromEntries(COL.map((x, i) => [x, ['Verde', 'Azul', 'Amarillo', 'Turquesa', 'Morado', 'Naranja', 'Rosa', 'Gris'][i]])) }, { k: 'e', l: 'Estado de Pedidos vinculado', t: 'select', opts: EOPTS, full: 1 }], { ...t, e: t.e || '' }, v => Object.assign(t, v));
       setTimeout(() => { const d = document.querySelector('#dlg'); if (d && !d.querySelector('#kbdel')) { const bt = document.createElement('button'); bt.type = 'button'; bt.id = 'kbdel'; bt.className = 'btn btn-del'; bt.textContent = 'Eliminar tablero'; bt.onclick = () => confirmDel('¿Eliminar el tablero «' + t.n + '»? Sus clientes salen del tablero pero siguen en «Chats».', () => { chats().forEach(c => { if (c.tab === t.id) delete c.tab; }); W().tabs = tabs().filter(x => x.id !== t.id); try { d.close(); } catch (e) {} Store.save(); refrescar(); }); const f = d.querySelector('form'); if (f) f.appendChild(bt); } }, 50); });
     // arrastrar y soltar (escritorio)
     let arr = null;
