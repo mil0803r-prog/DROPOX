@@ -84,8 +84,8 @@ const FREQ = { diario: 30, semanal: 52 / 12, mensual: 1, trimestral: 1 / 3, anua
 const mensualDe = f => f.frecuencia === 'unico' ? 0 : num(f.monto) * (FREQ[f.frecuencia] ?? 1);
 // gasto único: cuenta solo en el mes (o rango) de su fecha
 const unicosEn = (a, b) => S.fijos.filter(f => f.activo && f.frecuencia === 'unico' && (f.fecha || hoy()) >= a && (f.fecha || hoy()) <= b).reduce((s, f) => s + num(f.monto), 0);
-const ESTADOS = { pendiente: 'Pendiente', enruta: 'En ruta', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
-const SIG = { pendiente: ['enruta', 'Despachar'], enruta: ['entregado', 'Entregado'] };
+const ESTADOS = { pendiente: 'Pendiente', enruta: 'En ruta', enagencia: 'En agencia', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
+const SIG = { pendiente: ['enruta', 'Despachar'], enruta: ['enagencia', 'En agencia'], enagencia: ['entregado', 'Entregado'] };
 const TIPOS = { suscripcion: 'Suscripción mensual (S/)', porcentaje: 'Comisión % sobre venta', porPedido: 'Costo por pedido (S/)', gasto: 'Gasto variable mensual (S/)' };
 const CATS = ['Alquiler / Local', 'Sueldos', 'Servicios (luz, agua, internet)', 'Software / Herramientas', 'Contabilidad / Legal', 'Marketing fijo', 'Logística / Almacén', 'Otros'];
 const PERIODOS = { hoy: 'Hoy', semana: 'Esta semana', mes: 'Este mes', mespasado: 'Mes pasado', '30d': 'Últimos 30 días', todo: 'Todo el tiempo' };
@@ -164,7 +164,7 @@ function desglose(p) {
   return z;
 }
 const utilPedido = p => { const z = desglose(p); return z.ventas - z.igv - z.producto - z.flete - z.otros - z.comis - z.renta; };
-const enCurso = p => p.estado === 'pendiente' || p.estado === 'enruta';
+const enCurso = p => p.estado === 'pendiente' || p.estado === 'enruta' || p.estado === 'enagencia';
 const cerrado = p => p.estado === 'entregado' || p.estado === 'devuelto';
 
 const PAUTA_PAT = { meta: /meta/i, tiktok: /tiktok/i, google: /google/i };
@@ -350,28 +350,54 @@ const campoPed = () => [
   { k: 'otros', l: 'Otros costos (S/)', t: 'number' },
 ];
 function vPedidos(el) {
-  const q = fPed.q.toLowerCase();
+  const q = fPed.q.toLowerCase(), modo = (S.config && S.config.pedVista) || 'tarjetas';
   const all = S.pedidos.slice().sort((a, b) => b.fecha.localeCompare(a.fecha));
-  const list = all.filter(p => (!q || [p.producto, p.cliente, p.ciudad, p.telefono].join(' ').toLowerCase().includes(q)) && (!fPed.estado || p.estado === fPed.estado));
+  const list = all.filter(p => (!q || [p.producto, p.cliente, p.ciudad, p.telefono].join(' ').toLowerCase().includes(q)) && (modo === 'tablero' || !fPed.estado || p.estado === fPed.estado));
+  const venta = p => num(p.cantidad) * num(p.precio), fch = p => p.fecha.slice(8) + '/' + p.fecha.slice(5, 7);
+  const acciones = p => `${SIG[p.estado] ? `<button class="btn btn-sm btn-pri" data-n="${p.id}">${SIG[p.estado][1]} →</button>` : ''}${enCurso(p) ? `<button class="btn btn-sm btn-del" data-dv="${p.id}">Devuelto</button>` : ''}<button class="btn btn-sm" data-e="${p.id}">Editar</button><button class="btn btn-sm btn-del" data-d="${p.id}">✕</button>`;
+  const resumen = `<div class="pd-res">${Object.entries(ESTADOS).map(([k, l]) => { const ps = all.filter(p => p.estado === k); return `<button class="pd-r e-${k} ${fPed.estado === k && modo !== 'tablero' ? 'on' : ''}" data-s="${k}"><span>${l}</span><b>${ps.length}</b><small>${fmt(ps.reduce((a, p) => a + venta(p), 0))}</small></button>`; }).join('')}</div>`;
+  let cuerpo;
+  if (!list.length) cuerpo = `<div class="card empty">${S.pedidos.length ? 'Ningún pedido coincide con el filtro.' : 'Aún no hay pedidos. Pulsa “+ Nuevo” para registrar el primero.'}</div>`;
+  else if (modo === 'tabla') {
+    cuerpo = `<div class="card tw pd-tabla"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Producto</th><th>Ciudad / agencia</th><th>Estado</th><th class="num">Venta</th><th class="num">Utilidad</th><th></th></tr></thead><tbody>${list.map(p => {
+      const u = utilPedido(p);
+      return `<tr class="e-${p.estado}"><td>${esc(fch(p))}</td><td><b>${esc(p.cliente || 'Sin cliente')}</b>${p.telefono ? `<br><small>${esc(p.telefono)}</small>` : ''}</td><td>${esc(p.producto)} <small>x${num(p.cantidad)}</small></td><td>${esc(p.ciudad || '—')}</td>
+      <td><select class="pd-sel t-${p.estado}" data-es="${p.id}">${Object.entries(ESTADOS).map(([k, l]) => `<option value="${k}" ${p.estado === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
+      <td class="num">${fmt(venta(p))}</td><td class="num ${cls(u)}">${fmt(u)}${enCurso(p) ? ' <small>(esp.)</small>' : ''}</td><td class="pd-ac">${acciones(p)}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  } else if (modo === 'tablero') {
+    cuerpo = `<div class="pd-kb">${Object.entries(ESTADOS).map(([k, l]) => {
+      const ps = list.filter(p => p.estado === k), tot = ps.reduce((a, p) => a + venta(p), 0);
+      return `<div class="pd-col e-${k}" data-col="${k}"><div class="pd-ch"><b>${l}</b><i>${ps.length}</i><small>${fmt(tot)}</small></div><div class="pd-cb">${ps.length ? ps.map(p => { const u = utilPedido(p); return `<div class="pd-c e-${k}" draggable="true" data-kp="${p.id}"><div class="pd-cn"><b>${esc(p.producto)}</b><small>${esc(fch(p))}</small></div><div class="pd-cs">${esc(p.cliente || 'Sin cliente')}${p.ciudad ? ' · ' + esc(p.ciudad) : ''} · x${num(p.cantidad)}</div><div class="pd-cm"><span>Venta<b>${fmt(venta(p))}</b></span><span>Utilidad<b class="${cls(u)}">${fmt(u)}</b></span></div><div class="pd-ca">${SIG[p.estado] ? `<button class="btn btn-sm btn-pri" data-n="${p.id}">${SIG[p.estado][1]} →</button>` : ''}<button class="btn btn-sm" data-e="${p.id}">Editar</button></div></div>`; }).join('') : '<p class="note pd-v">Suelta aquí</p>'}</div></div>`;
+    }).join('')}</div>`;
+  } else {
+    cuerpo = `<div class="list">${list.map(p => {
+      const u = utilPedido(p), proj = enCurso(p);
+      return `<div class="it e-${p.estado}"><div class="it-h"><b>${esc(p.producto)}</b><span class="tag t-${p.estado}">${ESTADOS[p.estado] || p.estado}</span></div>
+      <div class="it-s">${esc(fch(p))} · ${esc(p.cliente || 'Sin cliente')}${p.ciudad ? ' · ' + esc(p.ciudad) : ''} · x${num(p.cantidad)}</div>
+      <div class="it-m"><span>Venta<b>${fmt(venta(p))}</b></span><span>Utilidad${proj ? ' (esperada)' : ''}<b class="${cls(u)}">${fmt(u)}</b></span></div>
+      <div class="it-a">${acciones(p)}</div></div>`;
+    }).join('')}</div>`;
+  }
   el.innerHTML = `${secH('pedidos', 'Pedidos', `${S.pedidos.length} registrados`, `<button class="btn btn-pri" id="nuevo">+ Nuevo</button>`)}
-  <input class="search" id="fq" type="search" placeholder="Buscar producto, cliente, ciudad…" value="${esc(fPed.q)}">
-  <div class="chips"><button class="chip ${fPed.estado === '' ? 'on' : ''}" data-s="">Todos<i>${all.length}</i></button>${Object.entries(ESTADOS).map(([k, l]) => `<button class="chip ${fPed.estado === k ? 'on' : ''}" data-s="${k}">${l}<i>${all.filter(p => p.estado === k).length}</i></button>`).join('')}</div>
-  ${list.length ? `<div class="list">${list.map(p => {
-    const u = utilPedido(p), proj = enCurso(p), sg = SIG[p.estado];
-    return `<div class="it"><div class="it-h"><b>${esc(p.producto)}</b><span class="tag t-${p.estado}">${ESTADOS[p.estado] || p.estado}</span></div>
-    <div class="it-s">${esc(p.fecha.slice(8) + '/' + p.fecha.slice(5, 7))} · ${esc(p.cliente || 'Sin cliente')}${p.ciudad ? ' · ' + esc(p.ciudad) : ''} · x${num(p.cantidad)}</div>
-    <div class="it-m"><span>Venta<b>${fmt(num(p.cantidad) * num(p.precio))}</b></span><span>Utilidad${proj ? ' (esperada)' : ''}<b class="${cls(u)}">${fmt(u)}</b></span></div>
-    <div class="it-a">${sg ? `<button class="btn btn-sm btn-pri" data-n="${p.id}">${sg[1]} →</button>` : ''}${enCurso(p) ? `<button class="btn btn-sm btn-del" data-dv="${p.id}">Devuelto</button>` : ''}<button class="btn btn-sm" data-e="${p.id}">Editar</button><button class="btn btn-sm btn-del" data-d="${p.id}">✕</button></div></div>`;
-  }).join('')}</div>` : `<div class="card empty">${S.pedidos.length ? 'Ningún pedido coincide con el filtro.' : 'Aún no hay pedidos. Pulsa “+ Nuevo” para registrar el primero.'}</div>`}
-  <p class="note">La utilidad descuenta IGV, costo, flete, comisiones (%) y renta según Ajustes. En devueltos se pierde el flete × factor de devolución.</p>`;
+  <div class="pd-top"><input class="search" id="fq" type="search" placeholder="Buscar producto, cliente, ciudad…" value="${esc(fPed.q)}"><div class="seg pd-modo" id="pdm"><button data-vm="tarjetas" class="${modo === 'tarjetas' ? 'on' : ''}">Tarjetas</button><button data-vm="tabla" class="${modo === 'tabla' ? 'on' : ''}">Tabla</button><button data-vm="tablero" class="${modo === 'tablero' ? 'on' : ''}">Tablero</button></div></div>
+  ${resumen}
+  ${fPed.estado && modo !== 'tablero' ? `<div class="chips"><button class="chip on" data-s="">Quitar filtro: ${ESTADOS[fPed.estado]} ✕</button></div>` : ''}
+  ${cuerpo}
+  <p class="note">La utilidad descuenta IGV, costo, flete, comisiones (%) y renta según Ajustes. En devueltos se pierde el flete × factor de devolución.${modo === 'tablero' ? ' Arrastra cada pedido a otra columna para cambiar su estado.' : ''}</p>`;
   $('#nuevo').onclick = () => openForm('Nuevo pedido', campoPed(), {}, v => S.pedidos.push({ id: uid(), ...v }));
   $('#fq').oninput = e => { fPed.q = e.target.value; const pos = e.target.selectionStart; render(); const i = $('#fq'); i.focus(); i.setSelectionRange(pos, pos); };
-  el.querySelectorAll('.chip').forEach(b => b.onclick = () => { fPed.estado = b.dataset.s; render(); });
+  el.querySelectorAll('#pdm [data-vm]').forEach(b => b.onclick = () => { S.config.pedVista = b.dataset.vm; Store.save(); render(); });
+  el.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { fPed.estado = fPed.estado === b.dataset.s ? '' : b.dataset.s; render(); });
   const P = id => S.pedidos.find(x => x.id === id);
   el.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { const p = P(b.dataset.n); p.estado = SIG[p.estado][0]; Store.save(); render(); });
   el.querySelectorAll('[data-dv]').forEach(b => b.onclick = () => { P(b.dataset.dv).estado = 'devuelto'; Store.save(); render(); });
+  el.querySelectorAll('[data-es]').forEach(b => b.onchange = () => { P(b.dataset.es).estado = b.value; Store.save(); render(); });
   el.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { const p = P(b.dataset.e); openForm('Editar pedido', campoPed(), p, v => Object.assign(p, v)); });
   el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => confirmDel('¿Eliminar este pedido?', () => S.pedidos = S.pedidos.filter(x => x.id !== b.dataset.d)));
+  // tablero: arrastrar y soltar para cambiar de estado
+  el.querySelectorAll('[data-kp]').forEach(k => { k.ondragstart = e => { try { e.dataTransfer.setData('text/plain', k.dataset.kp); e.dataTransfer.effectAllowed = 'move'; } catch (x) {} k.classList.add('arr'); }; k.ondragend = () => k.classList.remove('arr'); });
+  el.querySelectorAll('.pd-col').forEach(cl => { cl.ondragover = e => { e.preventDefault(); cl.classList.add('sobre'); }; cl.ondragleave = () => cl.classList.remove('sobre'); cl.ondrop = e => { e.preventDefault(); cl.classList.remove('sobre'); const p = P(e.dataTransfer.getData('text/plain')); if (p && p.estado !== cl.dataset.col) { p.estado = cl.dataset.col; Store.save(); render(); } }; });
 }
 function exportCSV() {
   const h = ['fecha', 'estado', 'producto', 'cliente', 'telefono', 'ciudad', 'canal', 'cantidad', 'precio', 'costo', 'flete', 'otros', 'utilidad'];

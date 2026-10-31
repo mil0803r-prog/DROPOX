@@ -216,10 +216,11 @@
   }
   // ── Tableros (estilo Kanban): cada chat está en un tablero a la vez, aparte de las etiquetas ──
   const tabs = () => { const w = W(); if (!Array.isArray(w.tabs)) w.tabs = [{ id: 't0', n: 'Datos recibidos', c: '#7a8794' }, { id: 't1', n: 'Guía generada en Shalom', c: '#e0a02f' }, { id: 't2', n: 'En ruta', c: '#2f7fe0' }, { id: 't3', n: 'Entregado', c: '#25a35a' }, { id: 't4', n: 'Recompra', c: '#8a6fd1' }]; if (!w.tabsV3) { w.tabsV3 = 1; const E = { t0: 'pendiente', t1: 'pendiente', t2: 'enruta', t3: 'entregado' }; w.tabs.forEach(t => { if (t.e === undefined && E[t.id]) t.e = E[t.id]; }); }
-    if (!w.tabsV2) { w.tabsV2 = 1; if (!w.tabs.some(t => t.id === 't0')) w.tabs.unshift({ id: 't0', n: 'Datos recibidos', c: '#7a8794' }); } return w.tabs; };
+    if (!w.tabsV2) { w.tabsV2 = 1; if (!w.tabs.some(t => t.id === 't0')) w.tabs.unshift({ id: 't0', n: 'Datos recibidos', c: '#7a8794' }); } if (!w.tabsV4) { w.tabsV4 = 1; if (!w.tabs.some(t => t.e === 'enagencia')) { const i = w.tabs.findIndex(t => t.e === 'enruta'); w.tabs.splice(i >= 0 ? i + 1 : w.tabs.length, 0, { id: 't5', n: 'En agencia', c: '#8b5cf6', e: 'enagencia' }); } }
+    return w.tabs; };
   const tabDe = c => tabs().find(t => t.id === c.tab);
-  const EOPTS = { '': 'Ninguno (no cambia pedidos)', pendiente: 'Pendiente', enruta: 'En ruta', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
-  const PED = { pendiente: 'Pendiente', enruta: 'En ruta', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
+  const EOPTS = { '': 'Ninguno (no cambia pedidos)', pendiente: 'Pendiente', enruta: 'En ruta', enagencia: 'En agencia', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
+  const PED = { pendiente: 'Pendiente', enruta: 'En ruta', enagencia: 'En agencia', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
   const pedidoDe = c => (c.pedidoId ? S.pedidos.find(p => p.id === c.pedidoId) : null);
   // al mover la tarjeta, el pedido toma el estado del tablero (si el tablero está vinculado a un estado)
   const mover = (c, id) => {
