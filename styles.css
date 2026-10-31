@@ -650,3 +650,8 @@ body.wa-full .wa+.note,body.wa-full #view>p.note{display:none}
 .kb-wrap{grid-template-columns:230px minmax(0,1fr);gap:8px}
 .kb-side{padding:8px}.kb-si{padding:6px}.kb-si .wa-av{flex:0 0 30px;width:30px;height:30px;font-size:13px}
 @media(max-width:820px){.kb{grid-auto-columns:minmax(150px,46vw)}.kb-col{max-width:none}}
+/* contorno de color según el tablero */
+.kb-c{border:2px solid var(--tc,var(--line));background:color-mix(in srgb,var(--tc,transparent) 9%,var(--bg));box-shadow:0 1px 3px color-mix(in srgb,var(--tc,#000) 22%,transparent)}
+.kb-c .wa-av{box-shadow:0 0 0 2px var(--tc,transparent)}
+.wa-r.wa-tb{border-left:5px solid var(--tc)!important}
+.wa-r.wa-tb .wa-av{box-shadow:0 0 0 2px var(--tc)}
