@@ -121,6 +121,7 @@
         } catch (e) { /* sigue con el siguiente */ }
       }
       con.sync = Date.now();
+      vincularEtiquetas(false);
     } catch (e) { con.error = e.message || 'No se pudo sincronizar.'; }
     con.sincronizando = false;
     if (entranTablero()) cambio = true;
@@ -257,6 +258,7 @@
     c.etq = (c.etq || []).filter(n => !otros.some(x => x.n === n));
     if (t && !c.etq.includes(t.n)) c.etq.push(t.n);
     if (!abierto() || !(c.jid || c.tel)) return;
+    if (t && !t.wid) { vincularEtiquetas(true).then(() => { if (t.wid) etiquetaDeTablero(c, t); else if (!con.avisoSin) { con.avisoSin = 1; toast('El tablero «' + t.n + '» no tiene etiqueta en WhatsApp: créala con ese nombre en WhatsApp Business'); } }); return; }
     const num = c.jid && !c.tel ? c.jid : tel(c.tel);
     const cambios = [];
     otros.forEach(x => { if (x.wid && antes.has(x.n)) cambios.push([x.wid, 'remove']); });
@@ -266,6 +268,34 @@
   const COLORW = n => (etqs().find(e => e.n === n) || {}).c;
   // adivina a qué estado de Pedidos corresponde una etiqueta por su nombre
   const adivinaE = n => { const t = String(n).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); return /devuel/.test(t) ? 'devuelto' : /cancel/.test(t) ? 'cancelado' : /entreg|finaliz/.test(t) ? 'entregado' : /agencia/.test(t) ? 'enagencia' : /ruta|despach|enviad|camino/.test(t) ? 'enruta' : /guia|pendiente|datos|pedido|pago/.test(t) ? 'pendiente' : ''; };
+  // Vincula por NOMBRE las etiquetas/tableros de la plataforma con las etiquetas que ya existen en WhatsApp Business
+  // (WhatsApp no permite crear etiquetas desde fuera: se crean en la app y aquí se enlazan solas).
+  let ultVinc = 0;
+  const igual = (a, b) => String(a).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === String(b).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  async function vincularEtiquetas(forzar) {
+    if (!abierto() || (!forzar && Date.now() - ultVinc < 60000)) return { ok: false, faltan: [] };
+    ultVinc = Date.now();
+    let d; try { d = await api('etiquetas'); } catch (e) { return { ok: false, faltan: [] }; }
+    if (!d || !d.ok || !Array.isArray(d.labels)) return { ok: false, faltan: [] };
+    const w = W(); let cambio = false;
+    d.labels.forEach(l => {
+      let e = etqs().find(x => x.wid === l.id) || etqs().find(x => !x.wid && igual(x.n, l.name));
+      if (!e) { etqs().push({ n: l.name, c: l.color, wid: l.id }); cambio = true; }
+      else if (e.wid !== l.id) { e.wid = l.id; cambio = true; }
+    });
+    tabs().forEach(t => { const l = d.labels.find(x => x.id === t.wid) || d.labels.find(x => igual(x.name, t.n)); if (l && t.wid !== l.id) { t.wid = l.id; cambio = true; } });
+    const faltan = tabs().filter(t => !t.wid).map(t => t.n);
+    if (cambio) { Store.save(); if (viendo()) render(); }
+    return { ok: true, faltan };
+  }
+  function avisarEtiquetaFaltante(nombre) {
+    if (!abierto()) return toast('Tablero creado. Cuando conectes WhatsApp se vinculará con la etiqueta «' + nombre + '»');
+    vincularEtiquetas(true).then(r => {
+      if (!r.ok) return toast('Tablero creado, pero no pude leer tus etiquetas de WhatsApp');
+      if (!r.faltan.includes(nombre)) return toast('Tablero vinculado con la etiqueta «' + nombre + '» de WhatsApp ✅');
+      ask('WhatsApp no deja crear etiquetas desde fuera. Crea la etiqueta «' + nombre + '» en tu WhatsApp Business (Ajustes → Herramientas para la empresa → Etiquetas → Nueva etiqueta) con ESE mismo nombre y luego pulsa «Ya la creé».', () => { vincularEtiquetas(true).then(r2 => { toast(r2.ok && !r2.faltan.includes(nombre) ? 'Vinculado con WhatsApp ✅' : 'Todavía no aparece esa etiqueta en WhatsApp'); }); }, 'Ya la creé');
+    });
+  }
   async function traerEtiquetas() {
     if (!abierto()) return toast('Conecta primero tu WhatsApp con el QR');
     let d; try { d = await api('etiquetas'); } catch (e) { return toast(e.message); }
@@ -314,7 +344,7 @@
       ${c.producto ? `<div class="kb-p">${esc(c.producto)}</div>` : ''}${pedidoDe(c) ? `<div class="kb-p">📦 Pedido: <b>${esc(PED[pedidoDe(c).estado] || pedidoDe(c).estado)}</b></div>` : ''}<div class="kb-m">${esc(prev(c)).slice(0, 70)}</div>
       ${(c.etq || []).length ? `<div class="kb-e">${c.etq.map(pill).join('')}</div>` : ''}
       <div class="kb-a"><select data-mv="${c.id}" aria-label="Mover a otro tablero"><option value="">Mover a…</option>${T.map(t => `<option value="${t.id}" ${c.tab === t.id ? 'disabled' : ''}>${esc(t.n)}</option>`).join('')}<option value="__ninguno">Quitar del tablero</option></select></div></div>`;
-    const col = (t, i) => { const l = L.filter(c => c.tab === t.id); return `<div class="kb-col" data-col="${t.id}"><div class="kb-h" style="border-top-color:${t.c}"><b>${esc(t.n)}${t.e ? `<small class="kb-vi" title="Vinculado al estado «${esc(PED[t.e] || t.e)}» de Pedidos">🔗 ${esc(PED[t.e] || t.e)}</small>` : ''}</b><i>${l.length}</i><span class="kb-hb"><button class="btn btn-sm" data-ml="${t.id}:-1" ${i === 0 ? 'disabled' : ''} aria-label="Mover tablero a la izquierda">◀</button><button class="btn btn-sm" data-ml="${t.id}:1" ${i === T.length - 1 ? 'disabled' : ''} aria-label="Mover tablero a la derecha">▶</button><button class="btn btn-sm" data-te="${t.id}" aria-label="Editar tablero">✎</button></span></div><div class="kb-b">${l.length ? l.map(card).join('') : '<p class="note kb-v">Suelta aquí</p>'}</div></div>`; };
+    const col = (t, i) => { const l = L.filter(c => c.tab === t.id); return `<div class="kb-col" data-col="${t.id}"><div class="kb-h" style="border-top-color:${t.c}"><b>${esc(t.n)}${abierto() && !t.wid ? '<small class="kb-nw" title="Aún no existe una etiqueta con este nombre en tu WhatsApp Business: créala allá con el mismo nombre">⚠ sin etiqueta en WhatsApp</small>' : ''}${t.e ? `<small class="kb-vi" title="Vinculado al estado «${esc(PED[t.e] || t.e)}» de Pedidos">🔗 ${esc(PED[t.e] || t.e)}</small>` : ''}</b><i>${l.length}</i><span class="kb-hb"><button class="btn btn-sm" data-ml="${t.id}:-1" ${i === 0 ? 'disabled' : ''} aria-label="Mover tablero a la izquierda">◀</button><button class="btn btn-sm" data-ml="${t.id}:1" ${i === T.length - 1 ? 'disabled' : ''} aria-label="Mover tablero a la derecha">▶</button><button class="btn btn-sm" data-te="${t.id}" aria-label="Editar tablero">✎</button></span></div><div class="kb-b">${l.length ? l.map(card).join('') : '<p class="note kb-v">Suelta aquí</p>'}</div></div>`; };
     const libres = chats().filter(c => !c.grupo && !tabDe(c) && (!qs || [c.nombre, c.tel, c.ciudad].join(' ').toLowerCase().includes(qs))).sort((a, b) => (b.ult || 0) - (a.ult || 0));
     const item = c => `<div class="kb-si" draggable="true" data-kc="${c.id}"><div class="kb-ct" data-abrir="${c.id}">${av(c)}<div class="kb-cn"><b>${esc(c.nombre)}</b><small>${c.tel ? '+' + esc(String(c.tel).replace(/\D/g, '')) : 'sin celular'}</small></div>${detectar(c) ? '<span class="kb-ok" title="Ya envió sus datos">📋</span>' : ''}</div><div class="kb-m">${esc(prev(c)).slice(0, 60)}</div>
       <select data-mv="${c.id}" aria-label="Mover a un tablero"><option value="">Mover a un tablero…</option>${T.map(t => `<option value="${t.id}">${esc(t.n)}</option>`).join('')}</select></div>`;
@@ -328,7 +358,7 @@
     g('#wq').oninput = e => { q = e.target.value.toLowerCase(); const p = e.target.selectionStart; refrescar(); const i = el.querySelector('#wq'); i.focus(); i.setSelectionRange(p, p); };
     g('#wqs').oninput = e => { qs = e.target.value.toLowerCase(); const p = e.target.selectionStart; refrescar(); const i = el.querySelector('#wqs'); i.focus(); i.setSelectionRange(p, p); };
     g('#kbet').onchange = e => { fet = e.target.value; refrescar(); };
-    g('#kbnew').onclick = () => openForm('Nuevo tablero', [{ k: 'n', l: 'Nombre', req: 1, full: 1 }, { k: 'c', l: 'Color', t: 'select', opts: Object.fromEntries(COL.map((x, i) => [x, ['Verde', 'Azul', 'Amarillo', 'Turquesa', 'Morado', 'Naranja', 'Rosa', 'Gris'][i]])) }, { k: 'e', l: 'Estado de Pedidos vinculado', t: 'select', opts: EOPTS, full: 1 }], {}, v => { tabs().push({ id: 't' + Date.now().toString(36), n: v.n, c: v.c || COL[0], e: v.e || '' }); });
+    g('#kbnew').onclick = () => openForm('Nuevo tablero', [{ k: 'n', l: 'Nombre', req: 1, full: 1 }, { k: 'c', l: 'Color', t: 'select', opts: Object.fromEntries(COL.map((x, i) => [x, ['Verde', 'Azul', 'Amarillo', 'Turquesa', 'Morado', 'Naranja', 'Rosa', 'Gris'][i]])) }, { k: 'e', l: 'Estado de Pedidos vinculado', t: 'select', opts: EOPTS, full: 1 }], {}, v => { tabs().push({ id: 't' + Date.now().toString(36), n: v.n, c: v.c || COL[0], e: v.e || '' }); setTimeout(() => avisarEtiquetaFaltante(v.n), 400); });
     el.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => { sel = b.dataset.abrir; modo = 'lista'; vista(el); });
     el.querySelectorAll('[data-mv]').forEach(b => b.onchange = () => { const c = chats().find(x => x.id === b.dataset.mv); if (!c || !b.value) return; mover(c, b.value === '__ninguno' ? '' : b.value); refrescar(); });
     el.querySelectorAll('[data-ml]').forEach(b => b.onclick = () => { const [id, d] = b.dataset.ml.split(':'), T = tabs(), i = T.findIndex(t => t.id === id), j = i + +d; if (i < 0 || j < 0 || j >= T.length) return; [T[i], T[j]] = [T[j], T[i]]; Store.save(); refrescar(); });

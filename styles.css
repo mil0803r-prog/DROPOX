@@ -673,3 +673,4 @@ body.wa-full .wa+.note,body.wa-full #view>p.note{display:none}
 .tabs.ed .tg .tgc{margin-left:6px}
 @media (min-width:700px){.tabs.ed a.gc{display:flex}}
 .tabs.open.ed a.gc{display:flex}
+.kb-nw{display:block;font-weight:600;font-size:9.5px;color:var(--bad,#dc2626);margin-top:2px;line-height:1.2}
