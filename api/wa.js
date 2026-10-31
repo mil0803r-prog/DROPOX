@@ -14,6 +14,7 @@ const tipoDe = m => {
   if (x.ephemeralMessage) return tipoDe({ message: x.ephemeralMessage.message });
   return x.imageMessage ? 'imagen' : x.videoMessage ? 'video' : x.audioMessage ? 'audio' : x.documentMessage ? 'doc' : x.stickerMessage ? 'sticker' : '';
 };
+const PALETA = ['#ff9485', '#64c4ff', '#ffd429', '#dfaef0', '#99b6c1', '#55ccb3', '#ff9dff', '#d3a91d', '#6d7cce', '#d7e752', '#00d0e2', '#ffc5c7', '#93ceac', '#f74848', '#00a0f2', '#83e422', '#ffaf04', '#b5ebff', '#9ba6ff', '#9368cf'];
 const ms = t => { const n = Number(t && t.low !== undefined ? t.low : t); return n ? (n < 1e12 ? n * 1000 : n) : 0; };
 const telDe = jid => (/@s\.whatsapp\.net$/.test(jid || '') ? jid.split('@')[0] : '');
 
@@ -57,6 +58,19 @@ module.exports = async (req, res) => {
       return res.json({ ok: true, dueno: String(dueno) });
     }
     if (b.accion === 'salir') { await evo('DELETE', `/instance/logout/${INST}`); return res.json({ ok: true }); }
+    if (b.accion === 'etiquetas') { // etiquetas reales de WhatsApp Business (nombre y color)
+      let r = await evo('GET', `/label/findLabels/${INST}`);
+      if (!r.ok || !Array.isArray(r.j)) r = await evo('POST', `/label/findLabels/${INST}`, {});
+      if (!r.ok || !Array.isArray(r.j)) return res.json({ ok: false, error: 'Tu servidor no entregó las etiquetas. Revisa que sea WhatsApp Business y que esté conectado.' });
+      const labels = r.j.map(l => ({ id: String(l.id), name: String(l.name || '').trim(), color: /^#/.test(String(l.color)) ? l.color : PALETA[(Number(l.color) || 0) % 20] })).filter(l => l.name);
+      return res.json({ ok: true, labels });
+    }
+    if (b.accion === 'etiquetar') { // pone o quita una etiqueta de WhatsApp a un chat
+      const num = String(b.numero || '').replace(/[^\d@a-z.]/gi, ''), id = String(b.labelId || '').replace(/[^\w-]/g, '');
+      if (!num || !id || !['add', 'remove'].includes(b.accion2)) return res.status(400).json({ error: 'Faltan datos.' });
+      const r = await evo('POST', `/label/handleLabel/${INST}`, { number: num, labelId: id, action: b.accion2 });
+      return res.json({ ok: r.ok, error: r.ok ? '' : 'No se pudo cambiar la etiqueta en WhatsApp (' + r.status + ').' });
+    }
     if (b.accion === 'diag') {
       const rc = await evo('POST', `/chat/findChats/${INST}`, {}), rk = await evo('POST', `/chat/findContacts/${INST}`, { where: {} });
       const ch = Array.isArray(rc.j) ? rc.j : [], ko = Array.isArray(rk.j) ? rk.j : [];
@@ -105,7 +119,7 @@ module.exports = async (req, res) => {
         const alt = lk.remoteJidAlt || c.remoteJidAlt || lk.senderPn || '';
         const k = cont[jid] || cont[alt] || {};
         const nombre = k.pushName || k.name || c.pushName || c.name || (!lk.fromMe && lm.pushName) || '';
-        return { jid, tel: telDe(jid) || telDe(alt), nombre, foto: k.profilePicUrl || c.profilePicUrl || '', ult: ms(c.updatedAt ? Date.parse(c.updatedAt) : lm.messageTimestamp), noLeidos: c.unreadMessages || 0 };
+        return { jid, tel: telDe(jid) || telDe(alt), nombre, foto: k.profilePicUrl || c.profilePicUrl || '', ult: ms(c.updatedAt ? Date.parse(c.updatedAt) : lm.messageTimestamp), noLeidos: c.unreadMessages || 0, labels: Array.isArray(c.labels) ? c.labels.map(x => String(x && x.id !== undefined ? x.id : x)) : undefined };
       }).filter(c => c.jid && !/@broadcast$|status@/.test(c.jid)).sort((a, c) => c.ult - a.ult).slice(0, 80);
       return res.json({ ok: true, chats });
     }

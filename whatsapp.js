@@ -85,6 +85,14 @@
         if (x.nombre && c.auto && /^\d+$|Sin nombre/.test(c.nombre || '')) { c.nombre = x.nombre; cambio = true; }
         if (x.grupo && x.nombre && c.nombre !== x.nombre) { c.nombre = x.nombre; c.grupo = true; cambio = true; }
         if (x.tel && !c.tel) { c.tel = x.tel; cambio = true; }
+        if (Array.isArray(x.labels) && W().etqWA) { // etiquetas reales del chat en WhatsApp
+          const conocidas = etqs().filter(e => e.wid), nombres = conocidas.filter(e => x.labels.includes(e.wid)).map(e => e.n);
+          const propias = (c.etq || []).filter(n => !conocidas.some(e => e.n === n));
+          const nuevas = [...new Set([...propias, ...nombres])];
+          if (nuevas.join('|') !== (c.etq || []).join('|')) { c.etq = nuevas; cambio = true; }
+          const tb = tabs().find(t => t.wid && nombres.includes(t.n));
+          if (tb && c.tab !== tb.id && !c.tabOut) { c.tab = tb.id; c.tabTs = Date.now(); cambio = true; }
+        }
         if (x.foto && c.foto !== x.foto) { c.foto = x.foto; cambio = true; }
         if (forzar || (!intentados.has(c.id) && !x.grupo && (!c.tel || /Sin nombre/.test(c.nombre || ''))) || c.id === sel || (x.ult || 0) > (c.sync || 0)) ocupados.push([c, x]);
       });
@@ -134,7 +142,7 @@
   }
   function barra() {
     if (con.estado === 'sinConfig') return `<div class="card wa-con"><b>Conectar tu WhatsApp con QR</b><p class="note" style="margin:6px 0 0">Todavía falta instalar el servidor de WhatsApp. Sigue los pasos que te di (Railway) y pon su dirección y clave en Vercel como <code>WA_URL</code> y <code>WA_KEY</code>. Cuando esté listo, aquí aparece el botón para escanear el QR.</p></div>`;
-    if (abierto()) return `<div class="card wa-con wa-ok">🟢 <b>WhatsApp conectado</b> <small>${con.sync ? 'Última sincronización ' + hora(con.sync) : 'Sincronizando…'}</small><span class="push"><button class="btn btn-sm" id="wsync">${con.sincronizando ? 'Sincronizando…' : 'Sincronizar ahora'}</button> <button class="btn btn-sm" id="wdiag">Diagnóstico</button> <button class="btn btn-sm btn-del" id="wout">Desvincular</button></span></div>`;
+    if (abierto()) return `<div class="card wa-con wa-ok">🟢 <b>WhatsApp conectado</b> <small>${con.sync ? 'Última sincronización ' + hora(con.sync) : 'Sincronizando…'}</small><span class="push"><button class="btn btn-sm" id="wsync">${con.sincronizando ? 'Sincronizando…' : 'Sincronizar ahora'}</button> <button class="btn btn-sm" id="wetqw">Traer etiquetas de WhatsApp</button> <button class="btn btn-sm" id="wdiag">Diagnóstico</button> <button class="btn btn-sm btn-del" id="wout">Desvincular</button></span></div>`;
     if (con.qr) return `<div class="card wa-con"><b>Escanea este QR</b><p class="note" style="margin:6px 0">En tu celular: WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo.</p><img class="wa-qr" alt="QR de WhatsApp" src="${con.qr.startsWith('data:') ? con.qr : 'data:image/png;base64,' + con.qr}"><p class="note" style="margin:6px 0 0">Se renueva solo. Cuando lo escanees, esta pantalla cambia sola.</p><button class="btn btn-sm btn-del" id="wout">Cancelar y desvincular</button></div>`;
     return `<div class="card wa-con">⚪ <b>WhatsApp sin conectar</b> <small>${esc(con.error || (con.estado === 'close' ? 'Está desconectado: escanea el QR para volver a recibir los chats.' : 'Conéctalo para que los chats lleguen solos.'))}</small><span class="push"><button class="btn btn-sm btn-pri" id="wqr">${con.cargando ? 'Generando…' : 'Conectar con QR'}</button> <button class="btn btn-sm btn-del" id="wout">Desvincular</button> <button class="btn btn-sm" id="wvac">Vaciar chats</button></span></div>`;
   }
@@ -228,8 +236,41 @@
     c.tabTs = Date.now();
     const t = tabDe(c), p = pedidoDe(c);
     if (t && t.e && p) { p.estado = t.e; c.lastPed = t.e; }
+    etiquetaDeTablero(c, t);
     Store.save();
   };
+  // el tablero ES una etiqueta: al mover la tarjeta, el chat toma la etiqueta del tablero y pierde las de los otros tableros
+  function etiquetaDeTablero(c, t) {
+    const otros = tabs().filter(x => x !== t && x.n), antes = new Set(c.etq || []);
+    c.etq = (c.etq || []).filter(n => !otros.some(x => x.n === n));
+    if (t && !c.etq.includes(t.n)) c.etq.push(t.n);
+    if (!abierto() || !(c.jid || c.tel)) return;
+    const num = c.jid && !c.tel ? c.jid : tel(c.tel);
+    const cambios = [];
+    otros.forEach(x => { if (x.wid && antes.has(x.n)) cambios.push([x.wid, 'remove']); });
+    if (t && t.wid && !antes.has(t.n)) cambios.push([t.wid, 'add']);
+    cambios.forEach(([id, a2]) => api('etiquetar', { numero: num, labelId: id, accion2: a2 }).then(d => { if (d && d.ok === false && !con.avisoEtq) { con.avisoEtq = 1; toast(d.error || 'No se pudo cambiar la etiqueta en WhatsApp'); } }).catch(() => {}));
+  }
+  const COLORW = n => (etqs().find(e => e.n === n) || {}).c;
+  // adivina a qué estado de Pedidos corresponde una etiqueta por su nombre
+  const adivinaE = n => { const t = String(n).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); return /devuel/.test(t) ? 'devuelto' : /cancel/.test(t) ? 'cancelado' : /entreg|finaliz/.test(t) ? 'entregado' : /agencia/.test(t) ? 'enagencia' : /ruta|despach|enviad|camino/.test(t) ? 'enruta' : /guia|pendiente|datos|pedido|pago/.test(t) ? 'pendiente' : ''; };
+  async function traerEtiquetas() {
+    if (!abierto()) return toast('Conecta primero tu WhatsApp con el QR');
+    let d; try { d = await api('etiquetas'); } catch (e) { return toast(e.message); }
+    if (!d.ok || !d.labels.length) return toast(d.error || 'No encontré etiquetas en tu WhatsApp');
+    const L = d.labels;
+    openForm('Marca las etiquetas que serán TABLEROS', [...L.map(l => ({ k: 'w' + l.id, l: l.name, t: 'check', def: true }))], {}, v => {
+      const w = W(), previos = etqs().map(e => e.n);
+      w.etq = L.map(l => ({ n: l.name, c: l.color, wid: l.id }));
+      const nombres = new Set(L.map(l => l.name));
+      const viejas = w.tabs || [];
+      w.tabs = L.filter(l => v['w' + l.id]).map(l => { const prev = viejas.find(t => t.n === l.name || t.wid === l.id); return { id: 'w' + l.id, n: l.name, c: l.color, wid: l.id, e: prev && prev.e !== undefined ? prev.e : adivinaE(l.name) }; });
+      if (!w.tabs.length) w.tabs = [{ id: 't0', n: 'Datos recibidos', c: '#7a8794', e: 'pendiente' }];
+      chats().forEach(c => { c.etq = (c.etq || []).filter(n => nombres.has(n)); const t = w.tabs.find(x => x.id === c.tab); if (c.tab && !t) { const por = viejas.find(x => x.id === c.tab), nuevo = por && w.tabs.find(x => x.n === por.n); if (nuevo) c.tab = nuevo.id; else delete c.tab; } });
+      w.tabsV4 = 1; w.tabsV3 = 1; w.tabsV2 = 1; w.etqWA = 1;
+      toast('Etiquetas traídas de tu WhatsApp ✅');
+    });
+  }
   // al cambiar el estado en «Pedidos», la tarjeta pasa al tablero vinculado a ese estado
   function reconciliar() {
     let cambio = false;
@@ -332,6 +373,7 @@
     if (borrador && g('#wtx')) g('#wtx').value = borrador;
     if (g('#wrev')) g('#wrev').onclick = revisar;
     if (g('#wqr')) g('#wqr').onclick = pedirQr;
+    if (g('#wetqw')) g('#wetqw').onclick = traerEtiquetas;
     if (g('#wvac')) g('#wvac').onclick = () => ask('¿Vaciar todos los chats y tableros guardados aquí? Tus pedidos en «Pedidos» no se tocan.', () => { vaciar(); toast('Lista vacía ✅'); render(); }, 'Vaciar');
     if (g('#wsync')) g('#wsync').onclick = () => { sincronizar(true); render(); };
     if (g('#wdiag')) g('#wdiag').onclick = async () => { try { const d = await api('diag'); openInfo('<h2>Diagnóstico de WhatsApp</h2><p class="note">Copia este texto y envíaselo a Claude. No incluye nombres ni números.</p><textarea readonly rows="12" style="width:100%;font-family:monospace;font-size:12px">' + esc(JSON.stringify(d, null, 1)) + '</textarea>'); } catch (e) { toast(e.message); } };
@@ -351,7 +393,7 @@
     g('#wne').onclick = () => openForm('Nueva etiqueta', [{ k: 'n', l: 'Nombre', req: 1, full: 1 }, { k: 'c', l: 'Color', t: 'select', opts: Object.fromEntries(COL.map((x, i) => [x, ['Verde', 'Azul', 'Amarillo', 'Turquesa', 'Morado', 'Naranja', 'Rosa', 'Gris'][i]])) }], {}, v => { if (!etqs().some(e => e.n === v.n)) etqs().push({ n: v.n.trim(), c: v.c }); });
     g('#wback').onclick = () => { sel = ''; vista(el); };
     g('#ced').onclick = () => openForm('Editar chat', CAMPOS, c, v => Object.assign(c, v));
-    el.querySelectorAll('[data-et]').forEach(b => b.onclick = () => { const n = b.dataset.et; c.etq = c.etq || []; c.etq = c.etq.includes(n) ? c.etq.filter(x => x !== n) : c.etq.concat(n); Store.save(); vista(el); });
+    el.querySelectorAll('[data-et]').forEach(b => b.onclick = () => { const n = b.dataset.et; c.etq = c.etq || []; const quita = c.etq.includes(n); c.etq = quita ? c.etq.filter(x => x !== n) : c.etq.concat(n); const et = etqs().find(e => e.n === n); if (et && et.wid && abierto() && (c.jid || c.tel)) api('etiquetar', { numero: c.jid && !c.tel ? c.jid : tel(c.tel), labelId: et.wid, accion2: quita ? 'remove' : 'add' }).catch(() => {}); Store.save(); vista(el); });
     el.querySelectorAll('[data-tb]').forEach(b => b.onclick = () => { mover(c, c.tab === b.dataset.tb ? '' : b.dataset.tb); vista(el); });
     el.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { c.estado = b.dataset.st; Store.save(); vista(el); });
     el.querySelectorAll('[data-dm]').forEach(a => a.onclick = () => { c.msgs.splice(+a.dataset.dm, 1); Store.save(); vista(el); });
