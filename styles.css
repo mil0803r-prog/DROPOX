@@ -637,3 +637,16 @@ body.wa-full .wa{height:calc(100vh - 150px)}
 body.wa-full .kb-side{max-height:calc(100vh - 175px)}
 body.wa-full .wa+.note,body.wa-full #view>p.note{display:none}
 @media(max-width:820px){body.wa-pg .wa{height:calc(100vh - 230px)}}
+/* Tableros compactos: más columnas a la vez (se reparten el ancho; si no caben, se desplaza) */
+.kb{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(148px,1fr);gap:8px;overflow-x:auto;align-items:start;scroll-snap-type:none}
+.kb-col{flex:none;width:auto;max-width:none;min-width:0}
+.kb-h{padding:8px 7px 6px;gap:4px;flex-wrap:wrap}.kb-h b{font-size:12.5px;flex:1 1 60%}.kb-h i{font-size:11px}.kb-hb{gap:2px}.kb-hb .btn{padding:1px 5px;font-size:10px}
+.kb-vi{font-size:10px}
+.kb-b{padding:4px 6px 8px;gap:6px;min-height:70px}
+.kb-c{padding:6px;border-radius:10px}.kb-c .wa-av{flex:0 0 28px;width:28px;height:28px;font-size:13px}
+.kb-cn b{font-size:12px}.kb-cn small{font-size:10.5px}.kb-p{font-size:11px;margin-top:4px}
+.kb-m,.kb-e{display:none}
+.kb-a{margin-top:5px}.kb-a select{font-size:11px;padding:3px 4px}
+.kb-wrap{grid-template-columns:230px minmax(0,1fr);gap:8px}
+.kb-side{padding:8px}.kb-si{padding:6px}.kb-si .wa-av{flex:0 0 30px;width:30px;height:30px;font-size:13px}
+@media(max-width:820px){.kb{grid-auto-columns:minmax(150px,46vw)}.kb-col{max-width:none}}

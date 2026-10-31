@@ -227,6 +227,7 @@
     if (!w.tabsV2) { w.tabsV2 = 1; if (!w.tabs.some(t => t.id === 't0')) w.tabs.unshift({ id: 't0', n: 'Datos recibidos', c: '#7a8794' }); } if (!w.tabsV4) { w.tabsV4 = 1; if (!w.tabs.some(t => t.e === 'enagencia')) { const i = w.tabs.findIndex(t => t.e === 'enruta'); w.tabs.splice(i >= 0 ? i + 1 : w.tabs.length, 0, { id: 't5', n: 'En agencia', c: '#8b5cf6', e: 'enagencia' }); } }
     if (!w.tabsV5) { w.tabsV5 = 1; if (!w.tabs.some(t => /ya pag/i.test(String(t.n).normalize('NFD').replace(/[\u0300-\u036f]/g, '')))) { const i = w.tabs.findIndex(t => t.id === 't0'); w.tabs.splice(i >= 0 ? i + 1 : 0, 0, { id: 't6', n: 'Ya pagó', c: '#14a39a', e: '' }); } }
     if (!w.tabsV6) { w.tabsV6 = 1; w.tabs.forEach(t => { if (t.n === 'Datos recibidos') t.n = 'Datos completados'; }); }
+    if (!w.tabsV8) { w.tabsV8 = 1; const alf = [['devuelto', 'Devueltos', '#ef4444', 't7'], ['cancelado', 'Cancelados', '#94a3b8', 't8']]; alf.forEach(([e, n, c, id]) => { if (!w.tabs.some(t => t.e === e || String(t.n).toLowerCase().startsWith(n.toLowerCase().slice(0, 6)))) w.tabs.push({ id, n, c, e }); }); }
     return w.tabs; };
   const tabDe = c => tabs().find(t => t.id === c.tab);
   const EOPTS = { '': 'Ninguno (no cambia pedidos)', pendiente: 'Pendiente', enruta: 'En ruta', enagencia: 'En agencia', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
