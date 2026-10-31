@@ -148,10 +148,23 @@
     t.barra = t.barra || {}; if (!t.barra.dir) t.barra.dir = 'izq';
     if (!t.portada) t.portada = {}; if (t.portada.barraVel === undefined) t.portada.barraVel = 22;
   }
+  // Si dos productos quedan con la misma dirección (por ejemplo al unir copias), el repetido recibe una propia a partir de su nombre.
+  function direccionesUnicas(t) {
+    const ps = t.productos || [], vistos = new Set(); let cambio = false;
+    ps.forEach(q => {
+      if (q.slug && !vistos.has(q.slug)) { vistos.add(q.slug); return; }
+      const base = slugify(q.nombre) || 'producto';
+      let sl = base, i = 2;
+      while (vistos.has(sl)) sl = base + '-' + i++;
+      if (q.slug) (q.slugsAntes = q.slugsAntes || []).push(q.slug);
+      q.slug = sl; vistos.add(sl); cambio = true;
+    });
+    return cambio;
+  }
   function asegurar() {
     if (!Array.isArray(S.tiendas) || !S.tiendas.length) S.tiendas = [clon(window.TIENDA_BASE)];
     if (ti >= S.tiendas.length) ti = 0;
-    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); S.tiendas.forEach(asignarResenas); S.tiendas.forEach(migrarMov); S.tiendas.forEach(migrarCar); S.tiendas.forEach(migrarBarra); S.tiendas.forEach(migrarInf); restaurar();
+    S.tiendas.forEach(migrarSoles); S.tiendas.forEach(migrarWa); S.tiendas.forEach(sembrar); S.tiendas.forEach(asignarResenas); S.tiendas.forEach(migrarMov); S.tiendas.forEach(migrarCar); S.tiendas.forEach(migrarBarra); S.tiendas.forEach(migrarInf); if (S.tiendas.map(direccionesUnicas).some(Boolean)) setTimeout(() => { try { Store.save(); } catch (e) {} }, 0); restaurar();
     const t = S.tiendas[ti];
     if (pi >= (t.productos || []).length) pi = 0;
     return t;
@@ -717,6 +730,7 @@
     t.dominios = (t.dominios || []).map(d => d.toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()).filter(Boolean);
     const falla = m => { errPub = m; msg(m); pintarEstado(); };
     if (!R().slugOk(t.slug)) return falla('La dirección de prueba no es válida (usa minúsculas, números y guiones).');
+    direccionesUnicas(t);
     const malos = (t.productos || []).filter(p => !R().slugOk(p.slug)).map(p => p.nombre);
     if (malos.length) return falla('Revisa la dirección (slug) de: ' + malos.join(', '));
     const dup = (t.productos || []).map(p => p.slug).filter((s, i, a) => a.indexOf(s) !== i);
