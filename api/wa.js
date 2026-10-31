@@ -49,6 +49,13 @@ module.exports = async (req, res) => {
       if (!q.ok || !img) return res.json({ ok: true, qr: '', esperando: true });
       return res.json({ ok: true, qr: img });
     }
+    if (b.accion === 'quien') { // número de WhatsApp conectado (para detectar si cambiaron de número)
+      const r = await evo('GET', `/instance/fetchInstances?instanceName=${encodeURIComponent(INST)}`);
+      const x = Array.isArray(r.j) ? r.j[0] : r.j;
+      const i = (x && (x.instance || x)) || {};
+      const dueno = i.ownerJid || i.owner || (x && (x.ownerJid || x.owner)) || '';
+      return res.json({ ok: true, dueno: String(dueno) });
+    }
     if (b.accion === 'salir') { await evo('DELETE', `/instance/logout/${INST}`); return res.json({ ok: true }); }
     if (b.accion === 'diag') {
       const rc = await evo('POST', `/chat/findChats/${INST}`, {}), rk = await evo('POST', `/chat/findContacts/${INST}`, { where: {} });

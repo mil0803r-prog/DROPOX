@@ -49,6 +49,8 @@
     return d;
   }
   const abierto = () => con.estado === 'open';
+  // deja la plataforma vacía de chats (los pedidos ya creados NO se tocan)
+  function vaciar() { const w = W(); w.chats = []; delete w.owner; sel = ''; Object.keys(media).forEach(k => delete media[k]); intentados.clear(); Store.save(); }
   const viendo = () => (location.hash || '').slice(1) === 'whatsapp';
   const mismo = (c, t) => c.tel && t && String(c.tel).replace(/\D/g, '').slice(-9) === String(t).replace(/\D/g, '').slice(-9);
   async function estado(redib) {
@@ -68,6 +70,12 @@
     if (!abierto() || con.sincronizando) return;
     con.sincronizando = true; let cambio = false;
     try {
+      const q = await api('quien').catch(() => null);
+      if (q && q.ok && q.dueno) {
+        const w = W(), nuevo = q.dueno.split('@')[0].split(':')[0];
+        if (w.owner && w.owner !== nuevo) { w.chats = []; sel = ''; Object.keys(media).forEach(k => delete media[k]); intentados.clear(); toast('Cambiaste de número de WhatsApp: la lista se vació para no mezclar chats'); cambio = true; }
+        if (w.owner !== nuevo) { w.owner = nuevo; cambio = true; }
+      }
       const d = await api('chats'); if (!d.ok) throw new Error(d.error || '');
       const ocupados = [];
       d.chats.forEach(x => {
@@ -128,7 +136,7 @@
     if (con.estado === 'sinConfig') return `<div class="card wa-con"><b>Conectar tu WhatsApp con QR</b><p class="note" style="margin:6px 0 0">Todavía falta instalar el servidor de WhatsApp. Sigue los pasos que te di (Railway) y pon su dirección y clave en Vercel como <code>WA_URL</code> y <code>WA_KEY</code>. Cuando esté listo, aquí aparece el botón para escanear el QR.</p></div>`;
     if (abierto()) return `<div class="card wa-con wa-ok">🟢 <b>WhatsApp conectado</b> <small>${con.sync ? 'Última sincronización ' + hora(con.sync) : 'Sincronizando…'}</small><span class="push"><button class="btn btn-sm" id="wsync">${con.sincronizando ? 'Sincronizando…' : 'Sincronizar ahora'}</button> <button class="btn btn-sm" id="wdiag">Diagnóstico</button> <button class="btn btn-sm btn-del" id="wout">Desvincular</button></span></div>`;
     if (con.qr) return `<div class="card wa-con"><b>Escanea este QR</b><p class="note" style="margin:6px 0">En tu celular: WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo.</p><img class="wa-qr" alt="QR de WhatsApp" src="${con.qr.startsWith('data:') ? con.qr : 'data:image/png;base64,' + con.qr}"><p class="note" style="margin:6px 0 0">Se renueva solo. Cuando lo escanees, esta pantalla cambia sola.</p><button class="btn btn-sm btn-del" id="wout">Cancelar y desvincular</button></div>`;
-    return `<div class="card wa-con">⚪ <b>WhatsApp sin conectar</b> <small>${esc(con.error || (con.estado === 'close' ? 'Está desconectado: escanea el QR para volver a recibir los chats.' : 'Conéctalo para que los chats lleguen solos.'))}</small><span class="push"><button class="btn btn-sm btn-pri" id="wqr">${con.cargando ? 'Generando…' : 'Conectar con QR'}</button> <button class="btn btn-sm btn-del" id="wout">Desvincular</button></span></div>`;
+    return `<div class="card wa-con">⚪ <b>WhatsApp sin conectar</b> <small>${esc(con.error || (con.estado === 'close' ? 'Está desconectado: escanea el QR para volver a recibir los chats.' : 'Conéctalo para que los chats lleguen solos.'))}</small><span class="push"><button class="btn btn-sm btn-pri" id="wqr">${con.cargando ? 'Generando…' : 'Conectar con QR'}</button> <button class="btn btn-sm btn-del" id="wout">Desvincular</button> <button class="btn btn-sm" id="wvac">Vaciar chats</button></span></div>`;
   }
   // ── Detectar los datos de pedido que el cliente escribió ──
   function leer(txt) {
@@ -296,9 +304,10 @@
     if (borrador && g('#wtx')) g('#wtx').value = borrador;
     if (g('#wrev')) g('#wrev').onclick = revisar;
     if (g('#wqr')) g('#wqr').onclick = pedirQr;
+    if (g('#wvac')) g('#wvac').onclick = () => ask('¿Vaciar todos los chats y tableros guardados aquí? Tus pedidos en «Pedidos» no se tocan.', () => { vaciar(); toast('Lista vacía ✅'); render(); }, 'Vaciar');
     if (g('#wsync')) g('#wsync').onclick = () => { sincronizar(true); render(); };
     if (g('#wdiag')) g('#wdiag').onclick = async () => { try { const d = await api('diag'); openInfo('<h2>Diagnóstico de WhatsApp</h2><p class="note">Copia este texto y envíaselo a Claude. No incluye nombres ni números.</p><textarea readonly rows="12" style="width:100%;font-family:monospace;font-size:12px">' + esc(JSON.stringify(d, null, 1)) + '</textarea>'); } catch (e) { toast(e.message); } };
-    if (g('#wout')) g('#wout').onclick = () => ask('¿Desvincular tu WhatsApp? Se quita de «Dispositivos vinculados» sin que toques el celular. Tus chats guardados aquí no se borran.', () => { api('salir').catch(() => {}).then(() => { con.estado = 'close'; con.qr = ''; con.error = 'WhatsApp desvinculado.'; toast('WhatsApp desvinculado ✅'); render(); }); }, 'Desvincular');
+    if (g('#wout')) g('#wout').onclick = () => ask('¿Desvincular tu WhatsApp? Se quita de «Dispositivos vinculados» sin que toques el celular y esta pantalla queda VACÍA: se borran los chats y tableros guardados aquí. Tus pedidos creados en «Pedidos» no se tocan.', () => { api('salir').catch(() => {}).then(() => { vaciar(); con.estado = 'close'; con.qr = ''; con.error = 'WhatsApp desvinculado. La lista quedó vacía.'; toast('WhatsApp desvinculado ✅ · lista vacía'); render(); }); }, 'Desvincular y vaciar');
     if (!con.estado && !con.pidio) { con.pidio = 1; estado(true).then(() => { if (abierto()) sincronizar(true); }); }
     latido();
     g('#wweb').onclick = web;
