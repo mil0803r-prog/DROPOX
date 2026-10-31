@@ -1,7 +1,7 @@
 /* DROPOX — Botón flotante «Pegar datos»: pegas lo que te escribió el cliente, reconoce nombre, DNI, celular, zona, agencia y cantidad,
    y lo manda a Pedidos con cada dato en su lugar. Sirve en cualquier pantalla. */
 (function () {
-  const CAMPOS = [['nombre', 'Nombre', 1], ['dni', 'DNI'], ['cel', 'Celular'], ['ciudad', 'Departamento, provincia y distrito', 1], ['direccion', 'Dirección / agencia', 1], ['cantidad', 'Cantidad'], ['precio', 'Precio unit. (S/)'], ['producto', 'Producto', 1]];
+  const CAMPOS = [['nombre', 'Nombre', 1], ['dni', 'DNI'], ['cel', 'Celular'], ['ciudad', 'Departamento, provincia y distrito', 1], ['distrito', 'Distrito'], ['direccion', 'Dirección / agencia', 1], ['cantidad', 'Cantidad'], ['precio', 'Precio unit. (S/)'], ['producto', 'Producto', 1]];
   let dlg, bloques = [], AG = null;
   // ── Agencias Shalom: elige sola la que coincide con el distrito, provincia, departamento o dirección ──
   const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9ñ ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -26,9 +26,12 @@
   }
   const etiqueta = a => `${a.n} — ${a.a}${a.t === 'pro' ? ' (Punto Pro)' : ''}`;
   const textoAg = a => `Shalom ${a.n} · ${a.a}`;
+  const titulo = t => String(t || '').toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
+  const distDeZona = z => { const x = String(z || '').split(',').map(v => v.trim()).filter(Boolean); return x.length >= 2 ? x[x.length - 1] : ''; };
+  function ponDistrito(b) { if (b.ag && (!b.distrito || b.distAuto)) { b.distrito = titulo(b.ag.z); b.distAuto = true; } }
   function pegarAgencia(b, forzar) {
     const rk = ranking([String(b.raw || '').replace(b.nombre || '\u0000', ' '), b.ciudad, b.direccion0].join(' ')); b.cand = rk.slice(0, 40).map(x => x.a);
-    if (forzar !== false && rk.length && rk[0].sc >= 4) { b.ag = rk[0].a; b.direccion = textoAg(rk[0].a); b.auto = true; }
+    if (forzar !== false && rk.length && rk[0].sc >= 4) { b.ag = rk[0].a; b.direccion = textoAg(rk[0].a); b.auto = true; ponDistrito(b); }
   }
   const num = x => parseFloat(String(x).replace(',', '.')) || 0;
 
@@ -49,7 +52,7 @@
     const leer = window.LeerDatos; if (!leer) return [];
     const of = window.Mensajes && Mensajes.dato ? Mensajes.dato('oferta') : '';
     const prod = (window.Mensajes && Mensajes.dato && Mensajes.dato('producto')) || '';
-    return separar(txt).map(t => ({ t, d: leer(t) })).filter(x => x.d.puntos >= 2).map(({ d, t }) => ({ ...d, precio: num((of.match(/[\d.]+/) || [''])[0]) || '', producto: prod, ok: true, cantidad: d.cantidad || 1, raw: t, direccion0: d.direccion })).map(b => { pegarAgencia(b); return b; });
+    return separar(txt).map(t => ({ t, d: leer(t) })).filter(x => x.d.puntos >= 2).map(({ d, t }) => ({ ...d, precio: num((of.match(/[\d.]+/) || [''])[0]) || '', producto: prod, ok: true, cantidad: d.cantidad || 1, raw: t, direccion0: d.direccion, distrito: distDeZona(d.ciudad) })).map(b => { pegarAgencia(b); return b; });
   }
   function html() {
     const hay = bloques.length;
@@ -63,14 +66,14 @@
     const t = conservar != null ? conservar : (dlg.querySelector('#pgT') || {}).value || '';
     dlg.innerHTML = html(); const T = dlg.querySelector('#pgT'); T.value = t;
     T.oninput = () => { const f = analizar(T.value); bloques = f; const pos = T.selectionStart; pintar(T.value); const n = dlg.querySelector('#pgT'); n.focus(); n.setSelectionRange(pos, pos); };
-    dlg.querySelectorAll('[data-b]').forEach(i => i.oninput = () => { bloques[+i.dataset.b][i.dataset.k] = i.value; });
+    dlg.querySelectorAll('[data-b]').forEach(i => i.oninput = () => { const b = bloques[+i.dataset.b]; b[i.dataset.k] = i.value; if (i.dataset.k === 'distrito') b.distAuto = false; });
     dlg.querySelectorAll('[data-ok]').forEach(i => i.onchange = () => { bloques[+i.dataset.ok].ok = i.checked; const b = dlg.querySelector('#pgOk'); b.textContent = 'Enviar a Pedidos (' + bloques.filter(x => x.ok).length + ')'; });
-    dlg.querySelectorAll('[data-sa]').forEach(sl => sl.onchange = () => { const b = bloques[+sl.dataset.sa], a = b.cand[+sl.value]; if (a) { b.ag = a; b.direccion = textoAg(a); } else { b.ag = null; b.direccion = b.direccion0 || ''; } b.auto = false; const inp = dlg.querySelector(`[data-b="${sl.dataset.sa}"][data-k="direccion"]`); if (inp) inp.value = b.direccion; });
+    dlg.querySelectorAll('[data-sa]').forEach(sl => sl.onchange = () => { const b = bloques[+sl.dataset.sa], a = b.cand[+sl.value]; if (a) { b.ag = a; b.direccion = textoAg(a); ponDistrito(b); } else { b.ag = null; b.direccion = b.direccion0 || ''; } b.auto = false; const inp = dlg.querySelector(`[data-b="${sl.dataset.sa}"][data-k="direccion"]`); if (inp) inp.value = b.direccion; const inD = dlg.querySelector(`[data-b="${sl.dataset.sa}"][data-k="distrito"]`); if (inD) inD.value = b.distrito || ''; });
     dlg.querySelectorAll('[data-sf]').forEach(i => i.oninput = () => { const b = bloques[+i.dataset.sf]; const q = i.value; const rk = ranking(q ? q : [String(b.raw || '').replace(b.nombre || '\u0000', ' '), b.ciudad, b.direccion0].join(' ')); b.cand = rk.slice(0, 40).map(x => x.a); const sl = dlg.querySelector(`[data-sa="${i.dataset.sf}"]`); sl.innerHTML = '<option value="">— Sin agencia / otra empresa —</option>' + b.cand.map((a, j) => `<option value="${j}">${esc(etiqueta(a))}</option>`).join(''); });
     dlg.querySelector('#pgX').onclick = () => dlg.close();
     dlg.querySelector('#pgOk').onclick = () => {
       const sel = bloques.filter(b => b.ok); if (!sel.length) return toast('Marca al menos un cliente');
-      sel.forEach(b => S.pedidos.push({ id: uid(), fecha: hoy(), estado: 'pendiente', producto: b.producto || 'Producto', cliente: b.nombre, telefono: b.cel, ciudad: [b.ciudad, b.direccion].filter(Boolean).join(' · '), canal: 'WhatsApp', cantidad: num(b.cantidad) || 1, precio: num(b.precio), costo: 0, flete: 0, otros: 0, dni: b.dni }));
+      sel.forEach(b => S.pedidos.push({ id: uid(), fecha: hoy(), estado: 'pendiente', producto: b.producto || 'Producto', cliente: b.nombre, telefono: b.cel, ciudad: b.ciudad, distrito: b.distrito || '', agencia: b.direccion || '', canal: 'WhatsApp', cantidad: num(b.cantidad) || 1, precio: num(b.precio), costo: 0, flete: 0, otros: 0, dni: b.dni }));
       Store.save(); dlg.close(); bloques = [];
       toast(sel.length + ' pedido' + (sel.length === 1 ? '' : 's') + ' enviado' + (sel.length === 1 ? '' : 's') + ' a Pedidos ✅');
       if ((location.hash || '').slice(1) === 'pedidos') render();

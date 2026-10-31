@@ -211,7 +211,7 @@
   const nuevoPedido = (c, d, ex) => {
     const of = window.Mensajes && Mensajes.dato ? Mensajes.dato('oferta') : '', precio = parseFloat((of.match(/[\d.]+/) || [0])[0]) || 0;
     const id = uid();
-    S.pedidos.push({ id, fecha: hoy(), estado: 'pendiente', producto: (window.Mensajes && Mensajes.dato('producto')) || c.producto || 'Producto', cliente: d.nombre || c.nombre, telefono: d.cel || c.tel || '', ciudad: [d.ciudad || c.ciudad, d.direccion].filter(Boolean).join(' · '), canal: 'WhatsApp', cantidad: +d.cantidad || 1, precio, costo: 0, flete: 0, otros: 0, dni: d.dni || '', ...(ex || {}) });
+    S.pedidos.push({ id, fecha: hoy(), estado: 'pendiente', producto: (window.Mensajes && Mensajes.dato('producto')) || c.producto || 'Producto', cliente: d.nombre || c.nombre, telefono: d.cel || c.tel || '', ciudad: d.ciudad || c.ciudad || '', distrito: String(d.ciudad || '').split(',').map(v => v.trim()).filter(Boolean).slice(1).slice(-1)[0] || '', agencia: d.direccion || '', canal: 'WhatsApp', cantidad: +d.cantidad || 1, precio, costo: 0, flete: 0, otros: 0, dni: d.dni || '', ...(ex || {}) });
     c.pedidoId = id; if (!c.estado || ['nuevo', 'interesado', 'esperando'].includes(c.estado)) c.estado = 'confirmado';
     if (d.cel && !c.tel) c.tel = d.cel;
   };

@@ -164,6 +164,8 @@ function desglose(p) {
   return z;
 }
 const utilPedido = p => { const z = desglose(p); return z.ventas - z.igv - z.producto - z.flete - z.otros - z.comis - z.renta; };
+// distrito de un pedido: el campo propio o, en pedidos viejos, el último tramo de «Departamento, provincia, distrito»
+const distritoDe = p => { if (p.distrito) return p.distrito; const z = String(p.ciudad || '').split(' · ')[0].split(',').map(x => x.trim()).filter(Boolean); return z.length >= 2 ? z[z.length - 1] : ''; };
 const enCurso = p => p.estado === 'pendiente' || p.estado === 'enruta' || p.estado === 'enagencia';
 const cerrado = p => p.estado === 'entregado' || p.estado === 'devuelto';
 
@@ -344,7 +346,7 @@ const campoPed = () => [
   { k: 'estado', l: 'Estado', t: 'select', opts: ESTADOS, def: 'pendiente' },
   { k: 'producto', l: 'Producto', req: 1, full: 1, list: [...new Set(S.pedidos.map(p => p.producto))] },
   { k: 'cliente', l: 'Cliente' }, { k: 'telefono', l: 'Teléfono', t: 'tel' },
-  { k: 'ciudad', l: 'Ciudad / Distrito', list: [...new Set(S.pedidos.map(p => p.ciudad))] }, { k: 'canal', l: 'Canal (Tienda, WhatsApp…)' },
+  { k: 'ciudad', l: 'Departamento / ciudad', list: [...new Set(S.pedidos.map(p => p.ciudad))] }, { k: 'distrito', l: 'Distrito' }, { k: 'agencia', l: 'Agencia / dirección de entrega', full: 1 }, { k: 'canal', l: 'Canal (Tienda, WhatsApp…)' },
   { k: 'cantidad', l: 'Cantidad', t: 'number', def: 1 }, { k: 'precio', l: 'Precio venta unit. (S/)', t: 'number' },
   { k: 'costo', l: 'Costo producto unit. (S/)', t: 'number' }, { k: 'flete', l: 'Flete (S/)', t: 'number' },
   { k: 'otros', l: 'Otros costos (S/)', t: 'number' },
@@ -352,29 +354,29 @@ const campoPed = () => [
 function vPedidos(el) {
   const q = fPed.q.toLowerCase(), modo = (S.config && S.config.pedVista) || 'tarjetas';
   const all = S.pedidos.slice().sort((a, b) => b.fecha.localeCompare(a.fecha));
-  const list = all.filter(p => (!q || [p.producto, p.cliente, p.ciudad, p.telefono].join(' ').toLowerCase().includes(q)) && (modo === 'tablero' || !fPed.estado || p.estado === fPed.estado));
+  const list = all.filter(p => (!q || [p.producto, p.cliente, p.ciudad, distritoDe(p), p.agencia, p.telefono].join(' ').toLowerCase().includes(q)) && (modo === 'tablero' || !fPed.estado || p.estado === fPed.estado));
   const venta = p => num(p.cantidad) * num(p.precio), fch = p => p.fecha.slice(8) + '/' + p.fecha.slice(5, 7);
   const acciones = p => `${SIG[p.estado] ? `<button class="btn btn-sm btn-pri" data-n="${p.id}">${SIG[p.estado][1]} →</button>` : ''}${enCurso(p) ? `<button class="btn btn-sm btn-del" data-dv="${p.id}">Devuelto</button>` : ''}<button class="btn btn-sm" data-e="${p.id}">Editar</button><button class="btn btn-sm btn-del" data-d="${p.id}">✕</button>`;
   const resumen = `<div class="pd-res">${Object.entries(ESTADOS).map(([k, l]) => { const ps = all.filter(p => p.estado === k); return `<button class="pd-r e-${k} ${fPed.estado === k && modo !== 'tablero' ? 'on' : ''}" data-s="${k}"><span>${l}</span><b>${ps.length}</b><small>${fmt(ps.reduce((a, p) => a + venta(p), 0))}</small></button>`; }).join('')}</div>`;
   let cuerpo;
   if (!list.length) cuerpo = `<div class="card empty">${S.pedidos.length ? 'Ningún pedido coincide con el filtro.' : 'Aún no hay pedidos. Pulsa “+ Nuevo” para registrar el primero.'}</div>`;
   else if (modo === 'tabla') {
-    cuerpo = `<div class="card tw pd-tabla"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Producto</th><th>Ciudad / agencia</th><th>Estado</th><th class="num">Venta</th><th class="num">Utilidad</th><th></th></tr></thead><tbody>${list.map(p => {
+    cuerpo = `<div class="card tw pd-tabla"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Producto</th><th>Ciudad / agencia</th><th>Distrito</th><th>Estado</th><th class="num">Venta</th><th class="num">Utilidad</th><th></th></tr></thead><tbody>${list.map(p => {
       const u = utilPedido(p);
-      return `<tr class="e-${p.estado}"><td>${esc(fch(p))}</td><td><b>${esc(p.cliente || 'Sin cliente')}</b>${p.telefono ? `<br><small>${esc(p.telefono)}</small>` : ''}</td><td>${esc(p.producto)} <small>x${num(p.cantidad)}</small></td><td>${esc(p.ciudad || '—')}</td>
+      return `<tr class="e-${p.estado}"><td>${esc(fch(p))}</td><td><b>${esc(p.cliente || 'Sin cliente')}</b>${p.telefono ? `<br><small>${esc(p.telefono)}</small>` : ''}</td><td>${esc(p.producto)} <small>x${num(p.cantidad)}</small></td><td>${esc(p.ciudad || '—')}${p.agencia ? `<br><small>${esc(p.agencia)}</small>` : ''}</td><td><b>${esc(distritoDe(p) || '—')}</b></td>
       <td><select class="pd-sel t-${p.estado}" data-es="${p.id}">${Object.entries(ESTADOS).map(([k, l]) => `<option value="${k}" ${p.estado === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
       <td class="num">${fmt(venta(p))}</td><td class="num ${cls(u)}">${fmt(u)}${enCurso(p) ? ' <small>(esp.)</small>' : ''}</td><td class="pd-ac">${acciones(p)}</td></tr>`;
     }).join('')}</tbody></table></div>`;
   } else if (modo === 'tablero') {
     cuerpo = `<div class="pd-kb">${Object.entries(ESTADOS).map(([k, l]) => {
       const ps = list.filter(p => p.estado === k), tot = ps.reduce((a, p) => a + venta(p), 0);
-      return `<div class="pd-col e-${k}" data-col="${k}"><div class="pd-ch"><b>${l}</b><i>${ps.length}</i><small>${fmt(tot)}</small></div><div class="pd-cb">${ps.length ? ps.map(p => { const u = utilPedido(p); return `<div class="pd-c e-${k}" draggable="true" data-kp="${p.id}"><div class="pd-cn"><b>${esc(p.producto)}</b><small>${esc(fch(p))}</small></div><div class="pd-cs">${esc(p.cliente || 'Sin cliente')}${p.ciudad ? ' · ' + esc(p.ciudad) : ''} · x${num(p.cantidad)}</div><div class="pd-cm"><span>Venta<b>${fmt(venta(p))}</b></span><span>Utilidad<b class="${cls(u)}">${fmt(u)}</b></span></div><div class="pd-ca">${SIG[p.estado] ? `<button class="btn btn-sm btn-pri" data-n="${p.id}">${SIG[p.estado][1]} →</button>` : ''}<button class="btn btn-sm" data-e="${p.id}">Editar</button></div></div>`; }).join('') : '<p class="note pd-v">Suelta aquí</p>'}</div></div>`;
+      return `<div class="pd-col e-${k}" data-col="${k}"><div class="pd-ch"><b>${l}</b><i>${ps.length}</i><small>${fmt(tot)}</small></div><div class="pd-cb">${ps.length ? ps.map(p => { const u = utilPedido(p); return `<div class="pd-c e-${k}" draggable="true" data-kp="${p.id}"><div class="pd-cn"><b>${esc(p.producto)}</b><small>${esc(fch(p))}</small></div><div class="pd-cs">${esc(p.cliente || 'Sin cliente')}${p.ciudad ? ' · ' + esc(p.ciudad) : ''}${distritoDe(p) && !String(p.ciudad || '').toLowerCase().includes(distritoDe(p).toLowerCase()) ? ' · ' + esc(distritoDe(p)) : ''} · x${num(p.cantidad)}</div><div class="pd-cm"><span>Venta<b>${fmt(venta(p))}</b></span><span>Utilidad<b class="${cls(u)}">${fmt(u)}</b></span></div><div class="pd-ca">${SIG[p.estado] ? `<button class="btn btn-sm btn-pri" data-n="${p.id}">${SIG[p.estado][1]} →</button>` : ''}<button class="btn btn-sm" data-e="${p.id}">Editar</button></div></div>`; }).join('') : '<p class="note pd-v">Suelta aquí</p>'}</div></div>`;
     }).join('')}</div>`;
   } else {
     cuerpo = `<div class="list">${list.map(p => {
       const u = utilPedido(p), proj = enCurso(p);
       return `<div class="it e-${p.estado}"><div class="it-h"><b>${esc(p.producto)}</b><span class="tag t-${p.estado}">${ESTADOS[p.estado] || p.estado}</span></div>
-      <div class="it-s">${esc(fch(p))} · ${esc(p.cliente || 'Sin cliente')}${p.ciudad ? ' · ' + esc(p.ciudad) : ''} · x${num(p.cantidad)}</div>
+      <div class="it-s">${esc(fch(p))} · ${esc(p.cliente || 'Sin cliente')}${p.ciudad ? ' · ' + esc(p.ciudad) : ''}${distritoDe(p) && !String(p.ciudad || '').toLowerCase().includes(distritoDe(p).toLowerCase()) ? ' · ' + esc(distritoDe(p)) : ''} · x${num(p.cantidad)}</div>
       <div class="it-m"><span>Venta<b>${fmt(venta(p))}</b></span><span>Utilidad${proj ? ' (esperada)' : ''}<b class="${cls(u)}">${fmt(u)}</b></span></div>
       <div class="it-a">${acciones(p)}</div></div>`;
     }).join('')}</div>`;
@@ -400,8 +402,8 @@ function vPedidos(el) {
   el.querySelectorAll('.pd-col').forEach(cl => { cl.ondragover = e => { e.preventDefault(); cl.classList.add('sobre'); }; cl.ondragleave = () => cl.classList.remove('sobre'); cl.ondrop = e => { e.preventDefault(); cl.classList.remove('sobre'); const p = P(e.dataTransfer.getData('text/plain')); if (p && p.estado !== cl.dataset.col) { p.estado = cl.dataset.col; Store.save(); render(); } }; });
 }
 function exportCSV() {
-  const h = ['fecha', 'estado', 'producto', 'cliente', 'telefono', 'ciudad', 'canal', 'cantidad', 'precio', 'costo', 'flete', 'otros', 'utilidad'];
-  const rows = S.pedidos.map(p => h.map(k => k === 'utilidad' ? utilPedido(p).toFixed(2) : `"${String(p[k] ?? '').replace(/"/g, '""')}"`).join(','));
+  const h = ['fecha', 'estado', 'producto', 'cliente', 'telefono', 'ciudad', 'distrito', 'agencia', 'canal', 'cantidad', 'precio', 'costo', 'flete', 'otros', 'utilidad'];
+  const rows = S.pedidos.map(p => h.map(k => k === 'utilidad' ? utilPedido(p).toFixed(2) : k === 'distrito' ? distritoDe(p) : `"${String(p[k] ?? '').replace(/"/g, '""')}"`).join(','));
   descargar('pedidos.csv', '﻿' + h.join(',') + '\n' + rows.join('\n'), 'text/csv');
 }
 function descargar(nombre, txt, tipo) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: tipo })); a.download = nombre; a.click(); URL.revokeObjectURL(a.href); }
