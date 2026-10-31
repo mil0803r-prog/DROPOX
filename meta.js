@@ -11,7 +11,7 @@ const Meta = (() => {
   const ESTADOS = { ACTIVE: ['Activa', 'ok'], PAUSED: ['Pausada', 'off'], CAMPAIGN_PAUSED: ['Campaña pausada', 'off'], ADSET_PAUSED: ['Conjunto pausado', 'off'], ARCHIVED: ['Archivada', 'off'], DELETED: ['Eliminada', 'off'], WITH_ISSUES: ['Con problemas', 'bad'], IN_PROCESS: ['En revisión', 'warn'], PENDING_REVIEW: ['En revisión', 'warn'], DISAPPROVED: ['Rechazada', 'bad'] };
   const OBJ = { OUTCOME_SALES: 'Ventas', OUTCOME_LEADS: 'Clientes potenciales', OUTCOME_ENGAGEMENT: 'Interacción', OUTCOME_TRAFFIC: 'Tráfico', OUTCOME_AWARENESS: 'Reconocimiento', OUTCOME_APP_PROMOTION: 'Promoción de app' };
 
-  let datos = null, clave = '', hora = null, cargando = false, error = '', falta = false, filtro = 'activas', vistaM = 'tabla', nivelT = 'campaign', abierto = new Set();
+  let detAbierto = false, datos = null, clave = '', hora = null, cargando = false, error = '', falta = false, filtro = 'activas', vistaM = 'tabla', nivelT = 'campaign', abierto = new Set();
 
   const claveActual = () => { const [d, h] = rangoActual(); return d + '|' + h; };
   const rangoActual = () => { const pk = S.config.periodo; let [d, h] = rango(pk); if (pk === 'todo') { const x = new Date(); x.setDate(x.getDate() - 89); d = iso(x); } const hoyS = hoy(); return [d, h > hoyS ? hoyS : h]; };
@@ -319,7 +319,7 @@ const Meta = (() => {
       <div class="chips" style="margin-top:6px">${[['activas', 'Activas'], ['conGasto', 'Con gasto'], ['todas', 'Todas']].map(([k, l]) => `<button class="chip ${filtro === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
       <div class="mt-vista"><button class="chip ${vistaM === 'arbol' ? 'on' : ''}" data-vm="arbol">Árbol</button><button class="chip ${vistaM === 'tabla' ? 'on' : ''}" data-vm="tabla">Tabla</button></div>
       ${vistaM === 'tabla' ? tablaNivel(A) : `<div class="mt-arbol">${arbol}</div>`}</div>
-    <div class="card"><h3>Detalle por día</h3><p class="sub">Toda la cuenta, una fila por fecha</p>${tablaDias(A)}</div>`;
+    <details class="card mt-det" id="mdet" ${detAbierto ? 'open' : ''}><summary><h3>Detalle por día</h3><span class="sub">Toda la cuenta, una fila por fecha · toca para ver</span></summary>${tablaDias(A)}</details>`;
   }
 
   function dialogoDias(nivel, id) {
@@ -373,6 +373,7 @@ const Meta = (() => {
     if (fdI) fdI.onchange = () => fijar(fdI.value, fhI.value);
     if (fhI) fhI.onchange = () => fijar(fdI.value, fhI.value);
     el.querySelectorAll('[data-fr]').forEach(b => b.onclick = () => { const k = b.dataset.fr, D = datos; if (k === 'todo') fijar('', ''); else if (k === '7') fijar(sumaDias(D.hasta, -6), D.hasta); else if (k === 'ult') fijar(D.hasta, D.hasta); else if (k === 'ayer') fijar(sumaDias(hoy(), -1), sumaDias(hoy(), -1)); else fijar(hoy(), hoy()); });
+    const dt = $('#mdet'); if (dt) dt.ontoggle = () => { detAbierto = dt.open; };
     const per = $('#per'); if (per) per.onchange = e => { S.config.periodo = e.target.value; Store.save(); render(); };
     el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; render(); });
     el.querySelectorAll('[data-vm]').forEach(b => b.onclick = () => { vistaM = b.dataset.vm; render(); });

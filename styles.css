@@ -710,3 +710,6 @@ body.wa-full .wa+.note,body.wa-full #view>p.note{display:none}
 .mt-nw{display:flex;align-items:center;gap:8px}.mt-nw .mt-ck,.mt-nw .mt-sw{margin:0;flex-shrink:0}.mt-nw .mt-nt{flex:1;min-width:0;max-width:none}
 .mt-am th.mt-nm,.mt-am td.mt-nm{width:330px;min-width:330px;max-width:330px}
 .mt-am td.num small{max-width:150px}
+.mt-det summary{cursor:pointer;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;list-style:none}.mt-det summary::-webkit-details-marker{display:none}
+.mt-det summary h3{margin:0}.mt-det summary::before{content:'▸';color:var(--mut);transition:transform .15s}.mt-det[open] summary::before{transform:rotate(90deg)}
+.mt-det[open] summary{margin-bottom:10px}
