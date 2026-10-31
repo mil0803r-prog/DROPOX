@@ -440,7 +440,7 @@ $('#pedBody').innerHTML='<div class="ok"><div class="ck">✓</div><h2>¡Pedido c
     cfg = Object.assign({}, cfg, { _base: opt.base || '', _slugTienda: opt.slugTienda || cfg.slug || '' });
     ruta = String(ruta || '').replace(/^\/+|\/+$/g, '');
     if (!ruta) return { status: 200, html: conGuia(portada(cfg, opt), opt) };
-    const p = activos(cfg).find(x => x.slug === ruta);
+    const p = activos(cfg).find(x => x.slug === ruta) || activos(cfg).find(x => (x.slugsAntes || []).includes(ruta));
     if (!p) return { status: 404, html: `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>No encontrado</title><body style="font-family:system-ui;text-align:center;padding:60px 20px"><h1>Producto no encontrado</h1><p><a href="${esc(opt.base || '')}/">Volver a la tienda</a></p></body>` };
     const t = p.tipo === 'landing' ? landing : p.tipo === 'codigo' ? codigo : producto;
     return { status: 200, html: conGuia(t(cfg, p, opt), opt) };
