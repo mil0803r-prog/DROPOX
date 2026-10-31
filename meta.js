@@ -234,6 +234,24 @@ const Meta = (() => {
   if (Array.isArray(propias) && propias.length) PRESET.personalizado = ['Personalizado', propias.filter(k => COLM[k])];
   let preset = 'rendimiento', orden = { k: 'gasto', d: -1 }, busq = '', selFilas = new Set();
   try { preset = localStorage.getItem('dropox.metaPreset') || 'rendimiento'; if (!PRESET[preset]) preset = 'rendimiento'; } catch (e) { /* sin almacenamiento */ }
+  function guardarColumnas(ks) { propias = ks; PRESET.personalizado = ['Personalizado', ks]; preset = 'personalizado'; try { localStorage.setItem('dropox.metaCols', JSON.stringify(ks)); localStorage.setItem('dropox.metaPreset', preset); } catch (x) { /* sin almacenamiento */ } }
+  // ventana para elegir Y ORDENAR las columnas (casilla = mostrar, flechas = posición)
+  function ventanaColumnas() {
+    const act = PRESET[preset][1], lista = [...act, ...Object.keys(COLM).filter(k => !act.includes(k))], on = new Set(act);
+    const f = $('#dlgForm'), d = $('#dlg');
+    const pinta = () => {
+      f.innerHTML = `<h2>Columnas: elige y ordena</h2><p class="note" style="margin:-6px 0 10px">Marca las que quieres ver y usa ▲ ▼ para cambiar su posición. También puedes arrastrar los títulos en la tabla.</p>
+      <div class="mt-orden">${lista.map((k, i) => `<div class="mt-ol ${on.has(k) ? 'on' : ''}"><label><input type="checkbox" data-k="${k}" ${on.has(k) ? 'checked' : ''}> ${esc(COLM[k].l)}</label><span><button type="button" data-up="${i}" ${i === 0 ? 'disabled' : ''}>▲</button><button type="button" data-dn="${i}" ${i === lista.length - 1 ? 'disabled' : ''}>▼</button></span></div>`).join('')}</div>
+      <div class="dlg-foot"><button type="button" class="btn" id="mcCan">Cancelar</button><button type="button" class="btn btn-pri" id="mcOk">Guardar columnas</button></div>`;
+      f.querySelectorAll('[data-k]').forEach(c => c.onchange = () => { if (c.checked) on.add(c.dataset.k); else on.delete(c.dataset.k); c.closest('.mt-ol').classList.toggle('on', c.checked); });
+      const mueve = (i, j) => { [lista[i], lista[j]] = [lista[j], lista[i]]; pinta(); };
+      f.querySelectorAll('[data-up]').forEach(b => b.onclick = () => mueve(+b.dataset.up, +b.dataset.up - 1));
+      f.querySelectorAll('[data-dn]').forEach(b => b.onclick = () => mueve(+b.dataset.dn, +b.dataset.dn + 1));
+      f.querySelector('#mcCan').onclick = () => d.close();
+      f.querySelector('#mcOk').onclick = () => { const ks = lista.filter(k => on.has(k)); if (!ks.length) return toast('Marca al menos una columna'); guardarColumnas(ks); d.close(); render(); };
+    };
+    f.onsubmit = e => e.preventDefault(); pinta(); d.showModal();
+  }
   const filasNivel = A => {
     const rows = [];
     A.campanas.forEach(c => { if (nivelT === 'campaign') rows.push({ ...c, padre: '' }); c.conjuntos.forEach(s => { if (nivelT === 'adset') rows.push({ ...s, padre: c.nombre }); s.anuncios.forEach(a => { if (nivelT === 'ad') rows.push({ ...a, padre: s.nombre }); }); }); });
@@ -251,12 +269,12 @@ const Meta = (() => {
     const sel = rows.filter(r => selFilas.has(r.id)), base = sel.length ? sel : rows;
     const sumM = sumarM(base.map(r => r.m)), tot = { nombre: '', m: sumM };
     const flecha = k => (orden.k === k ? (orden.d > 0 ? ' ▲' : ' ▼') : '');
-    const th = (k, l, cls) => `<th class="${cls || 'num'} mt-so" data-so="${k}">${l}${flecha(k)}</th>`;
+    const th = (k, l, cls, mover) => `<th class="${cls || 'num'} mt-so" data-so="${k}" ${mover ? `draggable="true" data-ck="${k}" title="Arrastra para cambiar de posición"` : ''}>${l}${flecha(k)}</th>`;
     const celda = (k, r) => { const c = COLM[k]; return `<td class="num">${c.f(c.g(r), r)}</td>`; };
     const celdaTot = k => { if (k === 'alcance' || k === 'frecuencia') return '<td class="num">—</td>'; const c = COLM[k]; return `<td class="num"><b>${c.f(c.g(tot), tot)}</b></td>`; };
     return `<div class="mt-niv">${tabs}</div>${barra}<div class="tw mt-ads"><table class="mt-tabla mt-am"><thead><tr>
       <th class="mt-nm mt-so" data-so="nombre"><div class="mt-nw"><label class="mt-ck"><input type="checkbox" id="mselall" ${sel.length === rows.length ? 'checked' : ''}></label><span>${nombre.replace(/s$/, '')}${flecha('nombre')}</span></div></th>
-      ${th('estado', 'Entrega', 'mt-ent')}${th('presupuesto', 'Presupuesto')}${cols.map(k => th(k, COLM[k].l)).join('')}</tr></thead>
+      ${th('estado', 'Entrega', 'mt-ent')}${th('presupuesto', 'Presupuesto')}${cols.map(k => th(k, COLM[k].l, '', true)).join('')}</tr></thead>
       <tbody>${rows.map(r => `<tr class="${selFilas.has(r.id) ? 'sel' : ''}"><td class="mt-nm"><div class="mt-nw"><label class="mt-ck"><input type="checkbox" data-sel="${esc(r.id)}" ${selFilas.has(r.id) ? 'checked' : ''}></label><span class="mt-sw ${r.estado === 'ACTIVE' ? 'on' : ''}" title="${r.estado === 'ACTIVE' ? 'Activada' : 'Desactivada'} (se cambia en Meta)"></span><span class="mt-nt"><b>${esc(r.nombre)}</b>${r.padre ? `<small class="mt-padre">${esc(r.padre)}</small>` : ''}</span></div></td><td class="mt-ent">${tag(r.estado)}</td><td class="num">${r.presupuesto_diario ? `${money(r.presupuesto_diario)}<small>Diario</small>` : '<small>Usa presupuesto de la campaña</small>'}</td>${cols.map(k => celda(k, r)).join('')}</tr>`).join('')}</tbody>
       <tfoot><tr><td class="mt-nm"><b>${sel.length ? `Resultados de ${sel.length} seleccionad${sel.length === 1 ? 'a' : 'as'}` : `Resultados de ${rows.length} ${nombre.toLowerCase()}`}</b><small class="mt-padre">Excluye las eliminadas</small></td><td></td><td></td>${cols.map(celdaTot).join('')}</tr></tfoot></table></div>`;
   }
@@ -380,9 +398,17 @@ const Meta = (() => {
     el.querySelectorAll('[data-nt]').forEach(b => b.onclick = () => { nivelT = b.dataset.nt; selFilas.clear(); render(); });
     const mq = $('#mbq'); if (mq) mq.oninput = e => { busq = e.target.value.toLowerCase(); const p = e.target.selectionStart; render(); const i = $('#mbq'); if (i) { i.focus(); i.setSelectionRange(p, p); } };
     const mc = $('#mcols'); if (mc) mc.onchange = e => {
-      if (e.target.value === '__custom') { const act = new Set(PRESET[preset][1]); openForm('Elige las columnas', Object.entries(COLM).map(([k, c]) => ({ k, l: c.l, t: 'check', def: act.has(k), full: 1 })), {}, v => { const ks = Object.keys(COLM).filter(k => v[k]); if (!ks.length) return; propias = ks; PRESET.personalizado = ['Personalizado', ks]; preset = 'personalizado'; try { localStorage.setItem('dropox.metaCols', JSON.stringify(ks)); localStorage.setItem('dropox.metaPreset', preset); } catch (x) { /* sin almacenamiento */ } }); e.target.value = preset; return; }
+      if (e.target.value === '__custom') { e.target.value = preset; ventanaColumnas(); return; }
       preset = e.target.value; try { localStorage.setItem('dropox.metaPreset', preset); } catch (x) { /* sin almacenamiento */ } render(); };
     const mx = $('#mexp'); if (mx) mx.onclick = exportarTabla;
+    let colArr = null;
+    el.querySelectorAll('th[data-ck]').forEach(h => {
+      h.ondragstart = e => { colArr = h.dataset.ck; try { e.dataTransfer.setData('text/plain', colArr); e.dataTransfer.effectAllowed = 'move'; } catch (x) { /* sin dataTransfer */ } h.classList.add('arr'); };
+      h.ondragend = () => h.classList.remove('arr');
+      h.ondragover = e => { if (colArr) { e.preventDefault(); h.classList.add('sobre'); } };
+      h.ondragleave = () => h.classList.remove('sobre');
+      h.ondrop = e => { e.preventDefault(); h.classList.remove('sobre'); const a = colArr; colArr = null; if (!a || a === h.dataset.ck) return; const ks = PRESET[preset][1].slice(); ks.splice(ks.indexOf(a), 1); ks.splice(ks.indexOf(h.dataset.ck), 0, a); guardarColumnas(ks); render(); };
+    });
     el.querySelectorAll('[data-so]').forEach(h => h.onclick = ev => { if (ev.target.closest('.mt-ck')) return; const k = h.dataset.so; orden = orden.k === k ? { k, d: -orden.d } : { k, d: k === 'nombre' ? 1 : -1 }; render(); });
     el.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => { if (c.checked) selFilas.add(c.dataset.sel); else selFilas.delete(c.dataset.sel); render(); });
     const sa = $('#mselall'); if (sa) sa.onchange = () => { const A = filtrado(datos), ids = filasNivel(A).map(r => r.id); if (sa.checked) ids.forEach(i => selFilas.add(i)); else selFilas.clear(); render(); };
