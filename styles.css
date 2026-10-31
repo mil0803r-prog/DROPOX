@@ -623,3 +623,17 @@ dialog h2{margin:0 0 14px;font-size:19px}
 .kb-si{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:9px;cursor:grab;min-width:0}.kb-si.arr{opacity:.4}.kb-si .kb-ct{align-items:center}.kb-si select{width:100%;margin-top:6px;font-size:12.5px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
 .kb-ok{margin-left:auto;font-size:15px}.kb-si .kb-m{margin-top:4px}
 @media(max-width:900px){.kb-wrap{grid-template-columns:1fr}.kb-side{position:static;max-height:340px}}
+/* WhatsApp a pantalla completa */
+body.wa-pg #view{max-width:none}
+@media (min-width:1024px){body.wa-pg .wrap{max-width:none;padding:0 18px 16px}}
+@media (min-width:700px) and (max-width:1023px){body.wa-pg .wrap{padding:0 14px 16px}}
+body.wa-pg .wa{height:calc(100vh - 250px);min-height:460px}
+body.wa-pg .kb-side{max-height:calc(100vh - 270px)}
+body.wa-pg .wa-msgs{min-height:0}
+body.wa-pg .wa>.wa-l{height:100%}
+body.wa-full .head,body.wa-full .tabs,body.wa-full .fab,body.wa-full .fab-pegar{display:none!important}
+body.wa-full .wrap{margin:0!important;max-width:none;padding:6px 12px 10px}
+body.wa-full .wa{height:calc(100vh - 150px)}
+body.wa-full .kb-side{max-height:calc(100vh - 175px)}
+body.wa-full .wa+.note,body.wa-full #view>p.note{display:none}
+@media(max-width:820px){body.wa-pg .wa{height:calc(100vh - 230px)}}

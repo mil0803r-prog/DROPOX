@@ -374,10 +374,15 @@
     </div>`;
   }
 
+  // pantalla completa: la sección usa todo el ancho y alto; el botón «⛶» además oculta el menú y pasa el navegador a pantalla completa
+  const salirPantalla = () => { document.body.classList.remove('wa-pg', 'wa-full'); try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) { /* sin pantalla completa */ } };
+  addEventListener('hashchange', () => { if ((location.hash || '').slice(1) !== 'whatsapp') salirPantalla(); });
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('wa-full')) { document.body.classList.remove('wa-full'); if (viendo()) render(); } });
   function vista(el) {
+    document.body.classList.add('wa-pg');
     const c = chats().find(x => x.id === sel);
     const ant = document.querySelector('#wtx'), borrador = ant ? ant.value : '';
-    el.innerHTML = `${secH('mensajes', 'WhatsApp', `${chats().length} chats · ${chats().filter(x => x.estado === 'esperando').length} esperando pago`, `<button class="btn ${modo === 'tableros' ? 'btn-pri' : ''}" id="wmodo">${modo === 'tableros' ? '☰ Ver lista' : '▦ Tableros'}</button> <button class="btn" id="wweb">WhatsApp Web ↗</button> <button class="btn btn-pri" id="wnew">+ Chat</button>`)}
+    el.innerHTML = `${secH('mensajes', 'WhatsApp', `${chats().length} chats · ${chats().filter(x => x.estado === 'esperando').length} esperando pago`, `<button class="btn ${modo === 'tableros' ? 'btn-pri' : ''}" id="wmodo">${modo === 'tableros' ? '☰ Ver lista' : '▦ Tableros'}</button> <button class="btn" id="wfull">${document.body.classList.contains('wa-full') ? '✕ Salir de pantalla completa' : '⛶ Pantalla completa'}</button> <button class="btn" id="wweb">WhatsApp Web ↗</button> <button class="btn btn-pri" id="wnew">+ Chat</button>`)}
     ${barra()}
     ${modo === 'tableros' ? tableros() : `<div class="wa ${c ? 'abierto' : ''}">${lista(el)}${chat(c)}</div>`}
     ${modo === 'tableros' ? '' : '<p class="note">Uso manual, igual que las etiquetas de WhatsApp Business: etiqueta a cada cliente aquí, copia el mensaje listo y pégalo en tu WhatsApp Business. No lee tu WhatsApp automáticamente. Las etiquetas también debes ponerlas allá si quieres verlas en la app.</p>'}`;
@@ -393,6 +398,7 @@
     if (!con.estado && !con.pidio) { con.pidio = 1; estado(true).then(() => { if (abierto()) sincronizar(true); }); }
     latido();
     g('#wweb').onclick = web;
+    g('#wfull').onclick = () => { const on = document.body.classList.toggle('wa-full'); try { if (on) { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); } else if (document.fullscreenElement) document.exitFullscreen(); } catch (e) { /* el navegador no lo permite: queda el modo ancho */ } vista(el); };
     g('#wnew').onclick = () => openForm('Nuevo chat', CAMPOS, {}, v => { const n = { id: uid(), ...v, msgs: [], ult: Date.now() }; chats().push(n); sel = n.id; });
     g('#wmodo').onclick = () => { modo = modo === 'tableros' ? 'lista' : 'tableros'; vista(el); };
     if (modo === 'tableros') return enlazarTableros(el);
