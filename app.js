@@ -752,23 +752,68 @@ function marcarMenu(key) {
   const g = grupoDe(NAV_ALIAS[key] || key); if (g) { S.menuG = S.menuG || {}; if (S.menuG[g] === undefined) S.menuG[g] = true; }
   aplicarGrupos();
 }
+let menuEd = false;
+const _idx = (arr, k) => { const i = arr.indexOf(k); return i < 0 ? 1e3 : i; };
+function ordenGrupo(g, its) { const o = (S.menuOrden && S.menuOrden[g]) || []; return its.map((x, i) => [x, _idx(o, x[0]) + (_idx(o, x[0]) === 1e3 ? i : 0)]).sort((a, b) => a[1] - b[1]).map(z => z[0]); }
+function listaMenu() {
+  const fj = (S.menuFijos = S.menuFijos || []).filter(k => TABS.some(x => x[0] === k));
+  const grupos = [];
+  GRUPOS.forEach(([g, its]) => { const r = its.filter(x => !fj.includes(x[0])); if (r.length) grupos.push([g, ordenGrupo(g, r)]); });
+  const go = S.menuGOrden || [];
+  grupos.sort((a, b) => _idx(go, a[0]) - _idx(go, b[0]) || GRUPOS.findIndex(x => x[0] === a[0]) - GRUPOS.findIndex(x => x[0] === b[0]));
+  return { fj, grupos: (fj.length ? [['Fijados', fj.map(k => TABS.find(x => x[0] === k))]] : []).concat(grupos) };
+}
 function pintarMenu() {
-  const t = $('#tabs'), fj = (S.menuFijos = S.menuFijos || []).filter(k => TABS.some(x => x[0] === k));
-  const ancla = ([k, l], g) => `<a href="#${k}" data-v="${k}" data-grp="${g}">${svg(k)}<span class="lg">${l}</span><span class="sh">${CORTO[k] || l}</span><span class="mpin ${fj.includes(k) ? 'on' : ''}" role="button" tabindex="0" data-pin="${k}" aria-pressed="${fj.includes(k)}" aria-label="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}" title="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}">${PIN_M}</span></a>`;
-  const grupos = fj.length ? [['Fijados', fj.map(k => TABS.find(x => x[0] === k))]] : [];
-  GRUPOS.forEach(([g, its]) => { const r = its.filter(x => !fj.includes(x[0])); if (r.length) grupos.push([g, r]); });
+  const { fj, grupos } = listaMenu();
+  const t = $('#tabs');
+  const ancla = ([k, l], g) => `<a href="#${k}" data-v="${k}" data-grp="${g}" ${menuEd ? 'draggable="true"' : ''}>${svg(k)}<span class="lg">${l}</span><span class="sh">${CORTO[k] || l}</span>${menuEd ? `<span class="mmv"><button type="button" data-imv="${g}|${k}|-1" aria-label="Subir">▲</button><button type="button" data-imv="${g}|${k}|1" aria-label="Bajar">▼</button></span>` : ''}<span class="mpin ${fj.includes(k) ? 'on' : ''}" role="button" tabindex="0" data-pin="${k}" aria-pressed="${fj.includes(k)}" aria-label="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}" title="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}">${PIN_M}</span></a>`;
   const marca = t.querySelector('.dbrand');
-  t.innerHTML = grupos.map(([g, its]) => `<div class="tg" data-g="${g}" role="button" tabindex="0" aria-expanded="true"><span>${g}</span><i class="tgc">▾</i></div>` + its.map(x => ancla(x, g)).join('')).join('');
+  const barra = `<div class="mbar"><button type="button" id="mord" class="${menuEd ? 'on' : ''}">${menuEd ? '✔ Listo' : '⇅ Ordenar secciones'}</button></div>`;
+  t.innerHTML = barra + grupos.map(([g, its]) => `<div class="tg" data-g="${g}" role="button" tabindex="0" aria-expanded="true"><span>${g}</span>${menuEd && g !== 'Fijados' ? `<span class="mmv"><button type="button" data-gmv="${g}|-1" aria-label="Subir grupo">▲</button><button type="button" data-gmv="${g}|1" aria-label="Bajar grupo">▼</button></span>` : ''}<i class="tgc">▾</i></div>` + its.map(x => ancla(x, g)).join('')).join('');
+  t.classList.toggle('ed', menuEd);
   if (marca) t.prepend(marca);
   marcarMenu();
+}
+function moverItemMenu(g, k, d) {
+  const { fj, grupos } = listaMenu();
+  const lista = g === 'Fijados' ? fj.slice() : (grupos.find(x => x[0] === g) || [, []])[1].map(x => x[0]);
+  const i = lista.indexOf(k), j = i + d; if (i < 0 || j < 0 || j >= lista.length) return;
+  [lista[i], lista[j]] = [lista[j], lista[i]];
+  if (g === 'Fijados') S.menuFijos = lista; else { S.menuOrden = S.menuOrden || {}; S.menuOrden[g] = lista; }
+  Store.save(); pintarMenu();
+}
+function moverGrupoMenu(g, d) {
+  const nombres = listaMenu().grupos.map(x => x[0]).filter(x => x !== 'Fijados');
+  const i = nombres.indexOf(g), j = i + d; if (i < 0 || j < 0 || j >= nombres.length) return;
+  [nombres[i], nombres[j]] = [nombres[j], nombres[i]];
+  S.menuGOrden = nombres; Store.save(); pintarMenu();
 }
 function alternarFijo(k) {
   const fj = (S.menuFijos = S.menuFijos || []), i = fj.indexOf(k);
   if (i < 0) fj.push(k); else fj.splice(i, 1);
   Store.save(); pintarMenu(); render(); toast(i < 0 ? 'Sección fijada arriba' : 'Sección quitada de fijados');
 }
+$('#tabs').addEventListener('click', e => {
+  const im = e.target.closest('[data-imv]'), gm = e.target.closest('[data-gmv]'), od = e.target.closest('#mord');
+  if (im) { e.preventDefault(); e.stopImmediatePropagation(); const [g, k, d] = im.dataset.imv.split('|'); moverItemMenu(g, k, +d); }
+  else if (gm) { e.preventDefault(); e.stopImmediatePropagation(); const [g, d] = gm.dataset.gmv.split('|'); moverGrupoMenu(g, +d); }
+  else if (od) { e.preventDefault(); e.stopImmediatePropagation(); menuEd = !menuEd; pintarMenu(); }
+});
+// arrastrar secciones (solo en modo «Ordenar»): se sueltan encima de otra del mismo grupo
+let _arrM = null;
+$('#tabs').addEventListener('dragstart', e => { const a = e.target.closest && e.target.closest('a[data-grp]'); if (!a || !menuEd) return; _arrM = [a.dataset.grp, a.dataset.v]; try { e.dataTransfer.setData('text/plain', a.dataset.v); e.dataTransfer.effectAllowed = 'move'; } catch (x) { /* sin dataTransfer */ } a.classList.add('arr'); });
+$('#tabs').addEventListener('dragend', e => { const a = e.target.closest && e.target.closest('a'); if (a) a.classList.remove('arr'); _arrM = null; });
+$('#tabs').addEventListener('dragover', e => { if (_arrM && e.target.closest('a[data-grp]')) e.preventDefault(); });
+$('#tabs').addEventListener('drop', e => {
+  const a = e.target.closest && e.target.closest('a[data-grp]'); if (!a || !_arrM || a.dataset.grp !== _arrM[0] || a.dataset.v === _arrM[1]) return;
+  e.preventDefault();
+  const g = _arrM[0], { fj, grupos } = listaMenu(), lista = g === 'Fijados' ? fj.slice() : (grupos.find(x => x[0] === g) || [, []])[1].map(x => x[0]);
+  const de = lista.indexOf(_arrM[1]); if (de < 0) return; lista.splice(de, 1); lista.splice(lista.indexOf(a.dataset.v), 0, _arrM[1]);
+  if (g === 'Fijados') S.menuFijos = lista; else { S.menuOrden = S.menuOrden || {}; S.menuOrden[g] = lista; }
+  _arrM = null; Store.save(); pintarMenu();
+});
 const alternarGrupo = h => { const g = h.dataset.g, cur = grupoDe(NAV_ALIAS[vista] || vista || 'dashboard'); S.menuG = S.menuG || {}; S.menuG[g] = !grupoAbierto(g, cur); Store.save(); aplicarGrupos(); };
-$('#tabs').addEventListener('click', e => { const h = e.target.closest('.tg'); if (h) { e.preventDefault(); alternarGrupo(h); } });
+$('#tabs').addEventListener('click', e => { const h = e.target.closest('.tg'); if (h && !e.target.closest('.mmv')) { e.preventDefault(); alternarGrupo(h); } });
 $('#tabs').addEventListener('keydown', e => { const h = e.target.closest && e.target.closest('.tg'); if (h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); alternarGrupo(h); } });
 $('#tabs').addEventListener('click', e => { const p = e.target.closest('.mpin'); if (p) { e.preventDefault(); e.stopImmediatePropagation(); alternarFijo(p.dataset.pin); } });
 $('#tabs').addEventListener('keydown', e => { const p = e.target.closest && e.target.closest('.mpin'); if (p && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopImmediatePropagation(); alternarFijo(p.dataset.pin); } });
