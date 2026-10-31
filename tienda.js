@@ -15,6 +15,13 @@
   let tab = 'resumen', ti = 0, pi = 0, pagPrev = '', anchoPrev = 420, lista = null, errLista = '';
   const clon = o => JSON.parse(JSON.stringify(o));
   const R = () => window.TiendaRender;
+  // Dirección (slug) tomada de la URL de la página importada: el último tramo del enlace (ej. /products/collar-sol-y-luna → collar-sol-y-luna)
+  const slugDeUrl = u => {
+    try {
+      const seg = new URL(u).pathname.split('/').map(x => { try { return decodeURIComponent(x); } catch (e) { return x; } }).filter(Boolean).filter(x => !/^(products?|productos?|p|collections?|pages?|paginas?|item|shop|tienda|es|en)$/i.test(x));
+      return slugify((seg.pop() || '').replace(/\.(html?|php|aspx?)$/i, ''));
+    } catch (e) { return ''; }
+  };
   const slugify = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
 
   // Todo en soles: las tiendas guardadas antes en quetzales pasan una sola vez a Perú, S/ y PEN (los precios los pones tú)
@@ -378,7 +385,7 @@
     lista(t) {
       const ps = t.productos || [];
       let h = card('Mis productos', ps.length ? ps.length + (ps.length === 1 ? ' producto' : ' productos') + ' · cada uno tiene su propia página y enlace.' + (window.Nube && Nube.estado ? ' · ☁ ' + Nube.estado : '') : 'Todavía no hay productos.', `
-        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnImpUrl">⬇ Importar landing desde URL</button>${ps.length ? '<button class="btn btn-del" id="tnPZero">Dejar todo en cero</button>' : ''}<button class="btn" id="tnRecup">🛟 Recuperar productos</button></div><p class="note" id="tnRecMsg"></p>${ps.length ? '' : '<p class="note">Pulsa «+ Producto nuevo» y elige el tipo de página (producto, landing, código o la plantilla lista).</p>'}`);
+        <div class="tn-act"><button class="btn btn-pri" id="tnPNew">+ Producto nuevo</button><button class="btn" id="tnImpUrl">⬇ Importar landing desde URL</button>${ps.length ? '<button class="btn btn-del" id="tnPZero">Dejar todo en cero</button>' : ''}<button class="btn" id="tnRecup">🛟 Recuperar productos</button><button class="btn" id="tnFixUrl">🔗 Arreglar direcciones (URL)</button></div><p class="note" id="tnRecMsg"></p>${ps.length ? '' : '<p class="note">Pulsa «+ Producto nuevo» y elige el tipo de página (producto, landing, código o la plantilla lista).</p>'}`);
       h += ps.map((q, i) => { const x = R().precios(t, q), lk = urlProducto(t, q); return `<div class="card tn-row">
         <div class="tn-rowi">${thumb((q.imagenes || [])[0])}<div class="tn-rowt"><b>${esc(q.nombre || 'Sin nombre')}</b><small>${TIPO[q.tipo || 'producto'][0]} · ${R().q(t, x.pr)}${x.c2 ? ' · 2 por ' + R().q(t, x.c2) : ''} · ${q.activo === false ? 'Oculto' : 'Visible'}${q.creado ? ' · ' + fechaCorta(q.creado) : ''}</small></div></div>
         <div class="tn-rowa"><button class="btn btn-pri btn-sm" data-edit="${i}">Editar</button><button class="btn btn-sm" data-dup="${i}">Duplicar</button><a class="btn btn-sm tn-ver" href="${esc(lk.url)}" target="_blank" rel="noopener">Ver ↗</a><button class="btn btn-sm btn-del" data-del="${i}">Eliminar</button><button class="btn btn-sm" data-mv="${i}:-1" aria-label="Subir" ${i === 0 ? 'disabled' : ''}>↑</button><button class="btn btn-sm" data-mv="${i}:1" aria-label="Bajar" ${i === ps.length - 1 ? 'disabled' : ''}>↓</button></div></div>`; }).join('');
@@ -667,6 +674,8 @@
         if (pr > 0) q.precio = pr;
         if (p2 > 0) q.combo2 = p2;
         q.importadoDe = res.url;
+        const nuevoSlug = slugDeUrl(res.url);
+        if (nuevoSlug && nuevoSlug !== q.slug) { const usados = T().productos.filter(z => z !== q).map(z => z.slug); let sl = nuevoSlug, i = 2; while (usados.includes(sl)) sl = nuevoSlug + '-' + i++; (q.slugsAntes = q.slugsAntes || []).push(q.slug); q.slug = sl; }
         pi = +$('#imD').value; tab = 'productos'; Store.save(); d.close(); render(); scrollTo(0, 0); toast('Contenido importado en «' + q.nombre + '»: se conservó su diseño');
         return;
       }
@@ -686,7 +695,7 @@
         // Producto completo: el diseño de «Collar de las Emociones» (ofertas, aviso, garantía, estructura) con el contenido de la página
         base = Object.assign(crearDePlantilla('collar', T().productos), marca, { etiqueta: '', barra: [], cta: 'Quiero el mío', garantiaTitulo: '', garantiaTexto: '', categoria: '', resenasLista: [], rating: 0, resenas: 0, vendidos: 0, imagenes: res.imagenes.slice(0, 10), contenido: cont, faq: res.faq, kicker: (res.descripcion || '').slice(0, 80), mostrar: { faqGeneral: !res.faq.length } });
       }
-      Object.assign(base, { slug: unico(nom), nombre: nom, titulo: nom, precio: pr, combo2: p2, tachado: 0 });
+      Object.assign(base, { slug: unico(slugDeUrl(res.url) || nom), nombre: nom, titulo: nom, precio: pr, combo2: p2, tachado: 0 });
       T().productos.push(base); pi = T().productos.length - 1; tab = 'productos'; Store.save(); d.close(); render(); scrollTo(0, 0); toast('Landing importada: revísala y ajusta el precio');
     }
     d.showModal();
@@ -823,6 +832,19 @@
       let err = ''; try { err = window.Nube && Nube.subirYa ? await Nube.subirYa() : ''; } catch (e) { err = e.message; }
       say(f.join(' · ') + `<br>Ahora tienes <b>${n()}</b> productos. ` + (err ? '⚠ No se pudo guardar en la nube: ' + esc(err) : '✓ Guardado en tu cuenta.'));
       render(); const m2 = q('#tnRecMsg'); if (m2) m2.innerHTML = f.join(' · ') + `<br>Ahora tienes <b>${n()}</b> productos. ` + (err ? '⚠ No se pudo guardar en la nube: ' + esc(err) : '✓ Guardado en tu cuenta.');
+    });
+    on('#tnFixUrl', () => {
+      const ps = arr(), cambios = [];
+      ps.forEach(q => {
+        const base = q.importadoDe ? (slugDeUrl(q.importadoDe) || slugify(q.nombre)) : slugify(q.nombre);
+        const heredado = q.importadoDe || (/-\d+$/.test(q.slug) && slugify(q.nombre) !== q.slug.replace(/-\d+$/, ''));
+        if (base && heredado && base !== q.slug) cambios.push([q, base]);
+      });
+      if (!cambios.length) return toast('Todas las direcciones ya coinciden con su producto');
+      ask('Se cambiará la dirección de ' + cambios.length + ' producto(s) para que use la URL de su página importada o su nombre:\n' + cambios.map(([q, b]) => '• ' + q.slug + ' → ' + b).join('\n') + '\nLos enlaces viejos siguen funcionando. ¿Continuar?', () => {
+        cambios.forEach(([q, b]) => { const usados = ps.filter(z => z !== q).map(z => z.slug); let sl = b, i = 2; while (usados.includes(sl)) sl = b + '-' + i++; if (sl !== q.slug) { (q.slugsAntes = q.slugsAntes || []).push(q.slug); q.slug = sl; } });
+        Store.save(); render(); toast('Direcciones corregidas. Publica para que se vean en tu dominio.');
+      }, 'Corregir');
     });
     on('#tnPNew', () => elegirTipo(tp => { arr().push(tp.startsWith('plantilla-') ? desdePlantilla(tp.slice(10)) : nuevoProducto(tp)); pi = arr().length - 1; tab = 'productos'; abiertas.add('basico'); Store.save(); render(); scrollTo(0, 0); }));
     on('#tnPDup', () => { const c = clon(arr()[pi]), base = c.slug.replace(/-\d+$/, ''), usados = arr().map(z => z.slug); let n = 2; while (usados.includes(base + '-' + n)) n++; c.slug = base + '-' + n; c.nombre += ' (copia)'; c.creado = new Date().toISOString(); delete c._rs; arr().splice(pi + 1, 0, c); pi++; Store.save(); render(); toast('Producto duplicado'); });
