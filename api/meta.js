@@ -77,7 +77,19 @@ function errorMeta(res, e) {
   return res.status(502).json({ error: 'No se pudo leer Meta. Intenta de nuevo.' });
 }
 
+const MEMO = new Map(); // memoria corta: evita repetir las mismas consultas a Meta (límite de uso)
 module.exports = async (req, res) => {
+  const fin = res.status.bind(res);
+  const llave = JSON.stringify(req.query || {});
+  const hit = MEMO.get(llave);
+  if (req.method === 'GET' && hit && Date.now() - hit.t < 120000 && req.headers.authorization) {
+    if (await sesionValida(String(req.headers.authorization).replace(/^Bearer\s+/i, ''))) { res.setHeader('Cache-Control', 'no-store'); return res.status(200).json(hit.d); }
+  }
+  const json0 = res.json.bind(res);
+  res.json = (d) => { if (res.statusCode === 200 && d && !d.error) { if (MEMO.size > 40) MEMO.clear(); MEMO.set(llave, { t: Date.now(), d }); } return json0(d); };
+  return principal(req, res);
+};
+async function principal(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método no permitido.' });
 
@@ -149,4 +161,4 @@ module.exports = async (req, res) => {
   } catch (e) {
     return errorMeta(res, e);
   }
-};
+}

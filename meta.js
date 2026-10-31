@@ -135,7 +135,8 @@ const Meta = (() => {
       { const len = Math.round((Date.parse(h) - Date.parse(d)) / 864e5) + 1, ph = mas(d, -1), pd = mas(ph, -(len - 1)); prevR = [pd, ph]; prevT = null;
         traer({ desde: pd, hasta: ph, solo: 'total' }).then(x => { prevT = x.total || null; if (vista === 'meta') render(); }).catch(() => { prevT = null; }); }
       sync();
-    } catch (e) { envivo = false; vivoMsg = e.falta ? 'sin_token' : (e.message || 'No se pudo leer Meta.'); if (e.falta && !datos && !S.metaSnap) { falta = true; error = e.message; } }
+    } catch (e) { envivo = false; vivoMsg = e.falta ? 'sin_token' : (e.message || 'No se pudo leer Meta.'); if (e.falta && !datos && !S.metaSnap) { falta = true; error = e.message; }
+      if (/limit/i.test(e.message || '')) { clearTimeout(window._mrt); window._mrt = setTimeout(() => { if (vista === 'meta') vivo(true); }, 75000); vivoMsg += ' Reintento solo en ~1 minuto.'; } }
     cargando = false; ultVivo = Date.now();
     if (vista === 'meta') render();
   }
