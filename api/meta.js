@@ -104,13 +104,17 @@ module.exports = async (req, res) => {
       return res.status(200).json({ dias: filas.map(f => ({ fecha: f.date_start, ...metricas(f) })).sort((a, b) => a.fecha.localeCompare(b.fecha)) });
     }
 
+    if (q.solo === 'total') {
+      const f = await insights(`${act}/insights`, { level: 'account', fields: CAMPOS, time_range: rango, limit: 5 }, tokenMeta);
+      return res.status(200).json({ cuenta: { id: CUENTA }, total: metricas(f[0] || {}) });
+    }
     const diario = insights(`${act}/insights`, { level: 'account', fields: CAMPOS, time_range: rango, time_increment: 1, limit: 500 }, tokenMeta);
     if (q.solo === 'dias') {
       const filas = await diario;
       return res.status(200).json({ cuenta: { id: CUENTA }, dias: filas.map(f => ({ fecha: f.date_start, ...metricas(f) })).sort((a, b) => a.fecha.localeCompare(b.fecha)) });
     }
 
-    const [info, camps, sets, ads, iCamp, iSet, iAd, dias] = await Promise.all([
+    const [info, camps, sets, ads, iCamp, iSet, iAd, dias, iTot] = await Promise.all([
       graph(act, { fields: 'name,currency,account_status,timezone_name' }, tokenMeta),
       graph(`${act}/campaigns`, { fields: 'id,name,status,effective_status,objective,daily_budget,lifetime_budget,start_time,stop_time,created_time', limit: 200 }, tokenMeta),
       graph(`${act}/adsets`, { fields: 'id,name,campaign_id,status,effective_status,daily_budget,lifetime_budget,optimization_goal,start_time,end_time,created_time', limit: 200 }, tokenMeta),
@@ -119,6 +123,7 @@ module.exports = async (req, res) => {
       insights(`${act}/insights`, { level: 'adset', fields: 'adset_id,' + CAMPOS, time_range: rango, limit: 500 }, tokenMeta),
       insights(`${act}/insights`, { level: 'ad', fields: 'ad_id,' + CAMPOS, time_range: rango, limit: 500 }, tokenMeta),
       diario,
+      insights(`${act}/insights`, { level: 'account', fields: CAMPOS, time_range: rango, limit: 5 }, tokenMeta),
     ]);
     const por = (filas, k) => Object.fromEntries(filas.map(f => [f[k], metricas(f)]));
     const mC = por(iCamp, 'campaign_id'), mS = por(iSet, 'adset_id'), mA = por(iAd, 'ad_id');
@@ -138,6 +143,7 @@ module.exports = async (req, res) => {
       cuenta: { id: CUENTA, nombre: info.name || '', moneda: info.currency || '', zona: info.timezone_name || '' },
       desde, hasta,
       campanas,
+      total: metricas((iTot && iTot[0]) || {}),
       dias: dias.map(f => ({ fecha: f.date_start, ...metricas(f) })).sort((a, b) => a.fecha.localeCompare(b.fecha)),
     });
   } catch (e) {

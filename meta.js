@@ -133,7 +133,7 @@ const Meta = (() => {
       if (String(nuevo.cuenta && nuevo.cuenta.id) !== META_CUENTA.id) throw new Error(`La cuenta conectada (${(nuevo.cuenta && (nuevo.cuenta.nombre || nuevo.cuenta.id)) || '?'}) no es ${META_CUENTA.nombre}.`);
       datos = nuevo; clave = d + '|' + h; hora = new Date(); envivo = true; vivoMsg = ''; error = ''; falta = false;
       { const len = Math.round((Date.parse(h) - Date.parse(d)) / 864e5) + 1, ph = mas(d, -1), pd = mas(ph, -(len - 1)); prevR = [pd, ph]; prevT = null;
-        traer({ desde: pd, hasta: ph, solo: 'dias' }).then(x => { prevT = sumarM(x.dias || []); if (vista === 'meta') render(); }).catch(() => { prevT = null; }); }
+        traer({ desde: pd, hasta: ph, solo: 'total' }).then(x => { prevT = x.total || null; if (vista === 'meta') render(); }).catch(() => { prevT = null; }); }
       sync();
     } catch (e) { envivo = false; vivoMsg = e.falta ? 'sin_token' : (e.message || 'No se pudo leer Meta.'); if (e.falta && !datos && !S.metaSnap) { falta = true; error = e.message; } }
     cargando = false; ultVivo = Date.now();
@@ -221,7 +221,8 @@ const Meta = (() => {
     return `<span class="dl ${mejor}">${pc > 0 ? '▲' : '▼'} ${Math.abs(pc) >= 100 ? Math.round(Math.abs(pc)) : Math.abs(pc).toFixed(0)}% vs periodo anterior</span>`;
   };
   function kpiHtml(A, dias) {
-    const T = sumarM(dias); T.alcance = A.campanas.reduce((a, c) => a + N(c.m.alcance), 0) || T.alcance;
+    // totales de la cuenta como los da Meta (con alcance exacto); si no vienen, se suman las campañas
+    const T = A.total ? { ...A.total } : sumarM(A.campanas.map(c => c.m)); if (!A.total) T.alcance = A.campanas.reduce((a, c) => a + N(c.m.alcance), 0);
     let P = prevT; if (!P && A.importado && prevR) { const pd = (datos.dias || []).filter(z => z.fecha >= prevR[0] && z.fecha <= prevR[1]); P = pd.length ? sumarM(pd) : null; }
     if (P) P.alcance = P.alcance;
     const tipoRes = resDe({ m: T }).t, esRes = k => (k === 'mensajes' ? /mensajes/i.test(tipoRes) : /compras/i.test(tipoRes));
