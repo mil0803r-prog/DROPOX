@@ -23,7 +23,7 @@ const Meta = (() => {
     const fecha = x => (/^\d{4}-\d{2}-\d{2}$/.test(String(x)) ? String(x) : '');
     const iso8 = x => (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}/.test(x) ? x.slice(0, 25) : null);
     const txtc = (x, n) => String(x == null ? '' : x).slice(0, n);
-    const MK = ['gasto', 'impresiones', 'alcance', 'frecuencia', 'clics', 'clics_enlace', 'ctr_enlace', 'cpc_enlace', 'ctr', 'cpc', 'cpm', 'compras', 'valor_compras', 'roas', 'mensajes'];
+    const MK = ['gasto', 'impresiones', 'alcance', 'frecuencia', 'clics', 'clics_enlace', 'ctr_enlace', 'cpc_enlace', 'ctr', 'cpc', 'cpm', 'compras', 'valor_compras', 'roas', 'mensajes', 'agregar_carrito', 'inicio_pago', 'visitas_pagina', 'interacciones', 'reacciones', 'comentarios', 'compartidos', 'guardados', 'conexiones_msj', 'clics_salientes', 'video_3s', 'thruplay', 'video_25', 'video_50', 'video_75', 'video_95', 'video_100', 'video_seg'];
     const nm = x => { x = x || {}; const o = {}; MK.forEach(k => { o[k] = N(x[k]); }); o.costo_compra = x.costo_compra == null ? null : N(x.costo_compra); o.costo_mensaje = x.costo_mensaje == null ? null : N(x.costo_mensaje); if (!o.roas) o.roas = null; return o; };
     const ne = e => ({ id: txtc(e.id, 40), nombre: txtc(e.nombre || 'Sin nombre', 200), estado: txtc(e.estado, 30).toUpperCase(), objetivo: e.objetivo ? txtc(e.objetivo, 40) : null, optimizacion: e.optimizacion ? txtc(e.optimizacion, 40) : null, presupuesto_diario: e.presupuesto_diario == null ? null : N(e.presupuesto_diario), inicio: iso8(e.inicio), creado: iso8(e.creado), m: nm(e.m), dias: (e.dias || []).slice(0, 200).map(z => ({ fecha: fecha(z.fecha), ...nm(z) })).filter(z => z.fecha) });
     const campanas = j.campanas.slice(0, 200).map(c => ({ ...ne(c), conjuntos: (c.conjuntos || []).slice(0, 200).map(s => ({ ...ne(s), anuncios: (s.anuncios || []).slice(0, 300).map(ne) })) }));
@@ -165,35 +165,73 @@ const Meta = (() => {
   // ───────── tabla estilo Administrador de anuncios de Meta ─────────
   const resDe = e => { const m = e.m; if (m.mensajes > 0) return { n: m.mensajes, t: 'Conversaciones de mensajes iniciadas' }; if (m.compras > 0) return { n: m.compras, t: 'Compras' }; if (m.clics_enlace > 0) return { n: m.clics_enlace, t: 'Clics en el enlace' }; return { n: 0, t: '' }; };
   const pc2 = v => (v === null || v === undefined || !isFinite(v) ? '—' : n2(v) + '%');
+  const mv = (e, k) => N(e.m[k]);
+  const div = (a, b) => (b > 0 ? a / b : null);
+  const mon = v => (v == null || !isFinite(v) ? '—' : money(v));
+  const ent = v => (v ? n0(v) : '—');
   const COLM = {
     resultados: { l: 'Resultados', g: e => resDe(e).n, f: (v, e) => (v ? `<b>${n0(v)}</b><small>${esc(resDe(e).t)}</small>` : '—') },
-    costo_res: { l: 'Costo por resultado', g: e => { const r = resDe(e).n; return r ? e.m.gasto / r : null; }, f: v => (v == null ? '—' : money(v)) },
+    costo_res: { l: 'Costo por resultado', g: e => { const r = resDe(e).n; return r ? e.m.gasto / r : null; }, f: mon },
     gasto: { l: 'Importe gastado', g: e => e.m.gasto, f: v => money(v) },
     alcance: { l: 'Alcance', g: e => e.m.alcance, f: v => n0(v) },
     impresiones: { l: 'Impresiones', g: e => e.m.impresiones, f: v => n0(v) },
     frecuencia: { l: 'Frecuencia', g: e => e.m.frecuencia, f: v => n2(v) },
     cpm: { l: 'CPM (costo por mil impresiones)', g: e => e.m.cpm, f: v => money(v) },
+    // compras en Meta (píxel)
+    compras: { l: 'Compras en Meta', g: e => mv(e, 'compras'), f: ent },
+    costo_compra: { l: 'CPA (costo por compra en Meta)', g: e => { const c = mv(e, 'compras'); return c ? e.m.gasto / c : null; }, f: mon },
+    valor_compras: { l: 'Valor de conversión de compras', g: e => mv(e, 'valor_compras'), f: v => (v ? money(v) : '—') },
+    roas: { l: 'ROAS de compras', g: e => { const g = e.m.gasto, v = mv(e, 'valor_compras'); return g > 0 && v > 0 ? v / g : null; }, f: v => (v ? n2(v) + 'x' : '—') },
+    // WhatsApp / mensajes
+    mensajes: { l: 'Conversaciones de WhatsApp iniciadas', g: e => mv(e, 'mensajes'), f: ent },
+    costo_mensaje: { l: 'Costo por conversación de WhatsApp', g: e => { const c = mv(e, 'mensajes'); return c ? e.m.gasto / c : null; }, f: mon },
+    // clics
+    clics_enlace: { l: 'Clics en el enlace', g: e => mv(e, 'clics_enlace'), f: v => n0(v) },
+    ctr_enlace: { l: 'CTR (clics en el enlace)', g: e => mv(e, 'ctr_enlace'), f: pc2 },
+    cpc_enlace: { l: 'CPC (costo por clic en el enlace)', g: e => mv(e, 'cpc_enlace'), f: v => (v ? money(v) : '—') },
     clics: { l: 'Clics (todos)', g: e => e.m.clics, f: v => n0(v) },
     ctr: { l: 'CTR (todos)', g: e => e.m.ctr, f: pc2 },
     cpc: { l: 'CPC (todos)', g: e => e.m.cpc, f: v => (v ? money(v) : '—') },
-    clics_enlace: { l: 'Clics en el enlace', g: e => e.m.clics_enlace, f: v => n0(v) },
-    ctr_enlace: { l: 'CTR (porcentaje de clics en el enlace)', g: e => e.m.ctr_enlace, f: pc2 },
-    cpc_enlace: { l: 'CPC (costo por clic en el enlace)', g: e => e.m.cpc_enlace, f: v => (v ? money(v) : '—') },
-    mensajes: { l: 'Conversaciones de mensajes iniciadas', g: e => e.m.mensajes, f: v => n0(v) },
-    costo_mensaje: { l: 'Costo por conversación iniciada', g: e => e.m.costo_mensaje, f: v => (v == null ? '—' : money(v)) },
-    compras: { l: 'Compras', g: e => e.m.compras, f: v => n0(v) },
-    costo_compra: { l: 'Costo por compra', g: e => e.m.costo_compra, f: v => (v == null ? '—' : money(v)) },
-    valor_compras: { l: 'Valor de conversión de compras', g: e => e.m.valor_compras, f: v => (v ? money(v) : '—') },
-    roas: { l: 'ROAS de compras', g: e => e.m.roas, f: v => (v ? n2(v) + 'x' : '—') },
+    clics_salientes: { l: 'Clics salientes', g: e => mv(e, 'clics_salientes'), f: ent },
+    // embudo de la web
+    visitas_pagina: { l: 'Visitas a la página de destino', g: e => mv(e, 'visitas_pagina'), f: ent },
+    costo_visita: { l: 'Costo por visita a la página', g: e => div(e.m.gasto, mv(e, 'visitas_pagina')), f: mon },
+    agregar_carrito: { l: 'Agregados al carrito', g: e => mv(e, 'agregar_carrito'), f: ent },
+    costo_carrito: { l: 'Costo por agregado al carrito', g: e => div(e.m.gasto, mv(e, 'agregar_carrito')), f: mon },
+    inicio_pago: { l: 'Inicios de pago', g: e => mv(e, 'inicio_pago'), f: ent },
+    costo_pago: { l: 'Costo por inicio de pago', g: e => div(e.m.gasto, mv(e, 'inicio_pago')), f: mon },
+    // video
+    video_3s: { l: 'Reproducciones de video (3 s)', g: e => mv(e, 'video_3s'), f: ent },
+    tasa_gancho: { l: 'Tasa de gancho (3 s ÷ impresiones)', g: e => { const x = div(mv(e, 'video_3s'), mv(e, 'impresiones')); return x == null ? null : x * 100; }, f: pc2 },
+    thruplay: { l: 'ThruPlays (video completo o 15 s)', g: e => mv(e, 'thruplay'), f: ent },
+    costo_thruplay: { l: 'Costo por ThruPlay', g: e => div(e.m.gasto, mv(e, 'thruplay')), f: mon },
+    tasa_retencion: { l: 'Tasa de retención (ThruPlay ÷ 3 s)', g: e => { const x = div(mv(e, 'thruplay'), mv(e, 'video_3s')); return x == null ? null : x * 100; }, f: pc2 },
+    video_25: { l: 'Video visto al 25%', g: e => mv(e, 'video_25'), f: ent },
+    video_50: { l: 'Video visto al 50%', g: e => mv(e, 'video_50'), f: ent },
+    video_75: { l: 'Video visto al 75%', g: e => mv(e, 'video_75'), f: ent },
+    video_95: { l: 'Video visto al 95%', g: e => mv(e, 'video_95'), f: ent },
+    video_100: { l: 'Video visto al 100%', g: e => mv(e, 'video_100'), f: ent },
+    video_seg: { l: 'Tiempo promedio de reproducción (s)', g: e => mv(e, 'video_seg'), f: v => (v ? n2(v) + ' s' : '—') },
+    // interacción
+    interacciones: { l: 'Interacciones con la publicación', g: e => mv(e, 'interacciones'), f: ent },
+    reacciones: { l: 'Reacciones', g: e => mv(e, 'reacciones'), f: ent },
+    comentarios: { l: 'Comentarios', g: e => mv(e, 'comentarios'), f: ent },
+    compartidos: { l: 'Veces compartido', g: e => mv(e, 'compartidos'), f: ent },
+    guardados: { l: 'Guardados', g: e => mv(e, 'guardados'), f: ent },
   };
   const PRESET = {
-    rendimiento: ['Rendimiento', ['resultados', 'costo_res', 'gasto', 'alcance', 'impresiones', 'cpm', 'clics_enlace', 'ctr_enlace', 'cpc_enlace']],
+    rendimiento: ['Rendimiento', ['resultados', 'costo_res', 'gasto', 'alcance', 'impresiones', 'cpm', 'ctr_enlace', 'cpc_enlace', 'compras', 'costo_compra']],
+    whatsapp: ['WhatsApp y mensajes', ['mensajes', 'costo_mensaje', 'gasto', 'alcance', 'impresiones', 'cpm', 'ctr_enlace']],
+    compras: ['Compras (CPA y ROAS)', ['compras', 'costo_compra', 'valor_compras', 'roas', 'gasto', 'clics_enlace', 'ctr_enlace']],
+    embudo: ['Embudo de la web', ['clics_enlace', 'visitas_pagina', 'costo_visita', 'agregar_carrito', 'costo_carrito', 'inicio_pago', 'costo_pago', 'compras', 'costo_compra']],
+    video: ['Video (gancho y retención)', ['gasto', 'impresiones', 'video_3s', 'tasa_gancho', 'thruplay', 'costo_thruplay', 'tasa_retencion', 'video_25', 'video_50', 'video_75', 'video_95', 'video_100', 'video_seg']],
+    clics: ['Clics y CTR', ['clics_enlace', 'ctr_enlace', 'cpc_enlace', 'clics', 'ctr', 'cpc', 'clics_salientes']],
     entrega: ['Entrega', ['gasto', 'alcance', 'impresiones', 'frecuencia', 'cpm']],
-    interaccion: ['Interacción', ['clics_enlace', 'ctr_enlace', 'cpc_enlace', 'clics', 'ctr', 'cpc']],
-    mensajes: ['Mensajes', ['mensajes', 'costo_mensaje', 'gasto', 'alcance', 'impresiones']],
-    ventas: ['Compras y ventas', ['compras', 'costo_compra', 'valor_compras', 'roas', 'gasto']],
+    interaccion: ['Interacción', ['interacciones', 'reacciones', 'comentarios', 'compartidos', 'guardados']],
     todas: ['Todas las columnas', Object.keys(COLM)],
   };
+  let propias = null; try { propias = JSON.parse(localStorage.getItem('dropox.metaCols') || 'null'); } catch (e) { propias = null; }
+  if (Array.isArray(propias) && propias.length) PRESET.personalizado = ['Personalizado', propias.filter(k => COLM[k])];
   let preset = 'rendimiento', orden = { k: 'gasto', d: -1 }, busq = '', selFilas = new Set();
   try { preset = localStorage.getItem('dropox.metaPreset') || 'rendimiento'; if (!PRESET[preset]) preset = 'rendimiento'; } catch (e) { /* sin almacenamiento */ }
   const filasNivel = A => {
@@ -208,7 +246,7 @@ const Meta = (() => {
     const rows = todas.slice().sort((a, b) => { const x = valOrden(a, orden.k), y = valOrden(b, orden.k); return (x < y ? -1 : x > y ? 1 : 0) * orden.d; });
     const cnt = k => { let n = 0; A.campanas.forEach(c => { if (k === 'campaign') n++; c.conjuntos.forEach(s => { if (k === 'adset') n++; if (k === 'ad') n += s.anuncios.length; }); }); return n; };
     const tabs = [['campaign', 'Campañas'], ['adset', 'Conjuntos de anuncios'], ['ad', 'Anuncios']].map(([k, l]) => `<button class="mt-nv ${nivelT === k ? 'on' : ''}" data-nt="${k}">${l}<i>${cnt(k)}</i></button>`).join('');
-    const barra = `<div class="mt-bar"><input class="search" id="mbq" type="search" placeholder="Buscar por nombre…" value="${esc(busq)}"><label class="mt-cols">Columnas: <select id="mcols">${Object.entries(PRESET).map(([k, [l]]) => `<option value="${k}" ${k === preset ? 'selected' : ''}>${l}</option>`).join('')}</select></label><button class="btn btn-sm" id="mexp">⬇ Exportar CSV</button></div>`;
+    const barra = `<div class="mt-bar"><input class="search" id="mbq" type="search" placeholder="Buscar por nombre…" value="${esc(busq)}"><label class="mt-cols">Columnas: <select id="mcols">${Object.entries(PRESET).map(([k, [l]]) => `<option value="${k}" ${k === preset ? 'selected' : ''}>${l}</option>`).join('')}<option value="__custom">✎ Personalizar columnas…</option></select></label><button class="btn btn-sm" id="mexp">⬇ Exportar CSV</button></div>`;
     if (!rows.length) return `<div class="mt-niv">${tabs}</div>${barra}<div class="empty">No hay ${nombre.toLowerCase()} con este filtro en el periodo.</div>`;
     const sel = rows.filter(r => selFilas.has(r.id)), base = sel.length ? sel : rows;
     const sumM = sumarM(base.map(r => r.m)), tot = { nombre: '', m: sumM };
@@ -238,7 +276,8 @@ const Meta = (() => {
   function sumarM(ds) {
     const t = k => ds.reduce((a, d) => a + N(d[k]), 0), g = t('gasto'), imp = t('impresiones'), al = t('alcance'), cl = t('clics'), lk = t('clics_enlace'), ms = t('mensajes'), co = t('compras'), vc = t('valor_compras');
     return { gasto: g, impresiones: imp, alcance: al, frecuencia: al ? imp / al : 0, clics: cl, clics_enlace: lk, ctr_enlace: imp ? lk / imp * 100 : 0, cpc_enlace: lk ? g / lk : 0, ctr: imp ? cl / imp * 100 : 0, cpc: cl ? g / cl : 0, cpm: imp ? g / imp * 1000 : 0,
-      compras: co, valor_compras: vc, roas: g && vc ? vc / g : null, costo_compra: co ? g / co : null, mensajes: ms, costo_mensaje: ms ? g / ms : null };
+      compras: co, valor_compras: vc, roas: g && vc ? vc / g : null, costo_compra: co ? g / co : null, mensajes: ms, costo_mensaje: ms ? g / ms : null,
+      ...Object.fromEntries(['agregar_carrito', 'inicio_pago', 'visitas_pagina', 'interacciones', 'reacciones', 'comentarios', 'compartidos', 'guardados', 'conexiones_msj', 'clics_salientes', 'video_3s', 'thruplay', 'video_25', 'video_50', 'video_75', 'video_95', 'video_100'].map(k => [k, t(k)])), video_seg: 0 };
   }
   const rangoFechas = A => { const c = S.config || {}; let d = c.metaDesde || A.desde, h = c.metaHasta || A.hasta; if (d < A.desde) d = A.desde; if (h > A.hasta) h = A.hasta; if (d > h) { const x = d; d = h; h = x; } return [d, h]; };
   function filtrado(A) {
@@ -339,7 +378,9 @@ const Meta = (() => {
     el.querySelectorAll('[data-vm]').forEach(b => b.onclick = () => { vistaM = b.dataset.vm; render(); });
     el.querySelectorAll('[data-nt]').forEach(b => b.onclick = () => { nivelT = b.dataset.nt; selFilas.clear(); render(); });
     const mq = $('#mbq'); if (mq) mq.oninput = e => { busq = e.target.value.toLowerCase(); const p = e.target.selectionStart; render(); const i = $('#mbq'); if (i) { i.focus(); i.setSelectionRange(p, p); } };
-    const mc = $('#mcols'); if (mc) mc.onchange = e => { preset = e.target.value; try { localStorage.setItem('dropox.metaPreset', preset); } catch (x) { /* sin almacenamiento */ } render(); };
+    const mc = $('#mcols'); if (mc) mc.onchange = e => {
+      if (e.target.value === '__custom') { const act = new Set(PRESET[preset][1]); openForm('Elige las columnas', Object.entries(COLM).map(([k, c]) => ({ k, l: c.l, t: 'check', def: act.has(k), full: 1 })), {}, v => { const ks = Object.keys(COLM).filter(k => v[k]); if (!ks.length) return; propias = ks; PRESET.personalizado = ['Personalizado', ks]; preset = 'personalizado'; try { localStorage.setItem('dropox.metaCols', JSON.stringify(ks)); localStorage.setItem('dropox.metaPreset', preset); } catch (x) { /* sin almacenamiento */ } }); e.target.value = preset; return; }
+      preset = e.target.value; try { localStorage.setItem('dropox.metaPreset', preset); } catch (x) { /* sin almacenamiento */ } render(); };
     const mx = $('#mexp'); if (mx) mx.onclick = exportarTabla;
     el.querySelectorAll('[data-so]').forEach(h => h.onclick = ev => { if (ev.target.closest('.mt-ck')) return; const k = h.dataset.so; orden = orden.k === k ? { k, d: -orden.d } : { k, d: k === 'nombre' ? 1 : -1 }; render(); });
     el.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => { if (c.checked) selFilas.add(c.dataset.sel); else selFilas.delete(c.dataset.sel); render(); });
