@@ -737,18 +737,28 @@ function render() {
 const CORTO = { tienda: 'Tienda', tiendahome: 'Inicio', tiendaprod: 'Prod.', whatsapp: 'WhatsApp', mensajes: 'Mensajes', tareas: 'Tareas', shalomzonas: 'Zonas', dashboard: 'Panel', calculadora: 'Calcular', meta: 'Meta', tiktok: 'TikTok', publicidad: 'Publi.', radar: 'Radar', prodtiktok: 'Prod. TT', gdia: 'Diarios', shalom: 'Shalom', shalompro: 'PRO', descargar: 'Bajar', caza: 'Caza', dlfb: 'Facebook', dltt: 'TikTok', investigacion: 'Invest.', dropi: 'Dropi', aliclick: 'AliClick', proyeccion: 'Proyec.' };
 // Menú con secciones fijables: la chincheta de cada sección la sube al grupo «Fijados» (se guarda en S.menuFijos).
 const PIN_M = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3zM12 14v7"/></svg>';
+// grupos del menú que se pliegan y despliegan al tocar su título (se recuerda cuáles están abiertos en S.menuG)
+const grupoAbierto = (g, cur) => { const m = S.menuG || {}; return g in m ? !!m[g] : g === 'Fijados' || g === cur; };
+function grupoDe(key) { const fj = S.menuFijos || []; if (fj.includes(key)) return 'Fijados'; const g = GRUPOS.find(([, its]) => its.some(x => x[0] === key)); return g ? g[0] : ''; }
+function aplicarGrupos() {
+  const cur = grupoDe(NAV_ALIAS[vista] || vista || 'dashboard');
+  document.querySelectorAll('#tabs .tg').forEach(h => { const ab = grupoAbierto(h.dataset.g, cur); h.classList.toggle('cerrado', !ab); h.setAttribute('aria-expanded', ab); });
+  document.querySelectorAll('#tabs a[data-grp]').forEach(a => a.classList.toggle('gc', !grupoAbierto(a.dataset.grp, cur)));
+}
 function marcarMenu(key) {
   key = key || (VIEWS[vista] ? vista : 'dashboard');
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.v === (NAV_ALIAS[key] || key)));
+  // si entras a una sección de un grupo plegado, ese grupo se abre solo
+  const g = grupoDe(NAV_ALIAS[key] || key); if (g) { S.menuG = S.menuG || {}; if (S.menuG[g] === undefined) S.menuG[g] = true; }
+  aplicarGrupos();
 }
 function pintarMenu() {
   const t = $('#tabs'), fj = (S.menuFijos = S.menuFijos || []).filter(k => TABS.some(x => x[0] === k));
-  const ancla = ([k, l]) => `<a href="#${k}" data-v="${k}">${svg(k)}<span class="lg">${l}</span><span class="sh">${CORTO[k] || l}</span><span class="mpin ${fj.includes(k) ? 'on' : ''}" role="button" tabindex="0" data-pin="${k}" aria-pressed="${fj.includes(k)}" aria-label="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}" title="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}">${PIN_M}</span></a>`;
-  const a = ancla;
+  const ancla = ([k, l], g) => `<a href="#${k}" data-v="${k}" data-grp="${g}">${svg(k)}<span class="lg">${l}</span><span class="sh">${CORTO[k] || l}</span><span class="mpin ${fj.includes(k) ? 'on' : ''}" role="button" tabindex="0" data-pin="${k}" aria-pressed="${fj.includes(k)}" aria-label="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}" title="${fj.includes(k) ? 'Quitar de fijados' : 'Fijar arriba'}">${PIN_M}</span></a>`;
   const grupos = fj.length ? [['Fijados', fj.map(k => TABS.find(x => x[0] === k))]] : [];
   GRUPOS.forEach(([g, its]) => { const r = its.filter(x => !fj.includes(x[0])); if (r.length) grupos.push([g, r]); });
   const marca = t.querySelector('.dbrand');
-  t.innerHTML = grupos.map(([g, its]) => `<div class="tg">${g}</div>` + its.map(a).join('')).join('');
+  t.innerHTML = grupos.map(([g, its]) => `<div class="tg" data-g="${g}" role="button" tabindex="0" aria-expanded="true"><span>${g}</span><i class="tgc">▾</i></div>` + its.map(x => ancla(x, g)).join('')).join('');
   if (marca) t.prepend(marca);
   marcarMenu();
 }
@@ -757,6 +767,9 @@ function alternarFijo(k) {
   if (i < 0) fj.push(k); else fj.splice(i, 1);
   Store.save(); pintarMenu(); render(); toast(i < 0 ? 'Sección fijada arriba' : 'Sección quitada de fijados');
 }
+const alternarGrupo = h => { const g = h.dataset.g, cur = grupoDe(NAV_ALIAS[vista] || vista || 'dashboard'); S.menuG = S.menuG || {}; S.menuG[g] = !grupoAbierto(g, cur); Store.save(); aplicarGrupos(); };
+$('#tabs').addEventListener('click', e => { const h = e.target.closest('.tg'); if (h) { e.preventDefault(); alternarGrupo(h); } });
+$('#tabs').addEventListener('keydown', e => { const h = e.target.closest && e.target.closest('.tg'); if (h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); alternarGrupo(h); } });
 $('#tabs').addEventListener('click', e => { const p = e.target.closest('.mpin'); if (p) { e.preventDefault(); e.stopImmediatePropagation(); alternarFijo(p.dataset.pin); } });
 $('#tabs').addEventListener('keydown', e => { const p = e.target.closest && e.target.closest('.mpin'); if (p && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopImmediatePropagation(); alternarFijo(p.dataset.pin); } });
 pintarMenu();
