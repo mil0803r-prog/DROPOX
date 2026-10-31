@@ -4,7 +4,7 @@
   const TR = { shalom: 'Shalom', olva: 'Olva', bus: 'Bus' };
   const ET0 = [['Nuevo cliente', '#25a35a'], ['Nuevo pedido', '#2f7fe0'], ['Pago pendiente', '#e0a02f'], ['Pagado', '#14a39a'], ['Pedido finalizado', '#8a6fd1'], ['Seguimiento', '#e0562f']];
   const COL = ['#25a35a', '#2f7fe0', '#e0a02f', '#14a39a', '#8a6fd1', '#e0562f', '#d1479a', '#7a8794'];
-  let sel = '', filtro = '', q = '', fet = '', modo = 'lista';
+  let sel = '', filtro = '', q = '', fet = '', modo = 'lista', qs = '';
   const W = () => { const w = (S.wa = S.wa || {}); w.chats = w.chats || []; if (!w.limpio1) { w.limpio1 = 1; w.chats.forEach(c => { if (c.auto) { c.etq = (c.etq || []).filter(n => n !== 'Nuevo cliente'); if (c.estado === 'nuevo') c.estado = ''; } }); } return w; };
   const chats = () => W().chats;
   const etqs = () => { const w = W(); if (!w.etq) w.etq = ET0.map(([n, c]) => ({ n, c })); return w.etq; };
@@ -223,9 +223,10 @@
     });
   }
   // ── Tableros (estilo Kanban): cada chat está en un tablero a la vez, aparte de las etiquetas ──
-  const tabs = () => { const w = W(); if (!Array.isArray(w.tabs)) w.tabs = [{ id: 't0', n: 'Datos recibidos', c: '#7a8794' }, { id: 't1', n: 'Guía generada en Shalom', c: '#e0a02f' }, { id: 't2', n: 'En ruta', c: '#2f7fe0' }, { id: 't3', n: 'Entregado', c: '#25a35a' }, { id: 't4', n: 'Recompra', c: '#8a6fd1' }]; if (!w.tabsV3) { w.tabsV3 = 1; const E = { t0: 'pendiente', t1: 'pendiente', t2: 'enruta', t3: 'entregado' }; w.tabs.forEach(t => { if (t.e === undefined && E[t.id]) t.e = E[t.id]; }); }
+  const tabs = () => { const w = W(); if (!Array.isArray(w.tabs)) w.tabs = [{ id: 't0', n: 'Datos completados', c: '#7a8794' }, { id: 't1', n: 'Guía generada en Shalom', c: '#e0a02f' }, { id: 't2', n: 'En ruta', c: '#2f7fe0' }, { id: 't3', n: 'Entregado', c: '#25a35a' }, { id: 't4', n: 'Recompra', c: '#8a6fd1' }]; if (!w.tabsV3) { w.tabsV3 = 1; const E = { t0: 'pendiente', t1: 'pendiente', t2: 'enruta', t3: 'entregado' }; w.tabs.forEach(t => { if (t.e === undefined && E[t.id]) t.e = E[t.id]; }); }
     if (!w.tabsV2) { w.tabsV2 = 1; if (!w.tabs.some(t => t.id === 't0')) w.tabs.unshift({ id: 't0', n: 'Datos recibidos', c: '#7a8794' }); } if (!w.tabsV4) { w.tabsV4 = 1; if (!w.tabs.some(t => t.e === 'enagencia')) { const i = w.tabs.findIndex(t => t.e === 'enruta'); w.tabs.splice(i >= 0 ? i + 1 : w.tabs.length, 0, { id: 't5', n: 'En agencia', c: '#8b5cf6', e: 'enagencia' }); } }
     if (!w.tabsV5) { w.tabsV5 = 1; if (!w.tabs.some(t => /ya pag/i.test(String(t.n).normalize('NFD').replace(/[\u0300-\u036f]/g, '')))) { const i = w.tabs.findIndex(t => t.id === 't0'); w.tabs.splice(i >= 0 ? i + 1 : 0, 0, { id: 't6', n: 'Ya pagó', c: '#14a39a', e: '' }); } }
+    if (!w.tabsV6) { w.tabsV6 = 1; w.tabs.forEach(t => { if (t.n === 'Datos recibidos') t.n = 'Datos completados'; }); }
     return w.tabs; };
   const tabDe = c => tabs().find(t => t.id === c.tab);
   const EOPTS = { '': 'Ninguno (no cambia pedidos)', pendiente: 'Pendiente', enruta: 'En ruta', enagencia: 'En agencia', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
@@ -289,13 +290,9 @@
     return cambio;
   }
   // solo entran al tablero los clientes que ya enviaron sus datos de pedido (o ya tienen pedido); los chats anteriores quedan normales
+  // los clientes ya NO entran solos al tablero: se arrastran a mano desde la lista de chats (el tablero parte vacío)
   function entranTablero() {
-    let cambio = reconciliar();
-    chats().forEach(c => {
-      if (c.grupo || c.tab || c.tabOut) return;
-      const n = (c.msgs || []).length; if (c._tn === n && !c.pedidoId) return; c._tn = n;
-      if (yaPedido(c) || detectar(c)) { c.tab = tabs()[0].id; c.tabTs = Date.now(); cambio = true; }
-    });
+    const cambio = reconciliar();
     if (cambio) Store.save();
     return cambio;
   }
@@ -308,13 +305,18 @@
       ${(c.etq || []).length ? `<div class="kb-e">${c.etq.map(pill).join('')}</div>` : ''}
       <div class="kb-a"><select data-mv="${c.id}" aria-label="Mover a otro tablero"><option value="">Mover a…</option>${T.map(t => `<option value="${t.id}" ${c.tab === t.id ? 'disabled' : ''}>${esc(t.n)}</option>`).join('')}<option value="__ninguno">Quitar del tablero</option></select></div></div>`;
     const col = (t, i) => { const l = L.filter(c => c.tab === t.id); return `<div class="kb-col" data-col="${t.id}"><div class="kb-h" style="border-top-color:${t.c}"><b>${esc(t.n)}${t.e ? `<small class="kb-vi" title="Vinculado al estado «${esc(PED[t.e] || t.e)}» de Pedidos">🔗 ${esc(PED[t.e] || t.e)}</small>` : ''}</b><i>${l.length}</i><span class="kb-hb"><button class="btn btn-sm" data-ml="${t.id}:-1" ${i === 0 ? 'disabled' : ''} aria-label="Mover tablero a la izquierda">◀</button><button class="btn btn-sm" data-ml="${t.id}:1" ${i === T.length - 1 ? 'disabled' : ''} aria-label="Mover tablero a la derecha">▶</button><button class="btn btn-sm" data-te="${t.id}" aria-label="Editar tablero">✎</button></span></div><div class="kb-b">${l.length ? l.map(card).join('') : '<p class="note kb-v">Suelta aquí</p>'}</div></div>`; };
+    const libres = chats().filter(c => !c.grupo && !tabDe(c) && (!qs || [c.nombre, c.tel, c.ciudad].join(' ').toLowerCase().includes(qs))).sort((a, b) => (b.ult || 0) - (a.ult || 0));
+    const item = c => `<div class="kb-si" draggable="true" data-kc="${c.id}"><div class="kb-ct" data-abrir="${c.id}">${av(c)}<div class="kb-cn"><b>${esc(c.nombre)}</b><small>${c.tel ? '+' + esc(String(c.tel).replace(/\D/g, '')) : 'sin celular'}</small></div>${detectar(c) ? '<span class="kb-ok" title="Ya envió sus datos">📋</span>' : ''}</div><div class="kb-m">${esc(prev(c)).slice(0, 60)}</div>
+      <select data-mv="${c.id}" aria-label="Mover a un tablero"><option value="">Mover a un tablero…</option>${T.map(t => `<option value="${t.id}">${esc(t.n)}</option>`).join('')}</select></div>`;
+    const lateral = `<aside class="kb-side"><div class="kb-sh"><b>💬 Chats</b><i>${libres.length}</i></div><input class="search" id="wqs" type="search" placeholder="Buscar chat…" value="${esc(qs)}"><p class="note" style="margin:6px 2px">Arrastra el chat al tablero. El 📋 marca a quien ya envió sus datos.</p><div class="kb-sl">${libres.slice(0, 80).map(item).join('') || '<p class="note kb-v">No hay chats sin tablero</p>'}${libres.length > 80 ? `<p class="note kb-v">+${libres.length - 80} más: usa el buscador</p>` : ''}</div></aside>`;
     return `<div class="kb-top"><input class="search" id="wq" type="search" placeholder="Buscar nombre, celular, ciudad…" value="${esc(q)}"><select id="kbet"><option value="">Todas las etiquetas</option>${etqs().map(e => `<option value="${esc(e.n)}" ${fet === e.n ? 'selected' : ''}>${esc(e.n)}</option>`).join('')}</select><button class="btn btn-pri" id="kbnew">+ Tablero</button></div>
-      <div class="kb">${T.map(col).join('')}
-      <p class="note">Aquí entran solos los clientes <b>cuando envían sus datos de pedido</b>. Muévelos arrastrando cada tarjeta (en el celular usa «Mover a…»). Los chats anteriores siguen normales en «Chats»; si quieres meter uno a mano, ábrelo y elige su tablero. Los tableros son aparte de las etiquetas.</p>`;
+      <div class="kb-wrap">${lateral}<div class="kb">${T.map(col).join('')}</div></div>
+      <p class="note">Los tableros parten <b>vacíos</b>. Arrastra cada chat de la lista de la izquierda a su tablero (por ejemplo «Datos completados» cuando ya envió sus datos); en el celular usa «Mover a un tablero…». Los tableros son aparte de las etiquetas, pero al mover un chat recibe la etiqueta del tablero.</p>`;
   }
   function enlazarTableros(el) {
     const g = i => el.querySelector(i), refrescar = () => vista(el);
     g('#wq').oninput = e => { q = e.target.value.toLowerCase(); const p = e.target.selectionStart; refrescar(); const i = el.querySelector('#wq'); i.focus(); i.setSelectionRange(p, p); };
+    g('#wqs').oninput = e => { qs = e.target.value.toLowerCase(); const p = e.target.selectionStart; refrescar(); const i = el.querySelector('#wqs'); i.focus(); i.setSelectionRange(p, p); };
     g('#kbet').onchange = e => { fet = e.target.value; refrescar(); };
     g('#kbnew').onclick = () => openForm('Nuevo tablero', [{ k: 'n', l: 'Nombre', req: 1, full: 1 }, { k: 'c', l: 'Color', t: 'select', opts: Object.fromEntries(COL.map((x, i) => [x, ['Verde', 'Azul', 'Amarillo', 'Turquesa', 'Morado', 'Naranja', 'Rosa', 'Gris'][i]])) }, { k: 'e', l: 'Estado de Pedidos vinculado', t: 'select', opts: EOPTS, full: 1 }], {}, v => { tabs().push({ id: 't' + Date.now().toString(36), n: v.n, c: v.c || COL[0], e: v.e || '' }); });
     el.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => { sel = b.dataset.abrir; modo = 'lista'; vista(el); });
