@@ -185,8 +185,8 @@ const Meta = (() => {
   const totales = rows => { const t = { gasto: 0, impresiones: 0, clics_enlace: 0, compras: 0, valor_compras: 0, mensajes: 0 }; rows.forEach(r => Object.keys(t).forEach(k => { t[k] += N(r.m[k]); })); const g = t.gasto;
     return [money(g), n0(t.impresiones), '—', '—', n0(t.clics_enlace), t.impresiones ? n2(t.clics_enlace / t.impresiones * 100) + '%' : '—', t.clics_enlace ? money(g / t.clics_enlace) : '—', t.impresiones ? money(g / t.impresiones * 1000) : '—', n0(t.compras), t.compras ? money(g / t.compras) : '—', g > 0 && t.valor_compras > 0 ? n2(t.valor_compras / g) + 'x' : '—', n0(t.mensajes), t.mensajes ? money(g / t.mensajes) : '—']; };
   // ───────── indicadores con color según tus metas y cambio contra el periodo anterior ─────────
-  const BENCH0 = { costo_res: { d: -1, b: 0.8, m: 1.5, n: 'Costo por resultado (S/)' }, costo_compra: { d: -1, b: 8, m: 15, n: 'CPA, costo por compra (S/)' }, roas: { d: 1, b: 3, m: 1.5, n: 'ROAS' }, ctr_enlace: { d: 1, b: 1.5, m: 0.8, n: 'CTR del enlace (%)' },
-    cpc_enlace: { d: -1, b: 0.4, m: 1, n: 'CPC del enlace (S/)' }, cpm: { d: -1, b: 6, m: 15, n: 'CPM (S/)' }, frecuencia: { d: -1, b: 1.8, m: 3, n: 'Frecuencia' }, tasa_gancho: { d: 1, b: 30, m: 15, n: 'Tasa de gancho (%)' }, tasa_retencion: { d: 1, b: 25, m: 10, n: 'Tasa de retención (%)' }, costo_visita: { d: -1, b: 0.5, m: 1.2, n: 'Costo por visita (S/)' } };
+  const BENCH0 = { costo_res: { d: -1, b: 0.8, m: 1.5, n: 'Costo por resultado' }, costo_compra: { d: -1, b: 8, m: 15, n: 'Costo por compra' }, roas: { d: 1, b: 3, m: 1.5, n: 'ROAS de compras' }, ctr_enlace: { d: 1, b: 1.5, m: 0.8, n: 'CTR (porcentaje de clics en el enlace)' },
+    cpc_enlace: { d: -1, b: 0.4, m: 1, n: 'CPC (costo por clic en el enlace)' }, cpm: { d: -1, b: 6, m: 15, n: 'CPM (costo por mil impresiones)' }, frecuencia: { d: -1, b: 1.8, m: 3, n: 'Frecuencia' }, costo_visita: { d: -1, b: 0.5, m: 1.2, n: 'Costo por visita a la página de destino' } };
   const bench = k => ({ ...BENCH0[k], ...((S.config.metaMetas || {})[k] || {}) });
   const calidad = (k, v) => { if (v == null || !isFinite(v) || !BENCH0[k]) return ''; const B = bench(k); if (B.d < 0) return v <= B.b ? 'bien' : v >= B.m ? 'mal' : 'medio'; return v >= B.b ? 'bien' : v <= B.m ? 'mal' : 'medio'; };
   let prevT = null, prevR = null;
@@ -195,20 +195,24 @@ const Meta = (() => {
     ['gasto', 'Importe gastado', T => T.gasto, v => money(v), 0, false],
     ['resultados', 'Resultados', T => resDe({ m: T }).n, v => n0(v), 1, false],
     ['costo_res', 'Costo por resultado', T => { const x = resDe({ m: T }).n; return x ? T.gasto / x : null; }, v => mon(v), -1, false],
-    ['compras', 'Compras en Meta', T => N(T.compras), v => n0(v), 1, false],
-    ['costo_compra', 'CPA (costo por compra)', T => (N(T.compras) ? T.gasto / T.compras : null), v => mon(v), -1, false],
-    ['roas', 'ROAS de compras', T => (T.gasto > 0 && N(T.valor_compras) > 0 ? T.valor_compras / T.gasto : null), v => (v ? n2(v) + 'x' : '—'), 1, false],
-    ['ctr_enlace', 'CTR (enlace)', T => (T.impresiones ? N(T.clics_enlace) / T.impresiones * 100 : null), v => pc2(v), 1, false],
-    ['cpc_enlace', 'CPC (enlace)', T => (N(T.clics_enlace) ? T.gasto / T.clics_enlace : null), v => mon(v), -1, false],
-    ['cpm', 'CPM', T => (T.impresiones ? T.gasto / T.impresiones * 1000 : null), v => mon(v), -1, false],
     ['alcance', 'Alcance', T => T.alcance, v => n0(v), 1, false],
     ['impresiones', 'Impresiones', T => T.impresiones, v => n0(v), 1, false],
     ['frecuencia', 'Frecuencia', T => (T.alcance ? T.impresiones / T.alcance : null), v => (v == null ? '—' : n2(v)), -1, false],
-    ['visitas_pagina', 'Visitas a la página', T => N(T.visitas_pagina), v => n0(v), 1, true],
-    ['costo_visita', 'Costo por visita', T => (N(T.visitas_pagina) ? T.gasto / T.visitas_pagina : null), v => mon(v), -1, true],
+    ['cpm', 'CPM (costo por mil impresiones)', T => (T.impresiones ? T.gasto / T.impresiones * 1000 : null), v => mon(v), -1, false],
+    ['clics_enlace', 'Clics en el enlace', T => N(T.clics_enlace), v => n0(v), 1, false],
+    ['ctr_enlace', 'CTR (porcentaje de clics en el enlace)', T => (T.impresiones ? N(T.clics_enlace) / T.impresiones * 100 : null), v => pc2(v), 1, false],
+    ['cpc_enlace', 'CPC (costo por clic en el enlace)', T => (N(T.clics_enlace) ? T.gasto / T.clics_enlace : null), v => mon(v), -1, false],
+    // lo que NO es el «resultado» de la campaña solo aparece si tiene datos (así no se repite el resultado)
+    ['mensajes', 'Conversaciones de mensajes iniciadas', T => N(T.mensajes), v => n0(v), 1, 'noRes:mensajes'],
+    ['costo_mensaje', 'Costo por conversación de mensajes iniciada', T => (N(T.mensajes) ? T.gasto / T.mensajes : null), v => mon(v), -1, 'noRes:mensajes'],
+    ['compras', 'Compras', T => N(T.compras), v => n0(v), 1, 'noRes:compras'],
+    ['costo_compra', 'Costo por compra', T => (N(T.compras) ? T.gasto / T.compras : null), v => mon(v), -1, 'noRes:compras'],
+    ['roas', 'ROAS de compras (retorno de la inversión publicitaria)', T => (T.gasto > 0 && N(T.valor_compras) > 0 ? T.valor_compras / T.gasto : null), v => (v ? n2(v) + 'x' : '—'), 1, true],
+    ['visitas_pagina', 'Visitas a la página de destino', T => N(T.visitas_pagina), v => n0(v), 1, true],
+    ['costo_visita', 'Costo por visita a la página de destino', T => (N(T.visitas_pagina) ? T.gasto / T.visitas_pagina : null), v => mon(v), -1, true],
     ['agregar_carrito', 'Agregados al carrito', T => N(T.agregar_carrito), v => n0(v), 1, true],
-    ['tasa_gancho', 'Tasa de gancho (video)', T => (T.impresiones && N(T.video_3s) ? N(T.video_3s) / T.impresiones * 100 : null), v => pc2(v), 1, true],
-    ['tasa_retencion', 'Tasa de retención (video)', T => (N(T.video_3s) && N(T.thruplay) ? T.thruplay / T.video_3s * 100 : null), v => pc2(v), 1, true],
+    ['video_3s', 'Reproducciones de video de 3 segundos', T => N(T.video_3s), v => n0(v), 1, true],
+    ['thruplay', 'Reproducciones de video ThruPlay', T => N(T.thruplay), v => n0(v), 1, true],
   ];
   const cambio = (dir, v, p) => {
     if (v == null || p == null || !isFinite(v) || !isFinite(p) || p === 0) return '';
@@ -220,9 +224,10 @@ const Meta = (() => {
     const T = sumarM(dias); T.alcance = A.campanas.reduce((a, c) => a + N(c.m.alcance), 0) || T.alcance;
     let P = prevT; if (!P && A.importado && prevR) { const pd = (datos.dias || []).filter(z => z.fecha >= prevR[0] && z.fecha <= prevR[1]); P = pd.length ? sumarM(pd) : null; }
     if (P) P.alcance = P.alcance;
-    const ts = KPIS.filter(([, , g, , , opc]) => !opc || (g(T) || 0) > 0).map(([k, l, g, f, dir]) => {
+    const tipoRes = resDe({ m: T }).t, esRes = k => (k === 'mensajes' ? /mensajes/i.test(tipoRes) : /compras/i.test(tipoRes));
+    const ts = KPIS.filter(([k, , g, , , opc]) => { if (!opc) return true; if (typeof opc === 'string') { const q = opc.split(':')[1]; return !esRes(q) && (g(T) || 0) > 0; } return (g(T) || 0) > 0; }).map(([k, l, g, f, dir]) => {
       const v = g(T), q = calidad(k, v), pv = P ? g(P) : null;
-      return `<div class="t mt-k ${q ? 'q-' + q : ''}"><small>${l}</small><b>${f(v, { m: T })}</b>${cambio(dir, v, pv) || '<span class="dl">&nbsp;</span>'}</div>`;
+      return `<div class="t mt-k ${q ? 'q-' + q : ''}"><small>${l}</small><b>${f(v, { m: T })}</b>${k === 'resultados' && tipoRes ? `<small class="mt-tipo">${esc(tipoRes)}</small>` : ''}${cambio(dir, v, pv) || '<span class="dl">&nbsp;</span>'}</div>`;
     }).join('');
     const pr = prevR ? `${f1(prevR[0])} – ${f1(prevR[1])}` : '';
     return `<div class="tiles mt-kpis">${ts}</div><p class="mt-leyenda"><span class="q-bien">● Bien</span><span class="q-medio">● Regular</span><span class="q-mal">● Mejorar</span>${pr ? `<span>Cambio contra ${pr}</span>` : ''}<button type="button" class="btn btn-sm" id="mmetas">🎯 Ajustar metas</button></p>`;
@@ -249,16 +254,16 @@ const Meta = (() => {
     frecuencia: { l: 'Frecuencia', g: e => e.m.frecuencia, f: v => n2(v) },
     cpm: { l: 'CPM (costo por mil impresiones)', g: e => e.m.cpm, f: v => money(v) },
     // compras en Meta (píxel)
-    compras: { l: 'Compras en Meta', g: e => mv(e, 'compras'), f: ent },
-    costo_compra: { l: 'CPA (costo por compra en Meta)', g: e => { const c = mv(e, 'compras'); return c ? e.m.gasto / c : null; }, f: mon },
+    compras: { l: 'Compras', g: e => mv(e, 'compras'), f: ent },
+    costo_compra: { l: 'Costo por compra', g: e => { const c = mv(e, 'compras'); return c ? e.m.gasto / c : null; }, f: mon },
     valor_compras: { l: 'Valor de conversión de compras', g: e => mv(e, 'valor_compras'), f: v => (v ? money(v) : '—') },
-    roas: { l: 'ROAS de compras', g: e => { const g = e.m.gasto, v = mv(e, 'valor_compras'); return g > 0 && v > 0 ? v / g : null; }, f: v => (v ? n2(v) + 'x' : '—') },
+    roas: { l: 'ROAS de compras (retorno de la inversión publicitaria)', g: e => { const g = e.m.gasto, v = mv(e, 'valor_compras'); return g > 0 && v > 0 ? v / g : null; }, f: v => (v ? n2(v) + 'x' : '—') },
     // WhatsApp / mensajes
-    mensajes: { l: 'Conversaciones de WhatsApp iniciadas', g: e => mv(e, 'mensajes'), f: ent },
-    costo_mensaje: { l: 'Costo por conversación de WhatsApp', g: e => { const c = mv(e, 'mensajes'); return c ? e.m.gasto / c : null; }, f: mon },
+    mensajes: { l: 'Conversaciones de mensajes iniciadas', g: e => mv(e, 'mensajes'), f: ent },
+    costo_mensaje: { l: 'Costo por conversación de mensajes iniciada', g: e => { const c = mv(e, 'mensajes'); return c ? e.m.gasto / c : null; }, f: mon },
     // clics
     clics_enlace: { l: 'Clics en el enlace', g: e => mv(e, 'clics_enlace'), f: v => n0(v) },
-    ctr_enlace: { l: 'CTR (clics en el enlace)', g: e => mv(e, 'ctr_enlace'), f: pc2 },
+    ctr_enlace: { l: 'CTR (porcentaje de clics en el enlace)', g: e => mv(e, 'ctr_enlace'), f: pc2 },
     cpc_enlace: { l: 'CPC (costo por clic en el enlace)', g: e => mv(e, 'cpc_enlace'), f: v => (v ? money(v) : '—') },
     clics: { l: 'Clics (todos)', g: e => e.m.clics, f: v => n0(v) },
     ctr: { l: 'CTR (todos)', g: e => e.m.ctr, f: pc2 },
@@ -266,39 +271,39 @@ const Meta = (() => {
     clics_salientes: { l: 'Clics salientes', g: e => mv(e, 'clics_salientes'), f: ent },
     // embudo de la web
     visitas_pagina: { l: 'Visitas a la página de destino', g: e => mv(e, 'visitas_pagina'), f: ent },
-    costo_visita: { l: 'Costo por visita a la página', g: e => div(e.m.gasto, mv(e, 'visitas_pagina')), f: mon },
+    costo_visita: { l: 'Costo por visita a la página de destino', g: e => div(e.m.gasto, mv(e, 'visitas_pagina')), f: mon },
     agregar_carrito: { l: 'Agregados al carrito', g: e => mv(e, 'agregar_carrito'), f: ent },
     costo_carrito: { l: 'Costo por agregado al carrito', g: e => div(e.m.gasto, mv(e, 'agregar_carrito')), f: mon },
-    inicio_pago: { l: 'Inicios de pago', g: e => mv(e, 'inicio_pago'), f: ent },
-    costo_pago: { l: 'Costo por inicio de pago', g: e => div(e.m.gasto, mv(e, 'inicio_pago')), f: mon },
+    inicio_pago: { l: 'Pagos iniciados', g: e => mv(e, 'inicio_pago'), f: ent },
+    costo_pago: { l: 'Costo por pago iniciado', g: e => div(e.m.gasto, mv(e, 'inicio_pago')), f: mon },
     // video
-    video_3s: { l: 'Reproducciones de video (3 s)', g: e => mv(e, 'video_3s'), f: ent },
-    tasa_gancho: { l: 'Tasa de gancho (3 s ÷ impresiones)', g: e => { const x = div(mv(e, 'video_3s'), mv(e, 'impresiones')); return x == null ? null : x * 100; }, f: pc2 },
-    thruplay: { l: 'ThruPlays (video completo o 15 s)', g: e => mv(e, 'thruplay'), f: ent },
-    costo_thruplay: { l: 'Costo por ThruPlay', g: e => div(e.m.gasto, mv(e, 'thruplay')), f: mon },
-    tasa_retencion: { l: 'Tasa de retención (ThruPlay ÷ 3 s)', g: e => { const x = div(mv(e, 'thruplay'), mv(e, 'video_3s')); return x == null ? null : x * 100; }, f: pc2 },
-    video_25: { l: 'Video visto al 25%', g: e => mv(e, 'video_25'), f: ent },
-    video_50: { l: 'Video visto al 50%', g: e => mv(e, 'video_50'), f: ent },
-    video_75: { l: 'Video visto al 75%', g: e => mv(e, 'video_75'), f: ent },
-    video_95: { l: 'Video visto al 95%', g: e => mv(e, 'video_95'), f: ent },
-    video_100: { l: 'Video visto al 100%', g: e => mv(e, 'video_100'), f: ent },
-    video_seg: { l: 'Tiempo promedio de reproducción (s)', g: e => mv(e, 'video_seg'), f: v => (v ? n2(v) + ' s' : '—') },
+    video_3s: { l: 'Reproducciones de video de 3 segundos', g: e => mv(e, 'video_3s'), f: ent },
+    tasa_gancho: { l: 'Tasa de gancho (cálculo propio, no es de Meta)', g: e => { const x = div(mv(e, 'video_3s'), mv(e, 'impresiones')); return x == null ? null : x * 100; }, f: pc2 },
+    thruplay: { l: 'Reproducciones de video ThruPlay', g: e => mv(e, 'thruplay'), f: ent },
+    costo_thruplay: { l: 'Costo por reproducción de video ThruPlay', g: e => div(e.m.gasto, mv(e, 'thruplay')), f: mon },
+    tasa_retencion: { l: 'Tasa de retención (cálculo propio, no es de Meta)', g: e => { const x = div(mv(e, 'thruplay'), mv(e, 'video_3s')); return x == null ? null : x * 100; }, f: pc2 },
+    video_25: { l: 'Reproducciones de video hasta el 25%', g: e => mv(e, 'video_25'), f: ent },
+    video_50: { l: 'Reproducciones de video hasta el 50%', g: e => mv(e, 'video_50'), f: ent },
+    video_75: { l: 'Reproducciones de video hasta el 75%', g: e => mv(e, 'video_75'), f: ent },
+    video_95: { l: 'Reproducciones de video hasta el 95%', g: e => mv(e, 'video_95'), f: ent },
+    video_100: { l: 'Reproducciones de video hasta el 100%', g: e => mv(e, 'video_100'), f: ent },
+    video_seg: { l: 'Tiempo promedio de reproducción de video', g: e => mv(e, 'video_seg'), f: v => (v ? n2(v) + ' s' : '—') },
     // interacción
     interacciones: { l: 'Interacciones con la publicación', g: e => mv(e, 'interacciones'), f: ent },
-    reacciones: { l: 'Reacciones', g: e => mv(e, 'reacciones'), f: ent },
-    comentarios: { l: 'Comentarios', g: e => mv(e, 'comentarios'), f: ent },
-    compartidos: { l: 'Veces compartido', g: e => mv(e, 'compartidos'), f: ent },
-    guardados: { l: 'Guardados', g: e => mv(e, 'guardados'), f: ent },
+    reacciones: { l: 'Reacciones a la publicación', g: e => mv(e, 'reacciones'), f: ent },
+    comentarios: { l: 'Comentarios de la publicación', g: e => mv(e, 'comentarios'), f: ent },
+    compartidos: { l: 'Veces que se compartió la publicación', g: e => mv(e, 'compartidos'), f: ent },
+    guardados: { l: 'Veces que se guardó la publicación', g: e => mv(e, 'guardados'), f: ent },
   };
   const PRESET = {
-    rendimiento: ['Rendimiento', ['resultados', 'costo_res', 'gasto', 'alcance', 'impresiones', 'cpm', 'ctr_enlace', 'cpc_enlace', 'compras', 'costo_compra']],
-    whatsapp: ['WhatsApp y mensajes', ['mensajes', 'costo_mensaje', 'gasto', 'alcance', 'impresiones', 'cpm', 'ctr_enlace']],
-    compras: ['Compras (CPA y ROAS)', ['compras', 'costo_compra', 'valor_compras', 'roas', 'gasto', 'clics_enlace', 'ctr_enlace']],
-    embudo: ['Embudo de la web', ['clics_enlace', 'visitas_pagina', 'costo_visita', 'agregar_carrito', 'costo_carrito', 'inicio_pago', 'costo_pago', 'compras', 'costo_compra']],
-    video: ['Video (gancho y retención)', ['gasto', 'impresiones', 'video_3s', 'tasa_gancho', 'thruplay', 'costo_thruplay', 'tasa_retencion', 'video_25', 'video_50', 'video_75', 'video_95', 'video_100', 'video_seg']],
-    clics: ['Clics y CTR', ['clics_enlace', 'ctr_enlace', 'cpc_enlace', 'clics', 'ctr', 'cpc', 'clics_salientes']],
+    rendimiento: ['Rendimiento', ['resultados', 'costo_res', 'gasto', 'alcance', 'impresiones', 'cpm', 'clics_enlace', 'ctr_enlace', 'cpc_enlace']],
     entrega: ['Entrega', ['gasto', 'alcance', 'impresiones', 'frecuencia', 'cpm']],
-    interaccion: ['Interacción', ['interacciones', 'reacciones', 'comentarios', 'compartidos', 'guardados']],
+    clics: ['Clics', ['clics_enlace', 'ctr_enlace', 'cpc_enlace', 'clics', 'ctr', 'cpc', 'clics_salientes']],
+    mensajes: ['Mensajes', ['mensajes', 'costo_mensaje', 'gasto', 'alcance', 'impresiones']],
+    compras: ['Compras', ['compras', 'costo_compra', 'valor_compras', 'roas', 'gasto']],
+    web: ['Eventos de la página web', ['clics_enlace', 'visitas_pagina', 'costo_visita', 'agregar_carrito', 'costo_carrito', 'inicio_pago', 'costo_pago', 'compras', 'costo_compra']],
+    video: ['Reproducciones de video', ['gasto', 'impresiones', 'video_3s', 'thruplay', 'costo_thruplay', 'video_25', 'video_50', 'video_75', 'video_95', 'video_100', 'video_seg', 'tasa_gancho', 'tasa_retencion']],
+    interaccion: ['Interacciones', ['interacciones', 'reacciones', 'comentarios', 'compartidos', 'guardados']],
     todas: ['Todas las columnas', Object.keys(COLM)],
   };
   let propias = null; try { propias = JSON.parse(localStorage.getItem('dropox.metaCols') || 'null'); } catch (e) { propias = null; }
