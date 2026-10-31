@@ -107,6 +107,7 @@
       con.sync = Date.now();
     } catch (e) { con.error = e.message || 'No se pudo sincronizar.'; }
     con.sincronizando = false;
+    if (entranTablero()) cambio = true;
     if (cambio) Store.save();
     if (viendo()) render();
   }
@@ -206,21 +207,32 @@
     });
   }
   // ── Tableros (estilo Kanban): cada chat está en un tablero a la vez, aparte de las etiquetas ──
-  const tabs = () => { const w = W(); if (!Array.isArray(w.tabs)) w.tabs = [{ id: 't1', n: 'Guía generada en Shalom', c: '#e0a02f' }, { id: 't2', n: 'En ruta', c: '#2f7fe0' }, { id: 't3', n: 'Entregado', c: '#25a35a' }, { id: 't4', n: 'Recompra', c: '#8a6fd1' }]; return w.tabs; };
+  const tabs = () => { const w = W(); if (!Array.isArray(w.tabs)) w.tabs = [{ id: 't0', n: 'Datos recibidos', c: '#7a8794' }, { id: 't1', n: 'Guía generada en Shalom', c: '#e0a02f' }, { id: 't2', n: 'En ruta', c: '#2f7fe0' }, { id: 't3', n: 'Entregado', c: '#25a35a' }, { id: 't4', n: 'Recompra', c: '#8a6fd1' }]; if (!w.tabsV2) { w.tabsV2 = 1; if (!w.tabs.some(t => t.id === 't0')) w.tabs.unshift({ id: 't0', n: 'Datos recibidos', c: '#7a8794' }); } return w.tabs; };
   const tabDe = c => tabs().find(t => t.id === c.tab);
-  const mover = (c, id) => { if (id) c.tab = id; else delete c.tab; c.tabTs = Date.now(); Store.save(); };
+  const mover = (c, id) => { if (id) { c.tab = id; delete c.tabOut; } else { delete c.tab; c.tabOut = 1; } c.tabTs = Date.now(); Store.save(); };
+  // solo entran al tablero los clientes que ya enviaron sus datos de pedido (o ya tienen pedido); los chats anteriores quedan normales
+  function entranTablero() {
+    let cambio = false;
+    chats().forEach(c => {
+      if (c.grupo || c.tab || c.tabOut) return;
+      const n = (c.msgs || []).length; if (c._tn === n && !c.pedidoId) return; c._tn = n;
+      if (yaPedido(c) || detectar(c)) { c.tab = tabs()[0].id; c.tabTs = Date.now(); cambio = true; }
+    });
+    if (cambio) Store.save();
+    return cambio;
+  }
   function tableros() {
-    const T = tabs(), L = chats().filter(c => !c.grupo && (!fet || (c.etq || []).includes(fet)) && (!q || [c.nombre, c.tel, c.ciudad, c.producto].join(' ').toLowerCase().includes(q))).sort((a, b) => (b.ult || 0) - (a.ult || 0));
+    entranTablero();
+    const T = tabs(), L = chats().filter(c => !c.grupo && tabDe(c) && (!fet || (c.etq || []).includes(fet)) && (!q || [c.nombre, c.tel, c.ciudad, c.producto].join(' ').toLowerCase().includes(q))).sort((a, b) => (b.ult || 0) - (a.ult || 0));
     const card = c => `<div class="kb-c" draggable="true" data-kc="${c.id}">
       <div class="kb-ct" data-abrir="${c.id}">${av(c)}<div class="kb-cn"><b>${esc(c.nombre)}</b><small>${c.tel ? '+' + esc(String(c.tel).replace(/\D/g, '')) : 'sin celular'}${c.ciudad ? ' · ' + esc(c.ciudad) : ''}</small></div></div>
       ${c.producto ? `<div class="kb-p">${esc(c.producto)}</div>` : ''}<div class="kb-m">${esc(prev(c)).slice(0, 70)}</div>
       ${(c.etq || []).length ? `<div class="kb-e">${c.etq.map(pill).join('')}</div>` : ''}
       <div class="kb-a"><select data-mv="${c.id}" aria-label="Mover a otro tablero"><option value="">Mover a…</option>${T.map(t => `<option value="${t.id}" ${c.tab === t.id ? 'disabled' : ''}>${esc(t.n)}</option>`).join('')}<option value="__ninguno">Quitar del tablero</option></select></div></div>`;
-    const col = (t, i) => { const l = L.filter(c => c.tab === t.id); return `<div class="kb-col" data-col="${t.id}"><div class="kb-h" style="border-top-color:${t.c}"><b>${esc(t.n)}</b><i>${l.length}</i><span class="kb-hb"><button class="btn btn-sm" data-ml="${t.id}:-1" ${i === 0 ? 'disabled' : ''} aria-label="Mover tablero a la izquierda">◀</button><button class="btn btn-sm" data-ml="${t.id}:1" ${i === T.length - 1 ? 'disabled' : ''} aria-label="Mover tablero a la derecha">▶</button><button class="btn btn-sm" data-te="${t.id}" aria-label="Editar tablero">✎</button></span></div><div class="kb-b">${l.length ? l.map(card).join('') : '<p class="note kb-v">Arrastra aquí un chat</p>'}</div></div>`; };
-    const sin = L.filter(c => !tabDe(c));
+    const col = (t, i) => { const l = L.filter(c => c.tab === t.id); return `<div class="kb-col" data-col="${t.id}"><div class="kb-h" style="border-top-color:${t.c}"><b>${esc(t.n)}</b><i>${l.length}</i><span class="kb-hb"><button class="btn btn-sm" data-ml="${t.id}:-1" ${i === 0 ? 'disabled' : ''} aria-label="Mover tablero a la izquierda">◀</button><button class="btn btn-sm" data-ml="${t.id}:1" ${i === T.length - 1 ? 'disabled' : ''} aria-label="Mover tablero a la derecha">▶</button><button class="btn btn-sm" data-te="${t.id}" aria-label="Editar tablero">✎</button></span></div><div class="kb-b">${l.length ? l.map(card).join('') : '<p class="note kb-v">Suelta aquí</p>'}</div></div>`; };
     return `<div class="kb-top"><input class="search" id="wq" type="search" placeholder="Buscar nombre, celular, ciudad…" value="${esc(q)}"><select id="kbet"><option value="">Todas las etiquetas</option>${etqs().map(e => `<option value="${esc(e.n)}" ${fet === e.n ? 'selected' : ''}>${esc(e.n)}</option>`).join('')}</select><button class="btn btn-pri" id="kbnew">+ Tablero</button></div>
-      <div class="kb">${T.map(col).join('')}<div class="kb-col kb-sin" data-col=""><div class="kb-h" style="border-top-color:#7a8794"><b>Sin tablero</b><i>${sin.length}</i></div><div class="kb-b">${sin.length ? sin.slice(0, 60).map(card).join('') + (sin.length > 60 ? `<p class="note kb-v">+${sin.length - 60} más: usa el buscador</p>` : '') : '<p class="note kb-v">Todos tus chats ya tienen tablero</p>'}</div></div></div>
-      <p class="note">Mueve cada chat de tablero arrastrándolo (en el celular usa «Mover a…»). Los tableros son aparte de las etiquetas. Toca el nombre para abrir el chat.</p>`;
+      <div class="kb">${T.map(col).join('')}
+      <p class="note">Aquí entran solos los clientes <b>cuando envían sus datos de pedido</b>. Muévelos arrastrando cada tarjeta (en el celular usa «Mover a…»). Los chats anteriores siguen normales en «Chats»; si quieres meter uno a mano, ábrelo y elige su tablero. Los tableros son aparte de las etiquetas.</p>`;
   }
   function enlazarTableros(el) {
     const g = i => el.querySelector(i), refrescar = () => vista(el);
@@ -231,7 +243,7 @@
     el.querySelectorAll('[data-mv]').forEach(b => b.onchange = () => { const c = chats().find(x => x.id === b.dataset.mv); if (!c || !b.value) return; mover(c, b.value === '__ninguno' ? '' : b.value); refrescar(); });
     el.querySelectorAll('[data-ml]').forEach(b => b.onclick = () => { const [id, d] = b.dataset.ml.split(':'), T = tabs(), i = T.findIndex(t => t.id === id), j = i + +d; if (i < 0 || j < 0 || j >= T.length) return; [T[i], T[j]] = [T[j], T[i]]; Store.save(); refrescar(); });
     el.querySelectorAll('[data-te]').forEach(b => b.onclick = () => { const t = tabs().find(x => x.id === b.dataset.te); if (!t) return; openForm('Editar tablero', [{ k: 'n', l: 'Nombre', req: 1, full: 1 }, { k: 'c', l: 'Color', t: 'select', opts: Object.fromEntries(COL.map((x, i) => [x, ['Verde', 'Azul', 'Amarillo', 'Turquesa', 'Morado', 'Naranja', 'Rosa', 'Gris'][i]])) }], t, v => Object.assign(t, v));
-      setTimeout(() => { const d = document.querySelector('#dlg'); if (d && !d.querySelector('#kbdel')) { const bt = document.createElement('button'); bt.type = 'button'; bt.id = 'kbdel'; bt.className = 'btn btn-del'; bt.textContent = 'Eliminar tablero'; bt.onclick = () => confirmDel('¿Eliminar el tablero «' + t.n + '»? Sus chats quedan en «Sin tablero».', () => { chats().forEach(c => { if (c.tab === t.id) delete c.tab; }); W().tabs = tabs().filter(x => x.id !== t.id); try { d.close(); } catch (e) {} Store.save(); refrescar(); }); const f = d.querySelector('form'); if (f) f.appendChild(bt); } }, 50); });
+      setTimeout(() => { const d = document.querySelector('#dlg'); if (d && !d.querySelector('#kbdel')) { const bt = document.createElement('button'); bt.type = 'button'; bt.id = 'kbdel'; bt.className = 'btn btn-del'; bt.textContent = 'Eliminar tablero'; bt.onclick = () => confirmDel('¿Eliminar el tablero «' + t.n + '»? Sus clientes salen del tablero pero siguen en «Chats».', () => { chats().forEach(c => { if (c.tab === t.id) delete c.tab; }); W().tabs = tabs().filter(x => x.id !== t.id); try { d.close(); } catch (e) {} Store.save(); refrescar(); }); const f = d.querySelector('form'); if (f) f.appendChild(bt); } }, 50); });
     // arrastrar y soltar (escritorio)
     let arr = null;
     el.querySelectorAll('[data-kc]').forEach(k => { k.ondragstart = e => { arr = k.dataset.kc; k.classList.add('arr'); try { e.dataTransfer.setData('text/plain', arr); e.dataTransfer.effectAllowed = 'move'; } catch (x) {} }; k.ondragend = () => k.classList.remove('arr'); });
