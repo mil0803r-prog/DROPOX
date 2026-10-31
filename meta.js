@@ -49,6 +49,7 @@ const Meta = (() => {
     if (!cl) return;
     try {
       const r = await fetch('datos/meta.enc.json', { cache: 'no-store' }); if (!r.ok) return;
+      if (envivo) return; // los datos en vivo mandan sobre los importados
       const obj = await r.json(); const snap = normalizarImport(await descifrar(obj, cl));
       S.metaAct = obj.actualizado || ''; hayNuevo = false;
       if ((S.metaSnap || {}).hasta === snap.hasta && (S.metaSnap || {}).campanas && JSON.stringify((S.metaSnap.campanas || []).map(c => c.m && c.m.gasto)) === JSON.stringify(snap.campanas.map(c => c.m && c.m.gasto))) return;
@@ -98,6 +99,29 @@ const Meta = (() => {
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { const e = new Error(d.error || 'No se pudo leer Meta.'); e.falta = d.falta === 'token'; throw e; }
     return d;
+  }
+
+  // ───────── actualización EN VIVO ─────────
+  // Si el token de Meta está en Vercel, la sección se actualiza sola al entrar y cada 5 minutos mientras la miras.
+  // Si no está, se queda con los datos importados y explica cómo conectarlo.
+  let envivo = false, vivoMsg = '', ultVivo = 0, timerVivo = null, tryVivo = false;
+  async function vivo(silencioso) {
+    if (cargando || demo() || !(window.Nube && Nube.activo)) return;
+    const [d, h] = rangoActual(); cargando = true;
+    try {
+      const nuevo = await traer({ desde: d, hasta: h });
+      if (String(nuevo.cuenta && nuevo.cuenta.id) !== META_CUENTA.id) throw new Error(`La cuenta conectada (${(nuevo.cuenta && (nuevo.cuenta.nombre || nuevo.cuenta.id)) || '?'}) no es ${META_CUENTA.nombre}.`);
+      datos = nuevo; clave = d + '|' + h; hora = new Date(); envivo = true; vivoMsg = ''; error = ''; falta = false;
+      sync();
+    } catch (e) { envivo = false; vivoMsg = e.falta ? 'sin_token' : (e.message || 'No se pudo leer Meta.'); if (e.falta && !datos && !S.metaSnap) { falta = true; error = e.message; } }
+    cargando = false; ultVivo = Date.now();
+    if (vista === 'meta') render();
+  }
+  function iniciarVivo() {
+    if (tryVivo || demo()) return; tryVivo = true;
+    vivo(true);
+    timerVivo = setInterval(() => { if (vista === 'meta' && !document.hidden && envivo) vivo(true); }, 300000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && vista === 'meta' && envivo && Date.now() - ultVivo > 120000) vivo(true); });
   }
 
   // los días de la cuenta alimentan el Dashboard (utilidad neta)
@@ -188,6 +212,7 @@ const Meta = (() => {
       <div class="chips" style="margin:6px 0 0"><button class="chip ${sel(datos.desde, datos.hasta)}" data-fr="todo">Todo</button><button class="chip ${sel(sumaDias(datos.hasta, -6), datos.hasta)}" data-fr="7">Últimos 7 días</button><button class="chip ${sel(datos.hasta, datos.hasta)}" data-fr="ult">Último día</button><button class="chip ${sel(sumaDias(hoy(), -1), sumaDias(hoy(), -1))}" data-fr="ayer">Ayer</button><button class="chip ${sel(hoy(), hoy())}" data-fr="hoy">Hoy</button></div>
       <p class="sub" style="margin:8px 0 0">Mostrando <b>${f1(A.desde)}</b> al <b>${f1(A.hasta)}</b>${A.recortado ? ' · las cifras de campañas, conjuntos y anuncios se recalculan para estas fechas' : ''}. Hay datos entre ${f1(datos.desde)} y ${f1(datos.hasta)}.</p></div>` : '';
     return `${A.ejemplo ? '<div class="demo-bar"><span><b>Datos de ejemplo.</b> Así se verá tu cuenta cuando Meta esté conectado.</span></div>' : ''}
+    ${envivo ? `<div class="nota-pub mt-vivo">🟢 <b>En vivo desde Meta</b> · actualizado a las ${hora ? hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : ''} · se renueva solo cada 5 minutos</div>` : (vivoMsg === 'sin_token' ? `<details class="card mt-sinv"><summary>⚪ <b>Sin conexión en vivo</b> — se muestran los datos importados. Toca para ver cómo conectarla.</summary>${pasos}</details>` : (vivoMsg ? `<div class="nota-pub">⚠ No pude actualizar en vivo: ${esc(vivoMsg)}</div>` : ''))}
     ${A.importado ? `<div class="nota-pub">Datos traídos de Meta ${A.fuente ? '(' + esc(A.fuente) + ') ' : ''}el ${esc(new Date(A.importado_en).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }))}. Es una foto de ese momento: para ponerla al día pídele a Claude <b>actualiza</b> y pega lo nuevo abajo.</div>` : ''}
     <div class="acct"><i></i><span>${A.importado ? 'Importado desde Meta' : 'Automático desde Meta'}</span><b>${esc(A.cuenta.nombre || META_CUENTA.nombre)}</b><code>${esc(A.cuenta.id)}</code>${A.cuenta.moneda ? `<code>${esc(A.cuenta.moneda)}</code>` : ''}</div>
     ${otro ? `<div class="nota-pub">Estás viendo ${f1(A.desde)} al ${f1(A.hasta)}. Toca <b>Actualizar</b> para traer el periodo que elegiste.</div>` : ''}
@@ -220,6 +245,7 @@ const Meta = (() => {
     if (!demo() && !(window.Nube && Nube.listo)) return false;
     const [d, h] = rangoActual();
     autoCargar(); revisarRemoto();
+    if (window.Nube && Nube.activo) iniciarVivo();
     if (demo() && (!datos || clave !== d + '|' + h)) cargar();
     if (!datos && !cargando && S.metaSnap && !demo()) { datos = S.metaSnap; clave = d + '|' + h; }
     const cab = secH('meta', 'Meta Ads', 'Campañas, conjuntos y anuncios', '<button class="btn btn-pri" id="mact" style="white-space:nowrap">Actualizar</button>');
@@ -232,7 +258,7 @@ const Meta = (() => {
     else cuerpoH = `<div class="card"><p class="mt-aviso">Inicia sesión para ver las campañas de Meta.</p></div>`;
     const avisoErr = datos && datos.importado && error ? `<div class="card"><p class="mt-aviso">${esc(error)}</p></div>` : '';
     const importador = demo() ? '' : `<details class="card mt-imp" ${!datos || hayNuevo ? 'open' : ''}><summary><b>Importar datos de Meta</b></summary><p class="sub">Si Claude dejó datos guardados, escribe tu clave y pulsa Cargar. O pega aquí el texto que te dio.</p><div class="mt-clave"><input id="mclave" type="password" autocomplete="off" placeholder="Tu clave"><button class="btn btn-pri btn-sm" id="mcargar" type="button">Cargar datos de Claude</button></div><label class="chk" style="margin:6px 0"><input type="checkbox" id="mrec" checked> Recordar mi clave en este dispositivo (así se actualiza sola)</label><textarea id="mimp" rows="5" placeholder="Pega aquí el texto"></textarea><div class="mt-impb"><button class="btn btn-pri btn-sm" id="mimpok" type="button">Importar</button>${S.metaSnap ? '<button class="btn btn-sm btn-del" id="mimpdel" type="button">Borrar lo importado</button>' : ''}</div><div class="nube-msg" id="mimpmsg"></div></details>`;
-    const nuevoH = hayNuevo ? `<div class="card" style="border-color:var(--acc2)"><p class="mt-aviso">🔔 <b>Hay datos nuevos de Meta</b> (${esc(fechaNueva.slice(0, 10))}). Abajo, escribe tu clave y pulsa <b>Cargar datos de Claude</b>.</p></div>` : '';
+    const nuevoH = hayNuevo && !envivo ? `<div class="card" style="border-color:var(--acc2)"><p class="mt-aviso">🔔 <b>Hay datos nuevos de Meta</b> (${esc(fechaNueva.slice(0, 10))}). Abajo, escribe tu clave y pulsa <b>Cargar datos de Claude</b>.</p></div>` : '';
     el.innerHTML = cab + nuevoH + avisoErr + cuerpoH + importador;
     const ok = $('#mimpok');
     if (ok) ok.onclick = () => { const msg = $('#mimpmsg'); const t = ($('#mimp').value || '').trim(); if (!t) { msg.textContent = 'Pega primero el texto.'; return; }
@@ -246,7 +272,7 @@ const Meta = (() => {
       S.metaAct = obj.actualizado || ''; hayNuevo = false;
       try { aplicarImport(txt); if (recordar) { try { localStorage.setItem('dropox.metaclave', cl); } catch (e) { /* sin almacenamiento */ } } } catch (e) { msg.textContent = e.message; } };
     const del = $('#mimpdel'); if (del) del.onclick = () => ask('¿Borrar los datos importados de Meta?', () => { delete S.metaSnap; if (datos && datos.importado) datos = null; Store.save(); render(); }, 'Borrar');
-    const bt = $('#mact'); if (bt) bt.onclick = () => { cargar(true); sync(); render(); };
+    const bt = $('#mact'); if (bt) bt.onclick = () => { vivo(false).then(() => { if (!envivo && !datos) cargar(true); }); };
     const fijar = (d, h) => { S.config.metaDesde = d; S.config.metaHasta = h; Store.save(); render(); };
     const fdI = $('#fdesde'), fhI = $('#fhasta');
     if (fdI) fdI.onchange = () => fijar(fdI.value, fhI.value);
