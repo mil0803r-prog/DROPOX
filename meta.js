@@ -132,6 +132,8 @@ const Meta = (() => {
       const nuevo = await traer({ desde: d, hasta: h });
       if (String(nuevo.cuenta && nuevo.cuenta.id) !== META_CUENTA.id) throw new Error(`La cuenta conectada (${(nuevo.cuenta && (nuevo.cuenta.nombre || nuevo.cuenta.id)) || '?'}) no es ${META_CUENTA.nombre}.`);
       datos = nuevo; clave = d + '|' + h; hora = new Date(); envivo = true; vivoMsg = ''; error = ''; falta = false;
+      { const len = Math.round((Date.parse(h) - Date.parse(d)) / 864e5) + 1, ph = mas(d, -1), pd = mas(ph, -(len - 1)); prevR = [pd, ph]; prevT = null;
+        traer({ desde: pd, hasta: ph, solo: 'dias' }).then(x => { prevT = sumarM(x.dias || []); if (vista === 'meta') render(); }).catch(() => { prevT = null; }); }
       sync();
     } catch (e) { envivo = false; vivoMsg = e.falta ? 'sin_token' : (e.message || 'No se pudo leer Meta.'); if (e.falta && !datos && !S.metaSnap) { falta = true; error = e.message; } }
     cargando = false; ultVivo = Date.now();
@@ -182,6 +184,55 @@ const Meta = (() => {
   const celdas = m => [money(m.gasto), n0(m.impresiones), n0(m.alcance), n2(m.frecuencia), n0(m.clics_enlace), n2(m.ctr_enlace) + '%', m.cpc_enlace ? money(m.cpc_enlace) : '—', money(m.cpm), n0(m.compras), money(m.costo_compra), m.roas ? n2(m.roas) + 'x' : '—', n0(m.mensajes), money(m.costo_mensaje)];
   const totales = rows => { const t = { gasto: 0, impresiones: 0, clics_enlace: 0, compras: 0, valor_compras: 0, mensajes: 0 }; rows.forEach(r => Object.keys(t).forEach(k => { t[k] += N(r.m[k]); })); const g = t.gasto;
     return [money(g), n0(t.impresiones), '—', '—', n0(t.clics_enlace), t.impresiones ? n2(t.clics_enlace / t.impresiones * 100) + '%' : '—', t.clics_enlace ? money(g / t.clics_enlace) : '—', t.impresiones ? money(g / t.impresiones * 1000) : '—', n0(t.compras), t.compras ? money(g / t.compras) : '—', g > 0 && t.valor_compras > 0 ? n2(t.valor_compras / g) + 'x' : '—', n0(t.mensajes), t.mensajes ? money(g / t.mensajes) : '—']; };
+  // ───────── indicadores con color según tus metas y cambio contra el periodo anterior ─────────
+  const BENCH0 = { costo_res: { d: -1, b: 0.8, m: 1.5, n: 'Costo por resultado (S/)' }, costo_compra: { d: -1, b: 8, m: 15, n: 'CPA, costo por compra (S/)' }, roas: { d: 1, b: 3, m: 1.5, n: 'ROAS' }, ctr_enlace: { d: 1, b: 1.5, m: 0.8, n: 'CTR del enlace (%)' },
+    cpc_enlace: { d: -1, b: 0.4, m: 1, n: 'CPC del enlace (S/)' }, cpm: { d: -1, b: 6, m: 15, n: 'CPM (S/)' }, frecuencia: { d: -1, b: 1.8, m: 3, n: 'Frecuencia' }, tasa_gancho: { d: 1, b: 30, m: 15, n: 'Tasa de gancho (%)' }, tasa_retencion: { d: 1, b: 25, m: 10, n: 'Tasa de retención (%)' }, costo_visita: { d: -1, b: 0.5, m: 1.2, n: 'Costo por visita (S/)' } };
+  const bench = k => ({ ...BENCH0[k], ...((S.config.metaMetas || {})[k] || {}) });
+  const calidad = (k, v) => { if (v == null || !isFinite(v) || !BENCH0[k]) return ''; const B = bench(k); if (B.d < 0) return v <= B.b ? 'bien' : v >= B.m ? 'mal' : 'medio'; return v >= B.b ? 'bien' : v <= B.m ? 'mal' : 'medio'; };
+  let prevT = null, prevR = null;
+  // [clave, título, valor(T), formato, dirección (1 = más es mejor, -1 = menos es mejor, 0 = neutro), solo si hay dato]
+  const KPIS = [
+    ['gasto', 'Importe gastado', T => T.gasto, v => money(v), 0, false],
+    ['resultados', 'Resultados', T => resDe({ m: T }).n, v => n0(v), 1, false],
+    ['costo_res', 'Costo por resultado', T => { const x = resDe({ m: T }).n; return x ? T.gasto / x : null; }, v => mon(v), -1, false],
+    ['compras', 'Compras en Meta', T => N(T.compras), v => n0(v), 1, false],
+    ['costo_compra', 'CPA (costo por compra)', T => (N(T.compras) ? T.gasto / T.compras : null), v => mon(v), -1, false],
+    ['roas', 'ROAS de compras', T => (T.gasto > 0 && N(T.valor_compras) > 0 ? T.valor_compras / T.gasto : null), v => (v ? n2(v) + 'x' : '—'), 1, false],
+    ['ctr_enlace', 'CTR (enlace)', T => (T.impresiones ? N(T.clics_enlace) / T.impresiones * 100 : null), v => pc2(v), 1, false],
+    ['cpc_enlace', 'CPC (enlace)', T => (N(T.clics_enlace) ? T.gasto / T.clics_enlace : null), v => mon(v), -1, false],
+    ['cpm', 'CPM', T => (T.impresiones ? T.gasto / T.impresiones * 1000 : null), v => mon(v), -1, false],
+    ['alcance', 'Alcance', T => T.alcance, v => n0(v), 1, false],
+    ['impresiones', 'Impresiones', T => T.impresiones, v => n0(v), 1, false],
+    ['frecuencia', 'Frecuencia', T => (T.alcance ? T.impresiones / T.alcance : null), v => (v == null ? '—' : n2(v)), -1, false],
+    ['visitas_pagina', 'Visitas a la página', T => N(T.visitas_pagina), v => n0(v), 1, true],
+    ['costo_visita', 'Costo por visita', T => (N(T.visitas_pagina) ? T.gasto / T.visitas_pagina : null), v => mon(v), -1, true],
+    ['agregar_carrito', 'Agregados al carrito', T => N(T.agregar_carrito), v => n0(v), 1, true],
+    ['tasa_gancho', 'Tasa de gancho (video)', T => (T.impresiones && N(T.video_3s) ? N(T.video_3s) / T.impresiones * 100 : null), v => pc2(v), 1, true],
+    ['tasa_retencion', 'Tasa de retención (video)', T => (N(T.video_3s) && N(T.thruplay) ? T.thruplay / T.video_3s * 100 : null), v => pc2(v), 1, true],
+  ];
+  const cambio = (dir, v, p) => {
+    if (v == null || p == null || !isFinite(v) || !isFinite(p) || p === 0) return '';
+    const pc = (v - p) / Math.abs(p) * 100; if (Math.abs(pc) < 1) return '<span class="dl igual">= igual que antes</span>';
+    const mejor = dir === 0 ? '' : (dir * pc > 0 ? 'mejor' : 'peor');
+    return `<span class="dl ${mejor}">${pc > 0 ? '▲' : '▼'} ${Math.abs(pc) >= 100 ? Math.round(Math.abs(pc)) : Math.abs(pc).toFixed(0)}% vs periodo anterior</span>`;
+  };
+  function kpiHtml(A, dias) {
+    const T = sumarM(dias); T.alcance = A.campanas.reduce((a, c) => a + N(c.m.alcance), 0) || T.alcance;
+    let P = prevT; if (!P && A.importado && prevR) { const pd = (datos.dias || []).filter(z => z.fecha >= prevR[0] && z.fecha <= prevR[1]); P = pd.length ? sumarM(pd) : null; }
+    if (P) P.alcance = P.alcance;
+    const ts = KPIS.filter(([, , g, , , opc]) => !opc || (g(T) || 0) > 0).map(([k, l, g, f, dir]) => {
+      const v = g(T), q = calidad(k, v), pv = P ? g(P) : null;
+      return `<div class="t mt-k ${q ? 'q-' + q : ''}"><small>${l}</small><b>${f(v, { m: T })}</b>${cambio(dir, v, pv) || '<span class="dl">&nbsp;</span>'}</div>`;
+    }).join('');
+    const pr = prevR ? `${f1(prevR[0])} – ${f1(prevR[1])}` : '';
+    return `<div class="tiles mt-kpis">${ts}</div><p class="mt-leyenda"><span class="q-bien">● Bien</span><span class="q-medio">● Regular</span><span class="q-mal">● Mejorar</span>${pr ? `<span>Cambio contra ${pr}</span>` : ''}<button type="button" class="btn btn-sm" id="mmetas">🎯 Ajustar metas</button></p>`;
+  }
+  function ventanaMetas() {
+    const m = S.config.metaMetas || {};
+    const campos = Object.entries(BENCH0).flatMap(([k, B]) => { const x = bench(k); return [{ k: k + '__b', l: `${B.n}: ${B.d < 0 ? 'bien hasta' : 'bien desde'}`, t: 'number', def: x.b }, { k: k + '__m', l: `${B.n}: ${B.d < 0 ? 'mal desde' : 'mal hasta'}`, t: 'number', def: x.m }]; });
+    openForm('Tus metas (para los colores)', campos, {}, v => { const o = { ...m }; Object.keys(BENCH0).forEach(k => { const b = parseFloat(v[k + '__b']), mm = parseFloat(v[k + '__m']); if (isFinite(b) && isFinite(mm)) o[k] = { b, m: mm }; }); S.config.metaMetas = o; });
+  }
+
   // ───────── tabla estilo Administrador de anuncios de Meta ─────────
   const resDe = e => { const m = e.m; if (m.mensajes > 0) return { n: m.mensajes, t: 'Conversaciones de mensajes iniciadas' }; if (m.compras > 0) return { n: m.compras, t: 'Compras' }; if (m.clics_enlace > 0) return { n: m.clics_enlace, t: 'Clics en el enlace' }; return { n: 0, t: '' }; };
   const pc2 = v => (v === null || v === undefined || !isFinite(v) ? '—' : n2(v) + '%');
@@ -331,7 +382,7 @@ const Meta = (() => {
   const sumaDias = (A, delta) => { const x = new Date(A + 'T12:00:00'); x.setDate(x.getDate() + delta); return iso(x); };
 
   function html() {
-    const A = filtrado(datos), dias = A.dias, [d0, h0] = rangoActual(), otro = clave !== d0 + '|' + h0 && !A.ejemplo && !A.importado;
+    const A = filtrado(datos), dias = A.dias, [rd0, rh0] = rangoActual(), [d0, h0] = [rd0, rh0], otro = clave !== d0 + '|' + h0 && !A.ejemplo && !A.importado;
     const g = dias.reduce((s, d) => s + d.gasto, 0), c = dias.reduce((s, d) => s + d.compras, 0), v = dias.reduce((s, d) => s + d.valor_compras, 0), im = dias.reduce((s, d) => s + d.impresiones, 0), cl = dias.reduce((s, d) => s + d.clics_enlace, 0);
     const tile = (l, val, s = '') => `<div class="t"><small>${l}</small><b>${val}</b>${s ? `<em>${s}</em>` : ''}</div>`;
     const mx = Math.max(...dias.map(d => d.gasto), 0);
@@ -339,6 +390,7 @@ const Meta = (() => {
     const chart = mx <= 0 ? '<div class="empty">Sin gasto en este periodo.</div>' : `<svg viewBox="0 0 ${W} ${H}" class="bars">${dias.map((d, i) => { const hh = (H - t - b) * d.gasto / mx; return `<rect x="${(i * bw + bw * .12).toFixed(1)}" y="${(H - b - hh).toFixed(1)}" width="${(bw * .76).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="#3b82f6"><title>${f1(d.fecha)}: ${money(d.gasto)} · ${d.compras} compras</title></rect>`; }).join('')}<line x1="0" x2="${W}" y1="${H - b}" y2="${H - b}" stroke="var(--line)"/>${dias.map((d, i) => i % Math.ceil(n / 8) === 0 ? `<text x="${(i * bw + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">${d.fecha.slice(8)}/${d.fecha.slice(5, 7)}</text>` : '').join('')}</svg>`;
     const camps = A.campanas.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto);
     const arbol = camps.length ? camps.map(ca => nodo('campaign', ca, ca.conjuntos.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto).map(se => nodo('adset', se, se.anuncios.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto).map(ad => nodo('ad', ad, '')).join(''))).join(''))).join('') : '<div class="empty">No hay campañas con este filtro en el periodo.</div>';
+    if (!envivo && A.importado) { const len = Math.round((Date.parse(rh0) - Date.parse(rd0)) / 864e5) + 1, ph = mas(rd0, -1); prevR = [mas(ph, -(len - 1)), ph]; prevT = null; }
     const [rd, rh] = rangoActual(), cr = mr(), bb = borr || { ...cr };
     const [bd, bh] = calcRango(bb.k, bb.d, bb.h, bb.hoy !== false);
     const panel = `<div class="mt-fp"><div class="mt-fl">${Object.entries(RANGOS).map(([k, [l]]) => `<label class="${bb.k === k ? 'on' : ''}"><input type="radio" name="mr" value="${k}" ${bb.k === k ? 'checked' : ''}> ${l}</label>`).join('')}</div>
@@ -353,7 +405,7 @@ const Meta = (() => {
     <div class="acct"><i></i><span>${A.importado ? 'Importado desde Meta' : 'Automático desde Meta'}</span><b>${esc(A.cuenta.nombre || META_CUENTA.nombre)}</b><code>${esc(A.cuenta.id)}</code>${A.cuenta.moneda ? `<code>${esc(A.cuenta.moneda)}</code>` : ''}</div>
     ${otro ? `<div class="nota-pub">Estás viendo ${f1(A.desde)} al ${f1(A.hasta)}. Toca <b>Actualizar</b> para traer el periodo que elegiste.</div>` : ''}
     ${fechaCtl}
-    <div class="tiles">${tile('Importe gastado', money(g), `${dias.length} días`)}${tile('Compras', n0(c), 'según el píxel')}${tile('Costo por compra', c > 0 ? money(g / c) : '—')}${tile('ROAS de compras', g > 0 && v > 0 ? n2(v / g) + 'x' : '—', 'valor ÷ gasto')}${tile('CTR (enlace)', im > 0 ? n2(cl / im * 100) + '%' : '—')}${tile('CPM', im > 0 ? money(g / im * 1000) : '—')}</div>
+    ${kpiHtml(A, dias)}
     <div class="card"><h3>Campañas, conjuntos y anuncios</h3><p class="sub">Toca una campaña para ver sus conjuntos y anuncios. Las métricas son las de Meta.</p>
       <div class="chips" style="margin-top:6px">${[['activas', 'Activas'], ['conGasto', 'Con gasto'], ['todas', 'Todas']].map(([k, l]) => `<button class="chip ${filtro === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
       <div class="mt-vista"><button class="chip ${vistaM === 'arbol' ? 'on' : ''}" data-vm="arbol">Árbol</button><button class="chip ${vistaM === 'tabla' ? 'on' : ''}" data-vm="tabla">Tabla</button></div>
@@ -424,6 +476,7 @@ const Meta = (() => {
       if (e.target.value === '__custom') { e.target.value = preset; ventanaColumnas(); return; }
       preset = e.target.value; try { localStorage.setItem('dropox.metaPreset', preset); } catch (x) { /* sin almacenamiento */ } render(); };
     const mx = $('#mexp'); if (mx) mx.onclick = exportarTabla;
+    const mmt = $('#mmetas'); if (mmt) mmt.onclick = ventanaMetas;
     el.querySelectorAll('[data-copiar]').forEach(c => c.onclick = ev => { ev.stopPropagation(); const v = c.dataset.copiar; (navigator.clipboard ? navigator.clipboard.writeText(v).then(() => toast('ID copiado: ' + v), () => toast('No se pudo copiar')) : toast('No se pudo copiar')); });
     let colArr = null;
     el.querySelectorAll('th[data-ck]').forEach(h => {
