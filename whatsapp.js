@@ -5,7 +5,7 @@
   const ET0 = [['Nuevo cliente', '#25a35a'], ['Nuevo pedido', '#2f7fe0'], ['Pago pendiente', '#e0a02f'], ['Pagado', '#14a39a'], ['Pedido finalizado', '#8a6fd1'], ['Seguimiento', '#e0562f']];
   const COL = ['#25a35a', '#2f7fe0', '#e0a02f', '#14a39a', '#8a6fd1', '#e0562f', '#d1479a', '#7a8794'];
   let sel = '', filtro = '', q = '', fet = '', modo = 'lista', qs = '';
-  const W = () => { const w = (S.wa = S.wa || {}); w.chats = w.chats || []; if (!w.limpio1) { w.limpio1 = 1; w.chats.forEach(c => { if (c.auto) { c.etq = (c.etq || []).filter(n => n !== 'Nuevo cliente'); if (c.estado === 'nuevo') c.estado = ''; } }); } return w; };
+  const W = () => { const w = (S.wa = S.wa || {}); w.chats = w.chats || []; if (!w.tabsV7) { w.tabsV7 = 1; w.chats.forEach(c => { if (c.tab === 't0') { delete c.tab; delete c.tabOut; } }); } if (!w.limpio1) { w.limpio1 = 1; w.chats.forEach(c => { if (c.auto) { c.etq = (c.etq || []).filter(n => n !== 'Nuevo cliente'); if (c.estado === 'nuevo') c.estado = ''; } }); } return w; };
   const chats = () => W().chats;
   const etqs = () => { const w = W(); if (!w.etq) w.etq = ET0.map(([n, c]) => ({ n, c })); return w.etq; };
   const col = n => (etqs().find(e => e.n === n) || { c: '#7a8794' }).c;
