@@ -4,7 +4,7 @@
   const TR = { shalom: 'Shalom', olva: 'Olva', bus: 'Bus' };
   const ET0 = [['Nuevo cliente', '#25a35a'], ['Nuevo pedido', '#2f7fe0'], ['Pago pendiente', '#e0a02f'], ['Pagado', '#14a39a'], ['Pedido finalizado', '#8a6fd1'], ['Seguimiento', '#e0562f']];
   const COL = ['#25a35a', '#2f7fe0', '#e0a02f', '#14a39a', '#8a6fd1', '#e0562f', '#d1479a', '#7a8794'];
-  let sel = '', filtro = '', q = '', fet = '';
+  let sel = '', filtro = '', q = '', fet = '', modo = 'lista';
   const W = () => { const w = (S.wa = S.wa || {}); w.chats = w.chats || []; if (!w.limpio1) { w.limpio1 = 1; w.chats.forEach(c => { if (c.auto) { c.etq = (c.etq || []).filter(n => n !== 'Nuevo cliente'); if (c.estado === 'nuevo') c.estado = ''; } }); } return w; };
   const chats = () => W().chats;
   const etqs = () => { const w = W(); if (!w.etq) w.etq = ET0.map(([n, c]) => ({ n, c })); return w.etq; };
@@ -205,6 +205,42 @@
       toast(n + ' pedido' + (n === 1 ? '' : 's') + ' creado' + (n === 1 ? '' : 's') + ' en Pedidos ✅');
     });
   }
+  // ── Tableros (estilo Kanban): cada chat está en un tablero a la vez, aparte de las etiquetas ──
+  const tabs = () => { const w = W(); if (!Array.isArray(w.tabs)) w.tabs = [{ id: 't1', n: 'Guía generada en Shalom', c: '#e0a02f' }, { id: 't2', n: 'En ruta', c: '#2f7fe0' }, { id: 't3', n: 'Entregado', c: '#25a35a' }, { id: 't4', n: 'Recompra', c: '#8a6fd1' }]; return w.tabs; };
+  const tabDe = c => tabs().find(t => t.id === c.tab);
+  const mover = (c, id) => { if (id) c.tab = id; else delete c.tab; c.tabTs = Date.now(); Store.save(); };
+  function tableros() {
+    const T = tabs(), L = chats().filter(c => !c.grupo && (!fet || (c.etq || []).includes(fet)) && (!q || [c.nombre, c.tel, c.ciudad, c.producto].join(' ').toLowerCase().includes(q))).sort((a, b) => (b.ult || 0) - (a.ult || 0));
+    const card = c => `<div class="kb-c" draggable="true" data-kc="${c.id}">
+      <div class="kb-ct" data-abrir="${c.id}">${av(c)}<div class="kb-cn"><b>${esc(c.nombre)}</b><small>${c.tel ? '+' + esc(String(c.tel).replace(/\D/g, '')) : 'sin celular'}${c.ciudad ? ' · ' + esc(c.ciudad) : ''}</small></div></div>
+      ${c.producto ? `<div class="kb-p">${esc(c.producto)}</div>` : ''}<div class="kb-m">${esc(prev(c)).slice(0, 70)}</div>
+      ${(c.etq || []).length ? `<div class="kb-e">${c.etq.map(pill).join('')}</div>` : ''}
+      <div class="kb-a"><select data-mv="${c.id}" aria-label="Mover a otro tablero"><option value="">Mover a…</option>${T.map(t => `<option value="${t.id}" ${c.tab === t.id ? 'disabled' : ''}>${esc(t.n)}</option>`).join('')}<option value="__ninguno">Quitar del tablero</option></select></div></div>`;
+    const col = (t, i) => { const l = L.filter(c => c.tab === t.id); return `<div class="kb-col" data-col="${t.id}"><div class="kb-h" style="border-top-color:${t.c}"><b>${esc(t.n)}</b><i>${l.length}</i><span class="kb-hb"><button class="btn btn-sm" data-ml="${t.id}:-1" ${i === 0 ? 'disabled' : ''} aria-label="Mover tablero a la izquierda">◀</button><button class="btn btn-sm" data-ml="${t.id}:1" ${i === T.length - 1 ? 'disabled' : ''} aria-label="Mover tablero a la derecha">▶</button><button class="btn btn-sm" data-te="${t.id}" aria-label="Editar tablero">✎</button></span></div><div class="kb-b">${l.length ? l.map(card).join('') : '<p class="note kb-v">Arrastra aquí un chat</p>'}</div></div>`; };
+    const sin = L.filter(c => !tabDe(c));
+    return `<div class="kb-top"><input class="search" id="wq" type="search" placeholder="Buscar nombre, celular, ciudad…" value="${esc(q)}"><select id="kbet"><option value="">Todas las etiquetas</option>${etqs().map(e => `<option value="${esc(e.n)}" ${fet === e.n ? 'selected' : ''}>${esc(e.n)}</option>`).join('')}</select><button class="btn btn-pri" id="kbnew">+ Tablero</button></div>
+      <div class="kb">${T.map(col).join('')}<div class="kb-col kb-sin" data-col=""><div class="kb-h" style="border-top-color:#7a8794"><b>Sin tablero</b><i>${sin.length}</i></div><div class="kb-b">${sin.length ? sin.slice(0, 60).map(card).join('') + (sin.length > 60 ? `<p class="note kb-v">+${sin.length - 60} más: usa el buscador</p>` : '') : '<p class="note kb-v">Todos tus chats ya tienen tablero</p>'}</div></div></div>
+      <p class="note">Mueve cada chat de tablero arrastrándolo (en el celular usa «Mover a…»). Los tableros son aparte de las etiquetas. Toca el nombre para abrir el chat.</p>`;
+  }
+  function enlazarTableros(el) {
+    const g = i => el.querySelector(i), refrescar = () => vista(el);
+    g('#wq').oninput = e => { q = e.target.value.toLowerCase(); const p = e.target.selectionStart; refrescar(); const i = el.querySelector('#wq'); i.focus(); i.setSelectionRange(p, p); };
+    g('#kbet').onchange = e => { fet = e.target.value; refrescar(); };
+    g('#kbnew').onclick = () => openForm('Nuevo tablero', [{ k: 'n', l: 'Nombre', req: 1, full: 1 }, { k: 'c', l: 'Color', t: 'select', opts: Object.fromEntries(COL.map((x, i) => [x, ['Verde', 'Azul', 'Amarillo', 'Turquesa', 'Morado', 'Naranja', 'Rosa', 'Gris'][i]])) }], {}, v => { tabs().push({ id: 't' + Date.now().toString(36), n: v.n, c: v.c || COL[0] }); });
+    el.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => { sel = b.dataset.abrir; modo = 'lista'; vista(el); });
+    el.querySelectorAll('[data-mv]').forEach(b => b.onchange = () => { const c = chats().find(x => x.id === b.dataset.mv); if (!c || !b.value) return; mover(c, b.value === '__ninguno' ? '' : b.value); refrescar(); });
+    el.querySelectorAll('[data-ml]').forEach(b => b.onclick = () => { const [id, d] = b.dataset.ml.split(':'), T = tabs(), i = T.findIndex(t => t.id === id), j = i + +d; if (i < 0 || j < 0 || j >= T.length) return; [T[i], T[j]] = [T[j], T[i]]; Store.save(); refrescar(); });
+    el.querySelectorAll('[data-te]').forEach(b => b.onclick = () => { const t = tabs().find(x => x.id === b.dataset.te); if (!t) return; openForm('Editar tablero', [{ k: 'n', l: 'Nombre', req: 1, full: 1 }, { k: 'c', l: 'Color', t: 'select', opts: Object.fromEntries(COL.map((x, i) => [x, ['Verde', 'Azul', 'Amarillo', 'Turquesa', 'Morado', 'Naranja', 'Rosa', 'Gris'][i]])) }], t, v => Object.assign(t, v));
+      setTimeout(() => { const d = document.querySelector('#dlg'); if (d && !d.querySelector('#kbdel')) { const bt = document.createElement('button'); bt.type = 'button'; bt.id = 'kbdel'; bt.className = 'btn btn-del'; bt.textContent = 'Eliminar tablero'; bt.onclick = () => confirmDel('¿Eliminar el tablero «' + t.n + '»? Sus chats quedan en «Sin tablero».', () => { chats().forEach(c => { if (c.tab === t.id) delete c.tab; }); W().tabs = tabs().filter(x => x.id !== t.id); try { d.close(); } catch (e) {} Store.save(); refrescar(); }); const f = d.querySelector('form'); if (f) f.appendChild(bt); } }, 50); });
+    // arrastrar y soltar (escritorio)
+    let arr = null;
+    el.querySelectorAll('[data-kc]').forEach(k => { k.ondragstart = e => { arr = k.dataset.kc; k.classList.add('arr'); try { e.dataTransfer.setData('text/plain', arr); e.dataTransfer.effectAllowed = 'move'; } catch (x) {} }; k.ondragend = () => k.classList.remove('arr'); });
+    el.querySelectorAll('[data-col]').forEach(cl => {
+      cl.ondragover = e => { e.preventDefault(); cl.classList.add('sobre'); };
+      cl.ondragleave = () => cl.classList.remove('sobre');
+      cl.ondrop = e => { e.preventDefault(); cl.classList.remove('sobre'); const c = chats().find(x => x.id === arr); arr = null; if (c && (c.tab || '') !== cl.dataset.col) { mover(c, cl.dataset.col); refrescar(); } };
+    });
+  }
   function lista(el) {
     const L = chats().filter(c => (!filtro || (filtro === '__g' ? c.grupo : c.estado === filtro)) && (!fet || (c.etq || []).includes(fet)) && (!q || [c.nombre, c.tel, c.ciudad, c.producto].join(' ').toLowerCase().includes(q)))
       .sort((a, b) => (b.ult || 0) - (a.ult || 0));
@@ -225,6 +261,7 @@
     return `<div class="wa-c">
       <div class="wa-hd"><button class="btn btn-sm wa-back" id="wback">←</button>${av(c)}<div class="wa-hb"><b>${esc(c.nombre)}</b><small>${esc((c.tel ? '+' + String(c.tel).replace(/\D/g, '') : 'sin celular') + (c.info ? ' · ' + c.info : ''))}${c.ciudad ? ' · ' + esc(c.ciudad) : ''}${c.producto ? ' · ' + esc(c.producto) : ''}</small></div><button class="btn btn-sm" id="ced">Editar</button></div>
       <div class="wa-est wa-etq">${etqs().map(e => `<button class="wa-et ${(c.etq || []).includes(e.n) ? 'on' : 'off'}" style="--c:${e.c}" data-et="${esc(e.n)}">${esc(e.n)}</button>`).join('')}</div>
+      <div class="wa-est"><small style="margin-right:6px;opacity:.7">Tablero:</small>${tabs().map(t => `<button class="chip ${c.tab === t.id ? 'on' : ''}" data-tb="${t.id}" style="${c.tab === t.id ? 'background:' + t.c + ';border-color:' + t.c + ';color:#fff' : ''}">${esc(t.n)}</button>`).join('')}</div>
       <div class="wa-est">${Object.entries(ESTADOS).map(([k, l]) => `<button class="chip ${c.estado === k ? 'on' : ''}" data-st="${k}">${l}</button>`).join('')}</div>
       <div class="wa-msgs" id="wmsgs">${(c.msgs || []).length ? c.msgs.map((m, i) => `<div class="wa-b ${m.d}">${c.grupo && m.d === 'in' && m.nombre ? `<b class="wa-qn">${esc(m.nombre)}</b>` : ''}${m.tipo && m.id ? medioHtml(m) : ''}${m.tipo && /^(📷 Foto|🎥 Video|🎤 Audio|📄 Documento|Sticker)$/.test(m.t) ? '' : `<span>${esc(m.t).replace(/\n/g, '<br>')}</span>`}<small>${hora(m.ts)}${m.d === 'out' ? ' <i class="wa-tk">✓✓</i>' : ''} <a data-dm="${i}" title="Quitar">✕</a></small></div>`).join('') : '<p class="note" style="text-align:center">Aún no hay mensajes. Escribe abajo, o pega lo que te escribió el cliente.</p>'}</div>
       <div class="wa-in">
@@ -239,10 +276,10 @@
   function vista(el) {
     const c = chats().find(x => x.id === sel);
     const ant = document.querySelector('#wtx'), borrador = ant ? ant.value : '';
-    el.innerHTML = `${secH('mensajes', 'WhatsApp', `${chats().length} chats · ${chats().filter(x => x.estado === 'esperando').length} esperando pago`, `<button class="btn" id="wweb">WhatsApp Web ↗</button> <button class="btn btn-pri" id="wnew">+ Chat</button>`)}
+    el.innerHTML = `${secH('mensajes', 'WhatsApp', `${chats().length} chats · ${chats().filter(x => x.estado === 'esperando').length} esperando pago`, `<button class="btn ${modo === 'tableros' ? 'btn-pri' : ''}" id="wmodo">${modo === 'tableros' ? '☰ Ver lista' : '▦ Tableros'}</button> <button class="btn" id="wweb">WhatsApp Web ↗</button> <button class="btn btn-pri" id="wnew">+ Chat</button>`)}
     ${barra()}
-    <div class="wa ${c ? 'abierto' : ''}">${lista(el)}${chat(c)}</div>
-    <p class="note">Uso manual, igual que las etiquetas de WhatsApp Business: etiqueta a cada cliente aquí, copia el mensaje listo y pégalo en tu WhatsApp Business. No lee tu WhatsApp automáticamente. Las etiquetas también debes ponerlas allá si quieres verlas en la app.</p>`;
+    ${modo === 'tableros' ? tableros() : `<div class="wa ${c ? 'abierto' : ''}">${lista(el)}${chat(c)}</div>`}
+    ${modo === 'tableros' ? '' : '<p class="note">Uso manual, igual que las etiquetas de WhatsApp Business: etiqueta a cada cliente aquí, copia el mensaje listo y pégalo en tu WhatsApp Business. No lee tu WhatsApp automáticamente. Las etiquetas también debes ponerlas allá si quieres verlas en la app.</p>'}`;
     const g = (i) => el.querySelector(i);
     if (borrador && g('#wtx')) g('#wtx').value = borrador;
     if (g('#wrev')) g('#wrev').onclick = revisar;
@@ -254,6 +291,8 @@
     latido();
     g('#wweb').onclick = web;
     g('#wnew').onclick = () => openForm('Nuevo chat', CAMPOS, {}, v => { const n = { id: uid(), ...v, msgs: [], ult: Date.now() }; chats().push(n); sel = n.id; });
+    g('#wmodo').onclick = () => { modo = modo === 'tableros' ? 'lista' : 'tableros'; vista(el); };
+    if (modo === 'tableros') return enlazarTableros(el);
     g('#wq').oninput = e => { q = e.target.value.toLowerCase(); const p = e.target.selectionStart; vista(el); const i = el.querySelector('#wq'); i.focus(); i.setSelectionRange(p, p); };
     el.querySelectorAll('[data-fe]').forEach(b => b.onclick = () => { fet = b.dataset.fe; vista(el); });
     el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; vista(el); });
@@ -264,6 +303,7 @@
     g('#wback').onclick = () => { sel = ''; vista(el); };
     g('#ced').onclick = () => openForm('Editar chat', CAMPOS, c, v => Object.assign(c, v));
     el.querySelectorAll('[data-et]').forEach(b => b.onclick = () => { const n = b.dataset.et; c.etq = c.etq || []; c.etq = c.etq.includes(n) ? c.etq.filter(x => x !== n) : c.etq.concat(n); Store.save(); vista(el); });
+    el.querySelectorAll('[data-tb]').forEach(b => b.onclick = () => { mover(c, c.tab === b.dataset.tb ? '' : b.dataset.tb); vista(el); });
     el.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { c.estado = b.dataset.st; Store.save(); vista(el); });
     el.querySelectorAll('[data-dm]').forEach(a => a.onclick = () => { c.msgs.splice(+a.dataset.dm, 1); Store.save(); vista(el); });
     g('#wpl').onchange = e => { const t = plantillas().find(x => x.id === e.target.value); if (t) g('#wtx').value = t.x.replace(/\[cliente\]/g, (c.nombre || '').split(' ')[0]).replace(/\[producto\]/g, c.producto || '[producto]'); };
