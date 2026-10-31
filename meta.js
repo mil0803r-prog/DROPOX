@@ -14,7 +14,27 @@ const Meta = (() => {
   let detAbierto = false, datos = null, clave = '', hora = null, cargando = false, error = '', falta = false, filtro = 'activas', vistaM = 'tabla', nivelT = 'campaign', abierto = new Set();
 
   const claveActual = () => { const [d, h] = rangoActual(); return d + '|' + h; };
-  const rangoActual = () => { const pk = S.config.periodo; let [d, h] = rango(pk); if (pk === 'todo') { const x = new Date(); x.setDate(x.getDate() - 89); d = iso(x); } const hoyS = hoy(); return [d, h > hoyS ? hoyS : h]; };
+  // ───────── filtro de fechas estilo Meta ─────────
+  const RANGOS = { hoy: ['Hoy'], ayer: ['Ayer'], hoyayer: ['Hoy y ayer'], '7d': ['Últimos 7 días'], '14d': ['Últimos 14 días'], '28d': ['Últimos 28 días'], '30d': ['Últimos 30 días'], semana: ['Esta semana'], semanap: ['La semana pasada'], mes: ['Este mes'], mesp: ['El mes pasado'], max: ['Máximo'], custom: ['Personalizado'] };
+  const mr = () => { S.config = S.config || {}; return (S.config.metaRango = S.config.metaRango || { k: '30d', hoy: true }); };
+  const mas = (f, n) => { const x = new Date(f + 'T12:00:00'); x.setDate(x.getDate() + n); return iso(x); };
+  function calcRango(k, d, h, incluyeHoy) {
+    const t = hoy(), y = mas(t, -1), dow = (new Date(t + 'T12:00:00').getDay() + 6) % 7, lunes = mas(t, -dow);
+    const nd = { '7d': 7, '14d': 14, '28d': 28, '30d': 30 }[k];
+    if (nd) { const fin = incluyeHoy ? t : y; return [mas(fin, -(nd - 1)), fin]; }
+    if (k === 'hoy') return [t, t];
+    if (k === 'ayer') return [y, y];
+    if (k === 'hoyayer') return [y, t];
+    if (k === 'semana') return [lunes, t];
+    if (k === 'semanap') return [mas(lunes, -7), mas(lunes, -1)];
+    if (k === 'mes') return [t.slice(0, 8) + '01', t];
+    if (k === 'mesp') { const pm = mas(t.slice(0, 8) + '01', -1); return [pm.slice(0, 8) + '01', pm]; }
+    if (k === 'max') return [mas(t, -89), t];
+    return [d || mas(t, -29), h || t];
+  }
+  const rangoActual = () => { const c = mr(), [d, h] = calcRango(c.k, c.d, c.h, c.hoy !== false), t = hoy(); return [d > t ? t : d, h > t ? t : h]; };
+  let fechaAbierta = false, borr = null;
+  document.addEventListener('click', e => { if (fechaAbierta && vista === 'meta' && !e.target.closest('.mt-fecha')) { fechaAbierta = false; borr = null; render(); } });
 
   // ───────── datos importados (los trae Claude desde el conector de Facebook) ─────────
   function normalizarImport(txt) {
@@ -297,14 +317,14 @@ const Meta = (() => {
       compras: co, valor_compras: vc, roas: g && vc ? vc / g : null, costo_compra: co ? g / co : null, mensajes: ms, costo_mensaje: ms ? g / ms : null,
       ...Object.fromEntries(['agregar_carrito', 'inicio_pago', 'visitas_pagina', 'interacciones', 'reacciones', 'comentarios', 'compartidos', 'guardados', 'conexiones_msj', 'clics_salientes', 'video_3s', 'thruplay', 'video_25', 'video_50', 'video_75', 'video_95', 'video_100'].map(k => [k, t(k)])), video_seg: 0 };
   }
-  const rangoFechas = A => { const c = S.config || {}; let d = c.metaDesde || A.desde, h = c.metaHasta || A.hasta; if (d < A.desde) d = A.desde; if (h > A.hasta) h = A.hasta; if (d > h) { const x = d; d = h; h = x; } return [d, h]; };
+  const rangoFechas = A => { const [d0, h0] = rangoActual(); return [d0 < A.desde ? A.desde : d0, h0 > A.hasta ? A.hasta : h0]; };
   function filtrado(A) {
     if (!A || !A.importado) return A;
-    const [d, h] = rangoFechas(A);
-    if (d <= A.desde && h >= A.hasta) return A;
-    const en = z => z.fecha >= d && z.fecha <= h;
+    const [d0, h0] = rangoActual();
+    if (d0 <= A.desde && h0 >= A.hasta) return A;
+    const en = z => z.fecha >= d0 && z.fecha <= h0;
     const rec = e => (e.dias && e.dias.length ? { ...e, dias: e.dias.filter(en), m: sumarM(e.dias.filter(en)) } : e);
-    return { ...A, desde: d, hasta: h, recortado: true, dias: A.dias.filter(en),
+    return { ...A, desde: d0, hasta: h0, recortado: true, dias: A.dias.filter(en),
       campanas: A.campanas.map(ca => ({ ...rec(ca), conjuntos: ca.conjuntos.map(se => ({ ...rec(se), anuncios: se.anuncios.map(rec) })) })) };
   }
   const sumaDias = (A, delta) => { const x = new Date(A + 'T12:00:00'); x.setDate(x.getDate() + delta); return iso(x); };
@@ -318,19 +338,20 @@ const Meta = (() => {
     const chart = mx <= 0 ? '<div class="empty">Sin gasto en este periodo.</div>' : `<svg viewBox="0 0 ${W} ${H}" class="bars">${dias.map((d, i) => { const hh = (H - t - b) * d.gasto / mx; return `<rect x="${(i * bw + bw * .12).toFixed(1)}" y="${(H - b - hh).toFixed(1)}" width="${(bw * .76).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="#3b82f6"><title>${f1(d.fecha)}: ${money(d.gasto)} · ${d.compras} compras</title></rect>`; }).join('')}<line x1="0" x2="${W}" y1="${H - b}" y2="${H - b}" stroke="var(--line)"/>${dias.map((d, i) => i % Math.ceil(n / 8) === 0 ? `<text x="${(i * bw + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">${d.fecha.slice(8)}/${d.fecha.slice(5, 7)}</text>` : '').join('')}</svg>`;
     const camps = A.campanas.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto);
     const arbol = camps.length ? camps.map(ca => nodo('campaign', ca, ca.conjuntos.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto).map(se => nodo('adset', se, se.anuncios.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto).map(ad => nodo('ad', ad, '')).join(''))).join(''))).join('') : '<div class="empty">No hay campañas con este filtro en el periodo.</div>';
-    const pk = S.config.periodo;
-    const [fd, fh] = datos.importado ? rangoFechas(datos) : ['', ''];
-    const sel = (a, b) => (fd === a && fh === b ? 'on' : '');
-    const ctrlFechas = datos.importado ? `<div class="card mt-fil"><small class="cap">Filtrar por fechas</small><div class="mt-fechas"><label>Desde<input type="date" id="fdesde" value="${fd}" min="${datos.desde}" max="${datos.hasta}"></label><label>Hasta<input type="date" id="fhasta" value="${fh}" min="${datos.desde}" max="${datos.hasta}"></label></div>
-      <div class="chips" style="margin:6px 0 0"><button class="chip ${sel(datos.desde, datos.hasta)}" data-fr="todo">Todo</button><button class="chip ${sel(sumaDias(datos.hasta, -6), datos.hasta)}" data-fr="7">Últimos 7 días</button><button class="chip ${sel(datos.hasta, datos.hasta)}" data-fr="ult">Último día</button><button class="chip ${sel(sumaDias(hoy(), -1), sumaDias(hoy(), -1))}" data-fr="ayer">Ayer</button><button class="chip ${sel(hoy(), hoy())}" data-fr="hoy">Hoy</button></div>
-      <p class="sub" style="margin:8px 0 0">Mostrando <b>${f1(A.desde)}</b> al <b>${f1(A.hasta)}</b>${A.recortado ? ' · las cifras de campañas, conjuntos y anuncios se recalculan para estas fechas' : ''}. Hay datos entre ${f1(datos.desde)} y ${f1(datos.hasta)}.</p></div>` : '';
+    const [rd, rh] = rangoActual(), cr = mr(), bb = borr || { ...cr };
+    const [bd, bh] = calcRango(bb.k, bb.d, bb.h, bb.hoy !== false);
+    const panel = `<div class="mt-fp"><div class="mt-fl">${Object.entries(RANGOS).map(([k, [l]]) => `<label class="${bb.k === k ? 'on' : ''}"><input type="radio" name="mr" value="${k}" ${bb.k === k ? 'checked' : ''}> ${l}</label>`).join('')}</div>
+      <div class="mt-fr"><div class="mt-fd"><label>Desde<input type="date" id="mrd" value="${bd}" max="${hoy()}"></label><label>Hasta<input type="date" id="mrh" value="${bh}" max="${hoy()}"></label></div>
+      <label class="chk"><input type="checkbox" id="mrhoy" ${bb.hoy !== false ? 'checked' : ''}> Incluir hoy en los «Últimos N días»</label>
+      <p class="note" style="margin:8px 0">Se muestran los datos del <b>${f1(bd)}</b> al <b>${f1(bh)}</b>.</p>
+      <div class="mt-fa"><button type="button" class="btn" id="mrcan">Cancelar</button><button type="button" class="btn btn-pri" id="mract">Actualizar</button></div></div></div>`;
+    const fechaCtl = `<div class="mt-fecha"><button type="button" class="mt-fb" id="mfb">📅 <b>${RANGOS[cr.k] ? RANGOS[cr.k][0] : 'Personalizado'}</b><span>${f1(rd)} – ${f1(rh)}</span><i>▾</i></button>${fechaAbierta ? panel : ''}${datos.importado ? `<small class="mt-fnota">Hay datos importados del ${f1(datos.desde)} al ${f1(datos.hasta)}. Para fechas más nuevas conecta Meta en vivo.</small>` : ''}</div>`;
     return `${A.ejemplo ? '<div class="demo-bar"><span><b>Datos de ejemplo.</b> Así se verá tu cuenta cuando Meta esté conectado.</span></div>' : ''}
     ${envivo ? `<div class="nota-pub mt-vivo">🟢 <b>En vivo desde Meta</b> · actualizado a las ${hora ? hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : ''} · se renueva solo cada 5 minutos</div>` : (vivoMsg === 'sin_token' ? `<details class="card mt-sinv"><summary>⚪ <b>Sin conexión en vivo</b> — se muestran los datos importados. Toca para ver cómo conectarla.</summary>${pasos}</details>` : (vivoMsg ? `<div class="nota-pub">⚠ No pude actualizar en vivo: ${esc(vivoMsg)}</div>` : ''))}
     ${A.importado ? `<div class="nota-pub">Datos traídos de Meta ${A.fuente ? '(' + esc(A.fuente) + ') ' : ''}el ${esc(new Date(A.importado_en).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }))}. Es una foto de ese momento: para ponerla al día pídele a Claude <b>actualiza</b> y pega lo nuevo abajo.</div>` : ''}
     <div class="acct"><i></i><span>${A.importado ? 'Importado desde Meta' : 'Automático desde Meta'}</span><b>${esc(A.cuenta.nombre || META_CUENTA.nombre)}</b><code>${esc(A.cuenta.id)}</code>${A.cuenta.moneda ? `<code>${esc(A.cuenta.moneda)}</code>` : ''}</div>
     ${otro ? `<div class="nota-pub">Estás viendo ${f1(A.desde)} al ${f1(A.hasta)}. Toca <b>Actualizar</b> para traer el periodo que elegiste.</div>` : ''}
-    ${ctrlFechas}
-    ${datos.importado ? '' : `<div class="card card-row per"><div><small class="cap">Periodo${hora && !A.ejemplo && !A.importado ? ' · actualizado ' + hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : ''}</small><b>${f1(A.desde)} al ${f1(A.hasta)}</b></div><select id="per">${Object.entries(PERIODOS).map(([k, l]) => `<option value="${k}" ${k === pk ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`}
+    ${fechaCtl}
     <div class="tiles">${tile('Importe gastado', money(g), `${dias.length} días`)}${tile('Compras', n0(c), 'según el píxel')}${tile('Costo por compra', c > 0 ? money(g / c) : '—')}${tile('ROAS de compras', g > 0 && v > 0 ? n2(v / g) + 'x' : '—', 'valor ÷ gasto')}${tile('CTR (enlace)', im > 0 ? n2(cl / im * 100) + '%' : '—')}${tile('CPM', im > 0 ? money(g / im * 1000) : '—')}</div>
     <div class="card"><h3>Gasto por día</h3><p class="sub">Cuenta completa en el periodo</p>${chart}</div>
     <div class="card"><h3>Campañas, conjuntos y anuncios</h3><p class="sub">Toca una campaña para ver sus conjuntos y anuncios. Las métricas son las de Meta.</p>
@@ -386,12 +407,14 @@ const Meta = (() => {
       try { aplicarImport(txt); if (recordar) { try { localStorage.setItem('dropox.metaclave', cl); } catch (e) { /* sin almacenamiento */ } } } catch (e) { msg.textContent = e.message; } };
     const del = $('#mimpdel'); if (del) del.onclick = () => ask('¿Borrar los datos importados de Meta?', () => { delete S.metaSnap; if (datos && datos.importado) datos = null; Store.save(); render(); }, 'Borrar');
     const bt = $('#mact'); if (bt) bt.onclick = () => { vivo(false).then(() => { if (!envivo && !datos) cargar(true); }); };
-    const fijar = (d, h) => { S.config.metaDesde = d; S.config.metaHasta = h; Store.save(); render(); };
-    const fdI = $('#fdesde'), fhI = $('#fhasta');
-    if (fdI) fdI.onchange = () => fijar(fdI.value, fhI.value);
-    if (fhI) fhI.onchange = () => fijar(fdI.value, fhI.value);
-    el.querySelectorAll('[data-fr]').forEach(b => b.onclick = () => { const k = b.dataset.fr, D = datos; if (k === 'todo') fijar('', ''); else if (k === '7') fijar(sumaDias(D.hasta, -6), D.hasta); else if (k === 'ult') fijar(D.hasta, D.hasta); else if (k === 'ayer') fijar(sumaDias(hoy(), -1), sumaDias(hoy(), -1)); else fijar(hoy(), hoy()); });
-    const dt = $('#mdet'); if (dt) dt.ontoggle = () => { detAbierto = dt.open; };
+    const mfb = $('#mfb'); if (mfb) mfb.onclick = () => { fechaAbierta = !fechaAbierta; borr = fechaAbierta ? { ...mr() } : null; render(); };
+    el.querySelectorAll('input[name="mr"]').forEach(x => x.onchange = () => { borr.k = x.value; if (x.value === 'custom') { const [d, h] = calcRango(borr.k, borr.d, borr.h, borr.hoy !== false); borr.d = borr.d || d; borr.h = borr.h || h; } render(); });
+    const mrd = $('#mrd'), mrh = $('#mrh'), mrhoy = $('#mrhoy');
+    const personal = () => { borr.k = 'custom'; borr.d = mrd.value; borr.h = mrh.value; if (borr.d > borr.h) { const x = borr.d; borr.d = borr.h; borr.h = x; } render(); };
+    if (mrd) mrd.onchange = personal; if (mrh) mrh.onchange = personal;
+    if (mrhoy) mrhoy.onchange = () => { borr.hoy = mrhoy.checked; render(); };
+    const mrc = $('#mrcan'); if (mrc) mrc.onclick = () => { fechaAbierta = false; borr = null; render(); };
+    const mra = $('#mract'); if (mra) mra.onclick = () => { const [d, h] = calcRango(borr.k, borr.d, borr.h, borr.hoy !== false); S.config.metaRango = { k: borr.k, hoy: borr.hoy !== false, ...(borr.k === 'custom' ? { d, h } : {}) }; Store.save(); fechaAbierta = false; borr = null; if (envivo || (window.Nube && Nube.activo && !(datos && datos.importado))) vivo(false); else render(); };
     const per = $('#per'); if (per) per.onchange = e => { S.config.periodo = e.target.value; Store.save(); render(); };
     el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; render(); });
     el.querySelectorAll('[data-vm]').forEach(b => b.onclick = () => { vistaM = b.dataset.vm; render(); });
