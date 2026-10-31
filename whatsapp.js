@@ -206,7 +206,7 @@
     prueba(ins.slice(-6).map(m => m.t).join('\n'));
     return mejor && mejor.puntos >= 3 ? mejor : null;
   }
-  const yaPedido = c => c.pedidoId && S.pedidos.some(p => p.id === c.pedidoId);
+  const yaPedido = c => !!pedidoDe(c);
   const listos = () => chats().map(c => ({ c, d: yaPedido(c) ? null : detectar(c) })).filter(x => x.d);
   const nuevoPedido = (c, d, ex) => {
     const of = window.Mensajes && Mensajes.dato ? Mensajes.dato('oferta') : '', precio = parseFloat((of.match(/[\d.]+/) || [0])[0]) || 0;
@@ -231,15 +231,24 @@
   const tabDe = c => tabs().find(t => t.id === c.tab);
   const EOPTS = { '': 'Ninguno (no cambia pedidos)', pendiente: 'Pendiente', enruta: 'En ruta', enagencia: 'En agencia', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
   const PED = { pendiente: 'Pendiente', enruta: 'En ruta', enagencia: 'En agencia', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
-  const pedidoDe = c => (c.pedidoId ? S.pedidos.find(p => p.id === c.pedidoId) : null);
+  // el pedido del chat: el que se creó desde el chat o, si no, el más reciente con el mismo celular (así también cuentan los que se crearon con «Pegar datos»)
+  const pedidoDe = c => {
+    if (c.pedidoId) { const x = S.pedidos.find(p => p.id === c.pedidoId); if (x) return x; }
+    const n = String(c.tel || '').replace(/\D/g, '').slice(-9); if (n.length < 9) return null;
+    const m = S.pedidos.filter(p => String(p.telefono || '').replace(/\D/g, '').slice(-9) === n && p.estado !== 'cancelado').sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))[0];
+    if (m) c.pedidoId = m.id;
+    return m || null;
+  };
   // al mover la tarjeta, el pedido toma el estado del tablero (si el tablero está vinculado a un estado)
   const mover = (c, id) => {
     if (id) { c.tab = id; delete c.tabOut; } else { delete c.tab; c.tabOut = 1; }
     c.tabTs = Date.now();
     const t = tabDe(c), p = pedidoDe(c);
-    if (t && t.e && p) { p.estado = t.e; c.lastPed = t.e; }
+    if (t && t.e && p) { p.estado = t.e; if (t.e === 'entregado') p.fechaEntrega = p.fechaEntrega || hoy(); c.lastPed = t.e; }
     etiquetaDeTablero(c, t);
     Store.save();
+    // tablero «Entregado» sin pedido registrado: ofrece crearlo para que cuente en el Dashboard
+    if (t && t.e === 'entregado' && !p) ask('«' + c.nombre + '» no tiene un pedido en Pedidos. ¿Crear el pedido como ENTREGADO para que cuente en el Dashboard?', () => { nuevoPedido(c, detectar(c) || { nombre: c.nombre, cel: c.tel, ciudad: c.ciudad || '', cantidad: 1 }, { estado: 'entregado', fechaEntrega: hoy() }); c.lastPed = 'entregado'; Store.save(); toast('Pedido creado como entregado ✅'); render(); }, 'Crear pedido');
   };
   // el tablero ES una etiqueta: al mover la tarjeta, el chat toma la etiqueta del tablero y pierde las de los otros tableros
   function etiquetaDeTablero(c, t) {
