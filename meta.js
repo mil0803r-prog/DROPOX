@@ -11,7 +11,7 @@ const Meta = (() => {
   const ESTADOS = { ACTIVE: ['Activa', 'ok'], PAUSED: ['Pausada', 'off'], CAMPAIGN_PAUSED: ['Campaña pausada', 'off'], ADSET_PAUSED: ['Conjunto pausado', 'off'], ARCHIVED: ['Archivada', 'off'], DELETED: ['Eliminada', 'off'], WITH_ISSUES: ['Con problemas', 'bad'], IN_PROCESS: ['En revisión', 'warn'], PENDING_REVIEW: ['En revisión', 'warn'], DISAPPROVED: ['Rechazada', 'bad'] };
   const OBJ = { OUTCOME_SALES: 'Ventas', OUTCOME_LEADS: 'Clientes potenciales', OUTCOME_ENGAGEMENT: 'Interacción', OUTCOME_TRAFFIC: 'Tráfico', OUTCOME_AWARENESS: 'Reconocimiento', OUTCOME_APP_PROMOTION: 'Promoción de app' };
 
-  let datos = null, clave = '', hora = null, cargando = false, error = '', falta = false, filtro = 'activas', vistaM = 'arbol', nivelT = 'campaign', abierto = new Set();
+  let datos = null, clave = '', hora = null, cargando = false, error = '', falta = false, filtro = 'activas', vistaM = 'tabla', nivelT = 'campaign', abierto = new Set();
 
   const claveActual = () => { const [d, h] = rangoActual(); return d + '|' + h; };
   const rangoActual = () => { const pk = S.config.periodo; let [d, h] = rango(pk); if (pk === 'todo') { const x = new Date(); x.setDate(x.getDate() - 89); d = iso(x); } const hoyS = hoy(); return [d, h > hoyS ? hoyS : h]; };
@@ -162,15 +162,71 @@ const Meta = (() => {
   const celdas = m => [money(m.gasto), n0(m.impresiones), n0(m.alcance), n2(m.frecuencia), n0(m.clics_enlace), n2(m.ctr_enlace) + '%', m.cpc_enlace ? money(m.cpc_enlace) : '—', money(m.cpm), n0(m.compras), money(m.costo_compra), m.roas ? n2(m.roas) + 'x' : '—', n0(m.mensajes), money(m.costo_mensaje)];
   const totales = rows => { const t = { gasto: 0, impresiones: 0, clics_enlace: 0, compras: 0, valor_compras: 0, mensajes: 0 }; rows.forEach(r => Object.keys(t).forEach(k => { t[k] += N(r.m[k]); })); const g = t.gasto;
     return [money(g), n0(t.impresiones), '—', '—', n0(t.clics_enlace), t.impresiones ? n2(t.clics_enlace / t.impresiones * 100) + '%' : '—', t.clics_enlace ? money(g / t.clics_enlace) : '—', t.impresiones ? money(g / t.impresiones * 1000) : '—', n0(t.compras), t.compras ? money(g / t.compras) : '—', g > 0 && t.valor_compras > 0 ? n2(t.valor_compras / g) + 'x' : '—', n0(t.mensajes), t.mensajes ? money(g / t.mensajes) : '—']; };
-  function tablaNivel(A) {
-    let rows = [];
+  // ───────── tabla estilo Administrador de anuncios de Meta ─────────
+  const resDe = e => { const m = e.m; if (m.mensajes > 0) return { n: m.mensajes, t: 'Conversaciones de mensajes iniciadas' }; if (m.compras > 0) return { n: m.compras, t: 'Compras' }; if (m.clics_enlace > 0) return { n: m.clics_enlace, t: 'Clics en el enlace' }; return { n: 0, t: '' }; };
+  const pc2 = v => (v === null || v === undefined || !isFinite(v) ? '—' : n2(v) + '%');
+  const COLM = {
+    resultados: { l: 'Resultados', g: e => resDe(e).n, f: (v, e) => (v ? `<b>${n0(v)}</b><small>${esc(resDe(e).t)}</small>` : '—') },
+    costo_res: { l: 'Costo por resultado', g: e => { const r = resDe(e).n; return r ? e.m.gasto / r : null; }, f: v => (v == null ? '—' : money(v)) },
+    gasto: { l: 'Importe gastado', g: e => e.m.gasto, f: v => money(v) },
+    alcance: { l: 'Alcance', g: e => e.m.alcance, f: v => n0(v) },
+    impresiones: { l: 'Impresiones', g: e => e.m.impresiones, f: v => n0(v) },
+    frecuencia: { l: 'Frecuencia', g: e => e.m.frecuencia, f: v => n2(v) },
+    cpm: { l: 'CPM (costo por mil impresiones)', g: e => e.m.cpm, f: v => money(v) },
+    clics: { l: 'Clics (todos)', g: e => e.m.clics, f: v => n0(v) },
+    ctr: { l: 'CTR (todos)', g: e => e.m.ctr, f: pc2 },
+    cpc: { l: 'CPC (todos)', g: e => e.m.cpc, f: v => (v ? money(v) : '—') },
+    clics_enlace: { l: 'Clics en el enlace', g: e => e.m.clics_enlace, f: v => n0(v) },
+    ctr_enlace: { l: 'CTR (porcentaje de clics en el enlace)', g: e => e.m.ctr_enlace, f: pc2 },
+    cpc_enlace: { l: 'CPC (costo por clic en el enlace)', g: e => e.m.cpc_enlace, f: v => (v ? money(v) : '—') },
+    mensajes: { l: 'Conversaciones de mensajes iniciadas', g: e => e.m.mensajes, f: v => n0(v) },
+    costo_mensaje: { l: 'Costo por conversación iniciada', g: e => e.m.costo_mensaje, f: v => (v == null ? '—' : money(v)) },
+    compras: { l: 'Compras', g: e => e.m.compras, f: v => n0(v) },
+    costo_compra: { l: 'Costo por compra', g: e => e.m.costo_compra, f: v => (v == null ? '—' : money(v)) },
+    valor_compras: { l: 'Valor de conversión de compras', g: e => e.m.valor_compras, f: v => (v ? money(v) : '—') },
+    roas: { l: 'ROAS de compras', g: e => e.m.roas, f: v => (v ? n2(v) + 'x' : '—') },
+  };
+  const PRESET = {
+    rendimiento: ['Rendimiento', ['resultados', 'costo_res', 'gasto', 'alcance', 'impresiones', 'cpm', 'clics_enlace', 'ctr_enlace', 'cpc_enlace']],
+    entrega: ['Entrega', ['gasto', 'alcance', 'impresiones', 'frecuencia', 'cpm']],
+    interaccion: ['Interacción', ['clics_enlace', 'ctr_enlace', 'cpc_enlace', 'clics', 'ctr', 'cpc']],
+    mensajes: ['Mensajes', ['mensajes', 'costo_mensaje', 'gasto', 'alcance', 'impresiones']],
+    ventas: ['Compras y ventas', ['compras', 'costo_compra', 'valor_compras', 'roas', 'gasto']],
+    todas: ['Todas las columnas', Object.keys(COLM)],
+  };
+  let preset = 'rendimiento', orden = { k: 'gasto', d: -1 }, busq = '', selFilas = new Set();
+  try { preset = localStorage.getItem('dropox.metaPreset') || 'rendimiento'; if (!PRESET[preset]) preset = 'rendimiento'; } catch (e) { /* sin almacenamiento */ }
+  const filasNivel = A => {
+    const rows = [];
     A.campanas.forEach(c => { if (nivelT === 'campaign') rows.push({ ...c, padre: '' }); c.conjuntos.forEach(s => { if (nivelT === 'adset') rows.push({ ...s, padre: c.nombre }); s.anuncios.forEach(a => { if (nivelT === 'ad') rows.push({ ...a, padre: s.nombre }); }); }); });
-    rows = rows.filter(pasa).sort((a, b) => b.m.gasto - a.m.gasto);
-    const nombre = { campaign: 'Campaña', adset: 'Conjunto de anuncios', ad: 'Anuncio' }[nivelT];
-    const nivs = [['campaign', 'Campañas'], ['adset', 'Conjuntos'], ['ad', 'Anuncios']];
-    const sel = `<div class="chips" style="margin-top:10px">${nivs.map(([k, l]) => `<button class="chip ${nivelT === k ? 'on' : ''}" data-nt="${k}">${l}</button>`).join('')}</div>`;
-    if (!rows.length) return sel + '<div class="empty">No hay filas con este filtro en el periodo.</div>';
-    return sel + `<div class="tw"><table class="mt-tabla"><thead><tr><th>${nombre}</th><th>Estado</th><th class="num">Presup. diario</th>${HEAD.map(h => `<th class="num">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr><td><b>${esc(r.nombre)}</b>${r.padre ? `<small class="mt-padre">${esc(r.padre)}</small>` : ''}</td><td>${tag(r.estado)}</td><td class="num">${r.presupuesto_diario ? money(r.presupuesto_diario) : '—'}</td>${celdas(r.m).map(v => `<td class="num">${v}</td>`).join('')}</tr>`).join('')}</tbody><tfoot><tr><td><b>Total (${rows.length})</b></td><td></td><td></td>${totales(rows).map(v => `<td class="num"><b>${v}</b></td>`).join('')}</tr></tfoot></table></div>`;
+    return rows.filter(pasa).filter(r => !busq || (r.nombre + ' ' + r.padre).toLowerCase().includes(busq));
+  };
+  const valOrden = (r, k) => { if (k === 'nombre') return r.nombre.toLowerCase(); if (k === 'estado') return r.estado === 'ACTIVE' ? 1 : 0; if (k === 'presupuesto') return N(r.presupuesto_diario); const c = COLM[k]; const v = c ? c.g(r) : 0; return v == null ? -1 : v; };
+  function tablaNivel(A) {
+    const nombre = { campaign: 'Campañas', adset: 'Conjuntos de anuncios', ad: 'Anuncios' }[nivelT];
+    const todas = filasNivel(A), cols = PRESET[preset][1];
+    const rows = todas.slice().sort((a, b) => { const x = valOrden(a, orden.k), y = valOrden(b, orden.k); return (x < y ? -1 : x > y ? 1 : 0) * orden.d; });
+    const cnt = k => { let n = 0; A.campanas.forEach(c => { if (k === 'campaign') n++; c.conjuntos.forEach(s => { if (k === 'adset') n++; if (k === 'ad') n += s.anuncios.length; }); }); return n; };
+    const tabs = [['campaign', 'Campañas'], ['adset', 'Conjuntos de anuncios'], ['ad', 'Anuncios']].map(([k, l]) => `<button class="mt-nv ${nivelT === k ? 'on' : ''}" data-nt="${k}">${l}<i>${cnt(k)}</i></button>`).join('');
+    const barra = `<div class="mt-bar"><input class="search" id="mbq" type="search" placeholder="Buscar por nombre…" value="${esc(busq)}"><label class="mt-cols">Columnas: <select id="mcols">${Object.entries(PRESET).map(([k, [l]]) => `<option value="${k}" ${k === preset ? 'selected' : ''}>${l}</option>`).join('')}</select></label><button class="btn btn-sm" id="mexp">⬇ Exportar CSV</button></div>`;
+    if (!rows.length) return `<div class="mt-niv">${tabs}</div>${barra}<div class="empty">No hay ${nombre.toLowerCase()} con este filtro en el periodo.</div>`;
+    const sel = rows.filter(r => selFilas.has(r.id)), base = sel.length ? sel : rows;
+    const sumM = sumarM(base.map(r => r.m)), tot = { nombre: '', m: sumM };
+    const flecha = k => (orden.k === k ? (orden.d > 0 ? ' ▲' : ' ▼') : '');
+    const th = (k, l, cls) => `<th class="${cls || 'num'} mt-so" data-so="${k}">${l}${flecha(k)}</th>`;
+    const celda = (k, r) => { const c = COLM[k]; return `<td class="num">${c.f(c.g(r), r)}</td>`; };
+    const celdaTot = k => { if (k === 'alcance' || k === 'frecuencia') return '<td class="num">—</td>'; const c = COLM[k]; return `<td class="num"><b>${c.f(c.g(tot), tot)}</b></td>`; };
+    return `<div class="mt-niv">${tabs}</div>${barra}<div class="tw mt-ads"><table class="mt-tabla mt-am"><thead><tr>
+      <th class="mt-nm mt-so" data-so="nombre"><div class="mt-nw"><label class="mt-ck"><input type="checkbox" id="mselall" ${sel.length === rows.length ? 'checked' : ''}></label><span>${nombre.replace(/s$/, '')}${flecha('nombre')}</span></div></th>
+      ${th('estado', 'Entrega', 'mt-ent')}${th('presupuesto', 'Presupuesto')}${cols.map(k => th(k, COLM[k].l)).join('')}</tr></thead>
+      <tbody>${rows.map(r => `<tr class="${selFilas.has(r.id) ? 'sel' : ''}"><td class="mt-nm"><div class="mt-nw"><label class="mt-ck"><input type="checkbox" data-sel="${esc(r.id)}" ${selFilas.has(r.id) ? 'checked' : ''}></label><span class="mt-sw ${r.estado === 'ACTIVE' ? 'on' : ''}" title="${r.estado === 'ACTIVE' ? 'Activada' : 'Desactivada'} (se cambia en Meta)"></span><span class="mt-nt"><b>${esc(r.nombre)}</b>${r.padre ? `<small class="mt-padre">${esc(r.padre)}</small>` : ''}</span></div></td><td class="mt-ent">${tag(r.estado)}</td><td class="num">${r.presupuesto_diario ? `${money(r.presupuesto_diario)}<small>Diario</small>` : '<small>Usa presupuesto de la campaña</small>'}</td>${cols.map(k => celda(k, r)).join('')}</tr>`).join('')}</tbody>
+      <tfoot><tr><td class="mt-nm"><b>${sel.length ? `Resultados de ${sel.length} seleccionad${sel.length === 1 ? 'a' : 'as'}` : `Resultados de ${rows.length} ${nombre.toLowerCase()}`}</b><small class="mt-padre">Excluye las eliminadas</small></td><td></td><td></td>${cols.map(celdaTot).join('')}</tr></tfoot></table></div>`;
+  }
+  function exportarTabla() {
+    const A = filtrado(datos), rows = filasNivel(A).sort((a, b) => valOrden(b, orden.k) - valOrden(a, orden.k)), cols = PRESET[preset][1];
+    const num = v => (v == null ? '' : (typeof v === 'number' ? String(Math.round(v * 100) / 100) : v));
+    const csv = [['Nombre', 'Entrega', 'Presupuesto diario', ...cols.map(k => COLM[k].l)], ...rows.map(r => [r.nombre, (ESTADOS[r.estado] || [r.estado])[0], r.presupuesto_diario || '', ...cols.map(k => num(COLM[k].g(r)))])].map(f => f.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); a.download = 'meta-ads-' + nivelT + '.csv'; a.click(); URL.revokeObjectURL(a.href);
   }
   function tablaDias(A) {
     const dias = A.dias.slice().sort((a, b) => b.fecha.localeCompare(a.fecha));
@@ -281,7 +337,13 @@ const Meta = (() => {
     const per = $('#per'); if (per) per.onchange = e => { S.config.periodo = e.target.value; Store.save(); render(); };
     el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; render(); });
     el.querySelectorAll('[data-vm]').forEach(b => b.onclick = () => { vistaM = b.dataset.vm; render(); });
-    el.querySelectorAll('[data-nt]').forEach(b => b.onclick = () => { nivelT = b.dataset.nt; render(); });
+    el.querySelectorAll('[data-nt]').forEach(b => b.onclick = () => { nivelT = b.dataset.nt; selFilas.clear(); render(); });
+    const mq = $('#mbq'); if (mq) mq.oninput = e => { busq = e.target.value.toLowerCase(); const p = e.target.selectionStart; render(); const i = $('#mbq'); if (i) { i.focus(); i.setSelectionRange(p, p); } };
+    const mc = $('#mcols'); if (mc) mc.onchange = e => { preset = e.target.value; try { localStorage.setItem('dropox.metaPreset', preset); } catch (x) { /* sin almacenamiento */ } render(); };
+    const mx = $('#mexp'); if (mx) mx.onclick = exportarTabla;
+    el.querySelectorAll('[data-so]').forEach(h => h.onclick = ev => { if (ev.target.closest('.mt-ck')) return; const k = h.dataset.so; orden = orden.k === k ? { k, d: -orden.d } : { k, d: k === 'nombre' ? 1 : -1 }; render(); });
+    el.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => { if (c.checked) selFilas.add(c.dataset.sel); else selFilas.delete(c.dataset.sel); render(); });
+    const sa = $('#mselall'); if (sa) sa.onchange = () => { const A = filtrado(datos), ids = filasNivel(A).map(r => r.id); if (sa.checked) ids.forEach(i => selFilas.add(i)); else selFilas.clear(); render(); };
     el.querySelectorAll('details.mt-n').forEach(x => x.addEventListener('toggle', () => { x.open ? abierto.add(x.dataset.k) : abierto.delete(x.dataset.k); }));
     el.querySelectorAll('[data-dia]').forEach(b => b.onclick = ev => { ev.stopPropagation(); const [nv, id] = b.dataset.dia.split(':'); dialogoDias(nv, id); });
     return true;
