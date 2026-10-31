@@ -303,6 +303,27 @@ const alertasHtml = L => L.length ? L.map(a => `<div class="al"><i class="dot ${
 const VIEWS = { tienda: el => window.Tienda && Tienda.vista(el, 'ajustes'), tiendahome: el => window.Tienda && Tienda.vista(el, 'home'), tiendaprod: el => window.Tienda && Tienda.vista(el, 'lista'), whatsapp: el => window.WhatsApp && WhatsApp.vista(el), mensajes: el => window.Mensajes && Mensajes.vista(el), tareas: el => window.Tareas && Tareas.vista(el), shalomzonas: el => window.ShalomZonas && ShalomZonas.vista(el), dashboard: vDashboard, calculadora: vCalc, pedidos: vPedidos, gastos: vGastos, meta: el => { if (!(window.Meta && Meta.vista(el))) vAdsPlat(el, 'meta'); }, tiktok: el => vAdsPlat(el, 'tiktok'), ads: el => vAdsPlat(el, 'meta'), publicidad: vPublicidad, caza: el => window.Caza && Caza.vista(el, Caza.ultimo || 'dropi'), dlfb: el => window.Descargador && Descargador.vista(el, 'facebook'), dltt: el => window.Descargador && Descargador.vista(el, 'tiktok'), descargar: el => window.Descargador && Descargador.vista(el, 'tiktok'), gdia: el => window.Gdia && Gdia.vista(el), shalom: el => window.Shalom && Shalom.vista(el, 'ag'), shalompro: el => window.Shalom && Shalom.vista(el, 'pro'), prodtiktok: el => window.Caza && Caza.vista(el, 'tiktok'), radar: el => window.Radar && Radar.vista(el), investigacion: el => window.Caza && Caza.vista(el, 'invest'), dropi: el => window.Caza && Caza.vista(el, 'dropi'), aliclick: el => window.Caza && Caza.vista(el, 'aliclick'), proyeccion: vProy, ajustes: vAjustes };
 let metrica = 'ventas', tabla = { dia: false, sem: false };
 
+// ── Dashboard por lugar: departamentos y ciudades ──
+const _sinTilde = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+const _titulo = t => String(t || '').toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
+const zonaDe = p => String(p.ciudad || '').split(' · ')[0].split(',').map(x => x.trim()).filter(Boolean);
+const departamentoDe = p => zonaDe(p)[0] || '';
+const ciudadGeoDe = p => { const z = zonaDe(p); return z.length >= 2 ? z[1] : (z[0] || ''); };
+function geoChart(P, lugarDe, metric) {
+  const valor = p => (metric === 'pedidos' ? 1 : metric === 'ventas' ? (p.estado === 'entregado' ? desglose(p).ventas : 0) : (cerrado(p) ? utilPedido(p) : 0));
+  const g = {}, nombres = {}; let sin = 0, tot = 0;
+  P.filter(p => p.estado !== 'cancelado').forEach(p => {
+    const raw = lugarDe(p); if (!raw) { sin++; return; }
+    const k = _sinTilde(raw); nombres[k] = nombres[k] || {}; nombres[k][raw] = (nombres[k][raw] || 0) + 1;
+    const o = g[k] || (g[k] = { v: 0, n: 0, ent: 0 }); o.v += valor(p); o.n++; if (p.estado === 'entregado') o.ent++; tot += valor(p);
+  });
+  const filas = Object.entries(g).map(([k, o]) => [_titulo(Object.entries(nombres[k]).sort((a, b) => b[1] - a[1])[0][0]), o]).sort((a, b) => b[1].v - a[1].v);
+  if (!filas.length) return '<div class="empty">Aún no hay pedidos con ciudad o departamento. Llénalo al crear el pedido o con «Pegar datos».</div>';
+  const top = filas.slice(0, 10), resto = filas.slice(10);
+  if (resto.length) top.push(['Otros (' + resto.length + ')', resto.reduce((a, [, o]) => ({ v: a.v + o.v, n: a.n + o.n, ent: a.ent + o.ent }), { v: 0, n: 0, ent: 0 })]);
+  const mx = Math.max(...top.map(([, o]) => Math.abs(o.v)), 1), fm = v => (metric === 'pedidos' ? v : fmt(v));
+  return `<div class="geo">${top.map(([n, o], i) => `<div class="geo-r"><span class="geo-n" title="${esc(n)}">${esc(n)}</span><div class="geo-b"><i class="${o.v < 0 ? 'neg' : ''}" style="width:${Math.max(3, Math.abs(o.v) / mx * 100).toFixed(1)}%;background:${PAL[i % PAL.length]}"></i></div><b class="geo-v">${fm(o.v)}</b><small class="geo-p">${tot ? Math.round(o.v / tot * 100) + '%' : ''} · ${o.n} ped.</small></div>`).join('')}</div>${sin ? `<p class="note">${sin} pedido${sin > 1 ? 's' : ''} sin ciudad o departamento no se muestra${sin > 1 ? 'n' : ''}.</p>` : ''}`;
+}
 function vDashboard(el) {
   const pk = S.config.periodo, A = analizar(pk), N = A.neta;
   const tile = (l, v, sub = '', c = '') => `<div class="t"><small>${l}</small><b class="${c}">${v}</b>${sub ? `<em>${sub}</em>` : ''}</div>`;
@@ -331,6 +352,8 @@ function vDashboard(el) {
   <div class="card card-row"><small class="cap">Gráficos por</small><div class="seg" id="met">${[['ventas', 'Ventas'], ['utilidad', 'Utilidad'], ['pedidos', 'Pedidos']].map(([k, l]) => `<button data-k="${k}" class="${k === metrica ? 'on' : ''}">${l}</button>`).join('')}</div></div>
   <div class="card"><div class="chart-h"><div><h3>Por día</h3><p class="sub">${mTit} · últimos 30 días${uni}</p></div><button class="btn btn-sm" data-t="dia">${tabla.dia ? 'Ver gráfico' : 'Ver tabla'}</button></div>${tabla.dia ? tbl(dia) : barChart(dia, metrica)}</div>
   <div class="card"><div class="chart-h"><div><h3>Por semana</h3><p class="sub">${mTit} · últimas 12 semanas, de lunes a domingo${uni}</p></div><button class="btn btn-sm" data-t="sem">${tabla.sem ? 'Ver gráfico' : 'Ver tabla'}</button></div>${tabla.sem ? tbl(sem) : barChart(sem, metrica)}</div>
+  <div class="card"><h3>Por departamento</h3><p class="sub">${mTit} · ${esc(PERIODOS[pk] || '')}${uni}</p>${geoChart(A.P, departamentoDe, metrica)}</div>
+  <div class="card"><h3>Por ciudad</h3><p class="sub">${mTit} · ${esc(PERIODOS[pk] || '')}${uni}</p>${geoChart(A.P, ciudadGeoDe, metrica)}</div>
   <div class="card"><h3>¿A dónde va cada sol que vendes?</h3><p class="sub">${A.D.ventas > 0 ? `Te queda <b class="${cls(N)}">${pct(N / A.D.ventas * 100)}</b> de lo que vendes, después de todo` : 'Se llena cuando tengas pedidos entregados.'}</p>${A.D.ventas > 0 ? stackBar(flow) : '<div class="empty">Aún no hay datos para este gráfico.</div>'}</div>
   <div class="card"><h3>Gastos mensuales</h3><p class="sub">Fijos y plataformas</p>${rows.length ? donut(rows) : '<div class="empty">Registra gastos para ver su distribución.</div>'}</div>
   <div class="card"><h3>Alertas</h3><p class="sub">Lo que conviene mirar ahora</p>${alertasHtml(insights(A))}</div>`;
