@@ -16,8 +16,11 @@
   };
 
   // ───── Reconocimiento automático ─────
-  const URL_RE = /(https?:\/\/[^\s<>"')\]]+|www\.[^\s<>"')\]]+)/i;
-  const plataforma = u => /zoom\.us|zoom\.com/i.test(u) ? 'Zoom' : /meet\.google/i.test(u) ? 'Google Meet' : /teams\.(microsoft|live)/i.test(u) ? 'Teams' : /youtu\.?be/i.test(u) ? 'YouTube' : /whatsapp|wa\.me|chat\.whatsapp/i.test(u) ? 'WhatsApp' : /drive\.google|docs\.google/i.test(u) ? 'Drive' : /vimeo/i.test(u) ? 'Vimeo' : /discord/i.test(u) ? 'Discord' : /t\.me|telegram/i.test(u) ? 'Telegram' : 'Enlace';
+  const TLD = 'com|net|org|us|pe|ma|me|io|co|app|link|ly|gl|be|tv|live|ai|dev|edu|info|biz|site|online|studio|page|fm|gg|to|cc|ws|xyz|club|top|vip|digital|academy|school|zoom|lat|es|mx|ar|cl|br|ec|bo|uy|py|ve|cr|pa|do|gt|hn|sv|ni|eu|uk';
+  const URL_RE = new RegExp('(https?:\\/\\/[^\\s<>"\')\\]]+|www\\.[^\\s<>"\')\\]]+|(?<![@\\w.\\-])(?:[a-z0-9][a-z0-9\\-]*\\.)+(?:' + TLD + ')(?![a-z0-9])(?:[/?#][^\\s<>"\')\\]]*)?)', 'i');
+  // saca el primer enlace de cualquier texto (con o sin https://)
+  const extraerUrl = t => { const m = String(t || '').match(URL_RE); return m ? m[1].replace(/[.,;:!?)]+$/, '') : ''; };
+  const plataforma = u => /zoom\.us|zoom\.com/i.test(u) ? 'Zoom' : /meet\.google/i.test(u) ? 'Google Meet' : /teams\.(microsoft|live)/i.test(u) ? 'Teams' : /youtu\.?be/i.test(u) ? 'YouTube' : /whatsapp|wa\.me|chat\.whatsapp/i.test(u) ? 'WhatsApp' : /drive\.google|docs\.google/i.test(u) ? 'Drive' : /vimeo/i.test(u) ? 'Vimeo' : /lu\.ma|luma\.com/i.test(u) ? 'Luma' : /discord/i.test(u) ? 'Discord' : /t\.me|telegram/i.test(u) ? 'Telegram' : 'Enlace';
   const urlOk = u => (/^https?:\/\//i.test(u) ? u : 'https://' + u);
 
   function hora(t) {
@@ -221,7 +224,7 @@
     $('#cl-txt').value = window._clTxt || ''; $('#cl-txt').oninput = guardarTxt;
     $('#cl-add').onclick = () => agregar();
     $('#cl-img').onclick = () => { guardarTxt(); elegir(u => { colocar(u); leerImagen(u); }); };
-    el.querySelectorAll('[data-fd]').forEach(i => i.onchange = () => { const [k, c2] = i.dataset.fd.split('|'), r = E().fi[+k]; if (!r) return; r[c2] = c2 === 'link' && i.value.trim() ? urlOk(i.value.trim()) : i.value.trim(); Store.save(); render(); });
+    el.querySelectorAll('[data-fd]').forEach(i => i.onchange = () => { const [k, c2] = i.dataset.fd.split('|'), r = E().fi[+k]; if (!r) return; r[c2] = c2 === 'link' ? (extraerUrl(i.value) ? urlOk(extraerUrl(i.value)) : i.value.trim()) : i.value.trim(); if (c2 === 'link' && r.link) r.p = plataforma(r.link); Store.save(); render(); });
     el.querySelectorAll('[data-fk]').forEach(i => i.onchange = () => { const r = E().fi[+i.dataset.fk]; if (r) { r.ok = i.checked; Store.save(); render(); } });
     el.querySelectorAll('[data-fc]').forEach(b => b.onclick = () => { const r = E().fi[+b.dataset.fc]; if (r && r.link && navigator.clipboard) navigator.clipboard.writeText(r.link).then(() => toast('Link copiado'), () => toast('No se pudo copiar')); });
     el.querySelectorAll('[data-fsl]').forEach(b => b.onclick = () => { const i = el.querySelector(`[data-fd="${b.dataset.fsl}|link"]`); toast('Primero pega el link de la clase'); if (i) { i.focus(); i.scrollIntoView({ block: 'center' }); } });
@@ -238,13 +241,13 @@
       ultimo = `✅ Agregué ${nuevos.length} clase${nuevos.length > 1 ? 's' : ''}.` + (falt ? ' Revisa las que tienen ⚠ y complétalas con «Editar».' : ' Todo reconocido.');
       tab = 'prox'; Store.save(); render();
     };
-    $('#cl-nuevo').onclick = () => openForm('Nueva clase', campos(), { f: hoy(), h: '20:00' }, v => { c.lista.push({ id: uid(), tema: v.tema, f: v.f, h: v.h, link: v.link ? urlOk(v.link.trim()) : '', p: v.link ? plataforma(v.link) : '', n: v.n, ok: false }); });
-    el.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { const x = c.lista.find(y => y.id === b.dataset.e); openForm('Editar clase', campos(), x, v => Object.assign(x, { tema: v.tema, f: v.f, h: v.h, link: v.link ? urlOk(v.link.trim()) : '', p: v.link ? plataforma(v.link) : '', n: v.n })); });
+    $('#cl-nuevo').onclick = () => openForm('Nueva clase', campos(), { f: hoy(), h: '20:00' }, v => { c.lista.push({ id: uid(), tema: v.tema, f: v.f, h: v.h, link: extraerUrl(v.link) ? urlOk(extraerUrl(v.link)) : '', p: extraerUrl(v.link) ? plataforma(v.link) : '', n: v.n, ok: false }); });
+    el.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { const x = c.lista.find(y => y.id === b.dataset.e); openForm('Editar clase', campos(), x, v => Object.assign(x, { tema: v.tema, f: v.f, h: v.h, link: extraerUrl(v.link) ? urlOk(extraerUrl(v.link)) : '', p: extraerUrl(v.link) ? plataforma(v.link) : '', n: v.n })); });
     el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => confirmDel('¿Quitar esta clase?', () => { c.lista = c.lista.filter(y => y.id !== b.dataset.d); }));
     el.querySelectorAll('[data-ok]').forEach(i => i.onchange = () => { const x = c.lista.find(y => y.id === i.dataset.ok); if (x) { x.ok = i.checked; Store.save(); render(); } });
     el.querySelectorAll('[data-cp]').forEach(b => b.onclick = () => { const x = c.lista.find(y => y.id === b.dataset.cp); if (x && navigator.clipboard) navigator.clipboard.writeText(x.link).then(() => toast('Link copiado'), () => toast('No se pudo copiar')); });
   }
 
-  window.Clases = { vista: pintar, reconocer, separar };
+  window.Clases = { vista: pintar, reconocer, separar, extraerUrl };
   if ((location.hash || '').slice(1) === 'clases') render();
 })();
