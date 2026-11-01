@@ -760,3 +760,4 @@ body.wa-full .wa+.note,body.wa-full #view>p.note{display:none}
 .cl-now{border-color:#16a34a;box-shadow:0 0 0 1px #16a34a33}
 .cl-ok{opacity:.65}
 .cl-acc a.btn{text-decoration:none}
+.cl-img{display:block;max-width:100%;max-height:140px;border-radius:10px;margin-top:8px;cursor:zoom-in;border:1px solid var(--line)}

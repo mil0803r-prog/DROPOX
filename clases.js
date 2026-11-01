@@ -97,7 +97,20 @@
   const dif = f => Math.round((new Date(f + 'T12:00:00') - new Date(hoy() + 'T12:00:00')) / 864e5);
   const segura = u => /^https?:\/\//i.test(u || '') ? u : '';
 
-  let tab = 'prox', ultimo = '';
+  // imagen: se reduce (máx. 1000 px, JPEG) para que ocupe poco al guardarse
+  const reducir = file => new Promise((ok, mal) => {
+    if (!file || !/^image\//.test(file.type)) return mal(new Error('No es una imagen'));
+    const fr = new FileReader();
+    fr.onerror = () => mal(new Error('No pude leer la imagen'));
+    fr.onload = () => { const im = new Image(); im.onerror = () => mal(new Error('Imagen no válida')); im.onload = () => {
+      const k = Math.min(1, 1000 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL('image/jpeg', 0.72)); }; im.src = fr.result; };
+    fr.readAsDataURL(file);
+  });
+  const elegir = cb => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.onchange = () => { const f = i.files && i.files[0]; if (f) reducir(f).then(cb, e => toast(e.message)); }; i.click(); };
+  const imgSeg = u => (/^data:image\/(jpeg|png|webp);base64,/.test(u || '') ? u : '');
+
+  let tab = 'prox', ultimo = '', imgPend = '';
   const campos = () => [{ k: 'tema', l: 'Tema', req: 1, full: 1 }, { k: 'f', l: 'Fecha', t: 'date' }, { k: 'h', l: 'Hora', t: 'time' }, { k: 'link', l: 'Link de la clase', full: 1 }, { k: 'n', l: 'Nota (opcional)', full: 1 }];
 
   function tarjeta(c) {
@@ -109,9 +122,11 @@
       <div class="cl-med"><b class="cl-tema">${esc(c.tema || 'Clase sin tema')}</b>
         <div class="sub">${c.f ? esc(cap(fechaCorta(c.f))) : '<span class="cl-warn">⚠ Falta la fecha</span>'} · ${c.h ? '🕒 ' + esc(hFmt(c.h)) : '<span class="cl-warn">⚠ Falta la hora</span>'} · ${cuando}</div>
         ${c.p ? `<span class="chip on" style="cursor:default;font-size:12px;padding:2px 10px">${esc(c.p)}</span>` : ''}${c.n ? `<div class="sub" style="margin-top:4px">📝 ${esc(c.n)}</div>` : ''}
+        ${imgSeg(c.img) ? `<img class="cl-img" data-ver="${esc(c.id)}" src="${esc(c.img)}" alt="Imagen de la clase">` : ''}
         ${enlace ? `<div class="cl-url">${esc(enlace.replace(/^https?:\/\//, '').slice(0, 60))}</div>` : '<div class="cl-warn" style="font-size:13px">⚠ Sin link</div>'}</div>
       <div class="cl-acc">
         ${enlace ? `<a class="btn btn-pri btn-sm" href="${esc(enlace)}" target="_blank" rel="noopener noreferrer">Entrar</a><button class="btn btn-sm" data-cp="${esc(c.id)}">Copiar link</button>` : ''}
+        <button class="btn btn-sm" data-im="${esc(c.id)}">${imgSeg(c.img) ? '📷 Cambiar imagen' : '📷 Subir imagen'}</button>
         <label class="chk"><input type="checkbox" data-ok="${esc(c.id)}" ${c.ok ? 'checked' : ''}> Asistí</label>
         <span><button class="btn btn-sm" data-e="${esc(c.id)}">Editar</button> <button class="btn btn-sm" data-d="${esc(c.id)}">Quitar</button></span>
       </div></div>`;
@@ -125,18 +140,28 @@
     <div class="card"><h3>Pega el mensaje de la clase</h3>
       <p class="sub">Pega el mensaje tal como te lo mandaron (WhatsApp, correo, Zoom…). Reconozco solo la <b>fecha</b>, el <b>día</b>, la <b>hora</b>, el <b>tema</b> y el <b>link</b>. Puedes pegar varias clases juntas.</p>
       <textarea id="cl-txt" rows="5" placeholder="Ejemplo:&#10;Clase de Meta Ads: cómo escalar campañas&#10;Jueves 6 de noviembre, 8:00 p. m.&#10;https://us02web.zoom.us/j/123456789" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;margin:8px 0"></textarea>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-pri" id="cl-add">Reconocer y agregar</button><button class="btn" id="cl-lim">Limpiar</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-pri" id="cl-add">Reconocer y agregar</button><button class="btn" id="cl-img">📷 Subir imagen</button><button class="btn" id="cl-lim">Limpiar</button></div>
+      ${imgPend ? `<div style="margin-top:10px;display:flex;gap:10px;align-items:center"><img class="cl-img" src="${esc(imgPend)}" alt="" style="max-height:90px"><button class="btn btn-sm" id="cl-qimg">Quitar imagen</button></div><p class="sub">La imagen se guardará con la clase. Tip: también puedes pegar una captura con Ctrl+V.</p>` : ''}
       ${ultimo ? `<p class="sub" style="margin-top:8px">${ultimo}</p>` : ''}</div>
     <div class="chips" id="cl-t"><button class="chip ${tab === 'prox' ? 'on' : ''}" data-t="prox">Próximas (${prox.length})</button><button class="chip ${tab === 'pas' ? 'on' : ''}" data-t="pas">Pasadas (${pas.length})</button></div>
     ${L.length ? L.map(tarjeta).join('') : `<div class="empty">${tab === 'prox' ? 'Aún no hay clases próximas. Pega arriba el mensaje de la clase.' : 'Aquí aparecerán las clases que ya pasaron.'}</div>`}`;
 
     el.querySelectorAll('#cl-t [data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
-    $('#cl-lim').onclick = () => { $('#cl-txt').value = ''; ultimo = ''; };
+    $('#cl-lim').onclick = () => { $('#cl-txt').value = ''; ultimo = ''; imgPend = ''; render(); };
+    const guardarTxt = () => { window._clTxt = $('#cl-txt').value; };
+    $('#cl-txt').value = window._clTxt || ''; $('#cl-txt').oninput = guardarTxt;
+    $('#cl-img').onclick = () => { guardarTxt(); elegir(u => { imgPend = u; render(); }); };
+    const qi = $('#cl-qimg'); if (qi) qi.onclick = () => { guardarTxt(); imgPend = ''; render(); };
+    $('#cl-txt').onpaste = e => { const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); guardarTxt(); reducir(f).then(u => { imgPend = u; render(); }, er => toast(er.message)); } };
+    el.querySelectorAll('[data-im]').forEach(b => b.onclick = () => elegir(u => { const x = c.lista.find(y => y.id === b.dataset.im); if (x) { x.img = u; Store.save(); render(); } }));
+    el.querySelectorAll('[data-ver]').forEach(i => i.onclick = () => { const x = c.lista.find(y => y.id === i.dataset.ver); if (x && imgSeg(x.img)) openInfo(`<h2>${esc(x.tema || 'Clase')}</h2><img src="${esc(x.img)}" alt="" style="width:100%;border-radius:12px"><div class="dlg-foot"><button class="btn" id="cl-qx">Quitar imagen</button></div>`); const q = $('#cl-qx'); if (q) q.onclick = () => { x.img = ''; Store.save(); $('#dlg').close(); render(); }; });
     $('#cl-add').onclick = () => {
-      const tx = $('#cl-txt').value.trim(); if (!tx) { toast('Pega primero el mensaje de la clase'); return; }
-      const nuevos = separar(tx).map(reconocer).filter(x => x.tema || x.link || x.f);
+      const tx = $('#cl-txt').value.trim(); if (!tx && !imgPend) { toast('Pega el mensaje o sube una imagen'); return; }
+      let nuevos = separar(tx).map(reconocer).filter(x => x.tema || x.link || x.f);
+      if (!nuevos.length && imgPend) nuevos = [{ tema: '', link: '', f: '', h: '', p: '' }];
       if (!nuevos.length) { toast('No encontré datos de una clase en ese texto'); return; }
-      nuevos.forEach(x => c.lista.push({ id: uid(), ...x, n: '', ok: false }));
+      nuevos.forEach(x => c.lista.push({ id: uid(), ...x, n: '', ok: false, img: imgPend }));
+      imgPend = ''; window._clTxt = '';
       const falt = nuevos.reduce((a, x) => a + (!x.f) + (!x.h) + (!x.link), 0);
       ultimo = `✅ Agregué ${nuevos.length} clase${nuevos.length > 1 ? 's' : ''}.` + (falt ? ' Revisa las que tienen ⚠ y complétalas con «Editar».' : ' Todo reconocido.');
       tab = 'prox'; Store.save(); render();
