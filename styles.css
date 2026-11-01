@@ -748,3 +748,15 @@ body.wa-full .wa+.note,body.wa-full #view>p.note{display:none}
 .mt-k .dl{display:block;font-size:11.5px;font-weight:700;margin-top:2px;color:var(--mut)}.mt-k .dl.mejor{color:#059669}.mt-k .dl.peor{color:#dc2626}.mt-k .dl.igual{font-weight:500}
 .mt-leyenda{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--mut);margin:6px 2px 12px}.mt-leyenda .q-bien{color:#10b981}.mt-leyenda .q-medio{color:#f59e0b}.mt-leyenda .q-mal{color:#ef4444}.mt-leyenda button{margin-left:auto}
 .mt-k .mt-tipo{display:block;font-size:11px;font-weight:600;color:var(--mut);text-transform:none;letter-spacing:0;margin-top:1px}
+
+/* Clases */
+.cl-item{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.cl-fecha{min-width:62px;text-align:center;border-radius:14px;padding:8px 6px;background:var(--acc-soft,rgba(124,92,255,.12));display:flex;flex-direction:column;line-height:1.1}
+.cl-fecha b{font-size:26px}.cl-fecha small{font-size:11px;text-transform:uppercase;letter-spacing:.04em;opacity:.75}
+.cl-med{flex:1;min-width:200px}.cl-tema{font-size:16px}
+.cl-acc{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cl-url{font-size:12px;opacity:.6;word-break:break-all;margin-top:2px}
+.cl-warn{color:#d97706}.cl-hoy{color:#16a34a}
+.cl-now{border-color:#16a34a;box-shadow:0 0 0 1px #16a34a33}
+.cl-ok{opacity:.65}
+.cl-acc a.btn{text-decoration:none}
