@@ -135,7 +135,7 @@
     document.addEventListener('keydown', tecla); document.body.appendChild(ov); pintarV();
   }
 
-  let tab = 'prox', ultimo = '', leyendo = false;
+  let tab = 'prox', ultimo = '', leyendo = false, imgPend = '';
   // las 3 imágenes grandes de la pantalla (guardadas aparte de las clases)
   const PANEL = { get tema() { return 'Clases a tener en cuenta'; }, get imgs() { return E().fi.map(x => x.u); }, set imgs(v) { const o = E().fi; E().fi = v.map(u => o.find(x => x.u === u) || { u }); delete E().fotos; } };
   const fotos = () => imgsDe(PANEL);
@@ -156,18 +156,22 @@
   const colocar = u => { const a = fotos(); if (a.length >= 3) { toast('Ya tienes 3 imágenes. Quita una para poner otra.'); return false; } guardarImgs(PANEL, a.concat(u)); Store.save(); return true; };
 
   // lee el texto de la imagen con la IA y lo mete en el cuadro; si encuentra fecha o link, agrega la clase sola
+  async function ocr(u) {
+    const tk = window.Nube && Nube.activo ? await Nube.token() : null;
+    if (!tk) throw new Error('Inicia sesión para que lea el texto de la imagen.');
+    const r = await fetch('/api/clase-imagen', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk }, body: JSON.stringify({ imagen: u }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'No pude leer la imagen.');
+    return (d.texto || '').trim();
+  }
+  // para las casillas vacías de abajo: pone la imagen y llena sus datos al instante
   async function leerImagen(u) {
     leyendo = true; ultimo = '🔎 Leyendo la imagen…'; render();
     try {
-      const tk = window.Nube && Nube.activo ? await Nube.token() : null;
-      if (!tk) throw new Error('Inicia sesión para que lea el texto de la imagen.');
-      const r = await fetch('/api/clase-imagen', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk }, body: JSON.stringify({ imagen: u }) });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || 'No pude leer la imagen.');
-      const tx = (d.texto || '').trim();
+      const tx = await ocr(u);
       if (!tx) { ultimo = 'No vi texto en la imagen. Escribe la fecha, hora y link debajo de la imagen.'; return; }
       const x = reconocer(tx), f = E().fi.find(y => y.u === u);
-      if (f) { if (x.f) f.f = x.f; if (x.h) f.h = x.h; if (x.link) f.link = x.link; if (x.tema) f.tema = x.tema; Store.save(); }
+      if (f) { if (x.f) f.f = x.f; if (x.h) f.h = x.h; if (x.link) f.link = x.link; if (x.tema) f.tema = x.tema; if (x.p) f.p = x.p; Store.save(); }
       ultimo = x.f || x.link ? '✅ Leí la imagen y llené la fecha, hora, tema y link. Revísalos debajo de la imagen.' : 'Leí la imagen pero no encontré fecha ni link. Escríbelos debajo de la imagen.';
     } catch (e) { ultimo = '⚠ ' + (e.message || 'No pude leer la imagen.') + ' Escribe los datos debajo de la imagen.'; }
     finally { leyendo = false; if (vista === 'clases') render(); }
@@ -175,7 +179,7 @@
   let _ult = '', _ultT = 0;
   const nuevaImagen = file => reducir(file).then(u => {
     if (u === _ult && Date.now() - _ultT < 5000) return; // evita subir la misma imagen dos veces seguidas
-    _ult = u; _ultT = Date.now(); colocar(u); leerImagen(u);
+    _ult = u; _ultT = Date.now(); imgPend = u; ultimo = '📎 Imagen lista. Cuando termines de pegar el texto y el link, toca «Reconocer y agregar».'; if (vista === 'clases') render();
   }, e => toast(e.message));
   // pegar (Ctrl+V) o arrastrar una imagen en cualquier parte de la sección
   document.addEventListener('paste', e => { if (vista !== 'clases' || e.defaultPrevented) return; const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); const t = $('#cl-txt'); if (t) window._clTxt = t.value; nuevaImagen(f); } });
@@ -209,21 +213,23 @@
     <div class="card cl-panel"><div class="it-h"><b>📌 Clases a tener en cuenta</b><small>${fotos().length}/3 imágenes</small></div>
       <div class="cl-3">${[0, 1, 2].map(k => { const u = fotos()[k]; return u ? `<div class="cl-slot ${fila(k).ok ? 'cl-hecha' : ''}"><img src="${esc(u)}" alt="Imagen ${k + 1}" data-fv="${k}">${slotDatos(k)}<div class="cl-slot-b"><button class="btn btn-sm" data-fs="${k}">Cambiar imagen</button><button class="btn btn-sm" data-fq="${k}">Quitar</button></div></div>` : `<button class="cl-slot cl-vacio" id="cl-nf${k}" data-nf>＋<span>Subir o pegar imagen</span></button>`; }).join('')}</div></div>
     <div class="card"><h3>Pega el mensaje de la clase</h3>
-      <p class="sub">Pega el mensaje tal como te lo mandaron (WhatsApp, correo, Zoom…). Reconozco solo la <b>fecha</b>, el <b>día</b>, la <b>hora</b>, el <b>tema</b> y el <b>link</b>. Puedes pegar varias clases juntas.<br>📷 También puedes <b>copiar una imagen o captura y pegarla con Ctrl+V</b> (o arrastrarla aquí): leo el texto de la imagen y agrego la clase sola, sin subir nada desde tu dispositivo.</p>
+      <p class="sub">Pega el mensaje tal como te lo mandaron (WhatsApp, correo, Zoom…). Reconozco solo la <b>fecha</b>, el <b>día</b>, la <b>hora</b>, el <b>tema</b> y el <b>link</b>. Puedes pegar varias clases juntas.<br>📷 Pega también el <b>link</b> y la <b>imagen</b> (Ctrl+V o arrastrar). Cuando tengas todo, toca <b>«Reconocer y agregar»</b> y se ordena junto: imagen, fecha, hora, tema y link.</p>
       <textarea id="cl-txt" rows="5" placeholder="Ejemplo:&#10;Clase de Meta Ads: cómo escalar campañas&#10;Jueves 6 de noviembre, 8:00 p. m.&#10;https://us02web.zoom.us/j/123456789" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;margin:8px 0"></textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-pri" id="cl-add">Reconocer y agregar</button><button class="btn" id="cl-img">📷 Subir imagen</button><button class="btn" id="cl-lim">Limpiar</button></div>
+      ${imgPend ? `<div class="cl-pend"><img src="${esc(imgPend)}" alt="Imagen pendiente"><div><b>📎 Imagen lista</b><div class="sub">Se leerá junto con el texto y el link cuando toques «Reconocer y agregar».</div><button class="btn btn-sm" id="cl-qp">Quitar imagen</button></div></div>` : ''}
       ${ultimo ? `<p class="sub" style="margin-top:8px">${ultimo}</p>` : ''}</div>
     <div class="chips" id="cl-t"><button class="chip ${tab === 'prox' ? 'on' : ''}" data-t="prox">Próximas (${prox.length})</button><button class="chip ${tab === 'pas' ? 'on' : ''}" data-t="pas">Pasadas (${pas.length})</button></div>
     ${L.length ? L.map(tarjeta).join('') : `<div class="empty">${tab === 'prox' ? 'Aún no hay clases próximas. Pega arriba el mensaje de la clase.' : 'Aquí aparecerán las clases que ya pasaron.'}</div>`}`;
 
     el.querySelectorAll('#cl-t [data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
     el.querySelectorAll('[data-nf]').forEach(b => b.onclick = () => { guardarTxt0(); elegir(u => { colocar(u); render(); }); });
-    $('#cl-lim').onclick = () => { $('#cl-txt').value = ''; ultimo = ''; render(); };
+    $('#cl-lim').onclick = () => { $('#cl-txt').value = ''; window._clTxt = ''; ultimo = ''; imgPend = ''; render(); };
     const guardarTxt0 = () => { const t = $('#cl-txt'); if (t) window._clTxt = t.value; };
     const guardarTxt = () => { window._clTxt = $('#cl-txt').value; };
     $('#cl-txt').value = window._clTxt || ''; $('#cl-txt').oninput = guardarTxt;
     $('#cl-add').onclick = () => agregar();
-    $('#cl-img').onclick = () => { guardarTxt(); elegir(u => { colocar(u); leerImagen(u); }); };
+    $('#cl-img').onclick = () => { guardarTxt(); elegir(u => { imgPend = u; ultimo = '📎 Imagen lista. Toca «Reconocer y agregar» cuando termines.'; render(); }); };
+    const qp = $('#cl-qp'); if (qp) qp.onclick = () => { guardarTxt(); imgPend = ''; ultimo = ''; render(); };
     el.querySelectorAll('[data-fd]').forEach(i => i.onchange = () => { const [k, c2] = i.dataset.fd.split('|'), r = E().fi[+k]; if (!r) return; r[c2] = c2 === 'link' ? (extraerUrl(i.value) ? urlOk(extraerUrl(i.value)) : i.value.trim()) : i.value.trim(); if (c2 === 'link' && r.link) r.p = plataforma(r.link); Store.save(); render(); });
     el.querySelectorAll('[data-fk]').forEach(i => i.onchange = () => { const r = E().fi[+i.dataset.fk]; if (r) { r.ok = i.checked; Store.save(); render(); } });
     el.querySelectorAll('[data-fc]').forEach(b => b.onclick = () => { const r = E().fi[+b.dataset.fc]; if (r && r.link && navigator.clipboard) navigator.clipboard.writeText(r.link).then(() => toast('Link copiado'), () => toast('No se pudo copiar')); });
@@ -231,9 +237,23 @@
     el.querySelectorAll('[data-fv]').forEach(i => i.onclick = () => visor(PANEL, +i.dataset.fv));
     el.querySelectorAll('[data-fq]').forEach(b => b.onclick = () => { const a = fotos(); a.splice(+b.dataset.fq, 1); guardarImgs(PANEL, a); Store.save(); render(); });
     el.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => elegir(u => { const a = fotos(); a[+b.dataset.fs] = u; guardarImgs(PANEL, a); Store.save(); render(); }));
-    agregar = tx0 => {
-      const tx = (typeof tx0 === 'string' ? tx0 : $('#cl-txt').value).trim(); if (!tx) { toast('Pega el mensaje de la clase'); return; }
-      let nuevos = separar(tx).map(reconocer).filter(x => x.tema || x.link || x.f);
+    agregar = async () => {
+      const tx = ($('#cl-txt').value || '').trim();
+      if (!tx && !imgPend) { toast('Pega el texto, el link o una imagen'); return; }
+      if (imgPend) { // todo junto: texto + link + imagen -> una tarjeta ordenada
+        if (fotos().length >= 3) { toast('Ya tienes 3 imágenes. Quita una para poner otra.'); return; }
+        const u = imgPend; let x = reconocer(tx), aviso = '';
+        ultimo = '🔎 Leyendo la imagen y ordenando los datos…'; leyendo = true; render();
+        try { const t2 = await ocr(u); if (t2) { const y = reconocer(t2); const buenoT = x.tema && x.tema.length >= 10 && !/^(de |del |la |el |los |las )/i.test(x.tema); x = { tema: buenoT ? x.tema : (y.tema || x.tema), f: x.f || y.f, h: x.h || y.h, link: x.link || y.link, p: x.p || y.p }; } else aviso = ' No vi texto en la imagen.'; }
+        catch (e) { aviso = ' ⚠ ' + (e.message || 'No pude leer la imagen.'); }
+        leyendo = false;
+        if (!x.link) { const l = extraerUrl(tx); if (l) { x.link = urlOk(l); x.p = plataforma(l); } }
+        if (colocar(u)) { Object.assign(E().fi.find(y => y.u === u) || {}, { tema: x.tema, f: x.f, h: x.h, link: x.link, p: x.p }); }
+        const falt = (!x.f) + (!x.h) + (!x.link);
+        ultimo = '✅ Ordené los datos debajo de la imagen.' + (falt ? ' Completa lo que tiene ⚠.' : ' Todo reconocido.') + aviso;
+        imgPend = ''; window._clTxt = ''; Store.save(); render(); return;
+      }
+      const nuevos = separar(tx).map(reconocer).filter(x => x.tema || x.link || x.f);
       if (!nuevos.length) { toast('No encontré datos de una clase en ese texto'); return; }
       nuevos.forEach(x => c.lista.push({ id: uid(), ...x, n: '', ok: false }));
       window._clTxt = '';
