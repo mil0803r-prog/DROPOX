@@ -145,6 +145,7 @@
   const fotos = () => imgsDe(PANEL);
   const pers = () => { const t = (S.tareas && S.tareas.personas) || ['Fray', 'Milner']; return { '': 'Sin asignar', 0: t[0] || 'Persona 1', 1: t[1] || 'Persona 2', 2: 'Ambos' }; };
   const selQ = (v, attr) => `<label class="cl-l">👤 Asignar a<select ${attr} class="cl-q">${Object.entries(pers()).map(([k, l]) => `<option value="${k}" ${String(v ?? '') === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
+  const etq = q => `<div class="cl-tag cl-q${String(q ?? '') === '' ? 'n' : q}">👤 ${esc(pers()[String(q ?? '')] || 'Sin asignar')}</div>`;
   const fila = k => E().fi[k] || {};
   function slotDatos(k) {
     const x = fila(k), d = x.f ? dif(x.f) : null, enlace = segura(x.link);
@@ -201,7 +202,7 @@
     const dd = c.f ? new Date(c.f + 'T12:00:00') : null;
     return `<div class="card cl-item ${d === 0 ? 'cl-now' : ''} ${c.ok ? 'cl-ok' : ''}">
       <div class="cl-fecha">${dd ? `<small>${cap(dd.toLocaleDateString('es-PE', { weekday: 'short' }).replace('.', ''))}</small><b>${dd.getDate()}</b><small>${cap(dd.toLocaleDateString('es-PE', { month: 'short' }).replace('.', ''))}</small>` : '<b>?</b>'}</div>
-      <div class="cl-med"><b class="cl-tema">${esc(c.tema || 'Clase sin tema')}</b>
+      <div class="cl-med">${c.q !== undefined && c.q !== '' ? `<span class="cl-tag cl-tag-s cl-q${c.q}">👤 ${esc(pers()[c.q])}</span> ` : ''}<b class="cl-tema">${esc(c.tema || 'Clase sin tema')}</b>
         <div class="sub">${c.f ? esc(cap(fechaCorta(c.f))) : '<span class="cl-warn">⚠ Falta la fecha</span>'} · ${c.h ? '🕒 ' + esc(hFmt(c.h)) : '<span class="cl-warn">⚠ Falta la hora</span>'} · ${cuando}</div>
         ${c.p ? `<span class="chip on" style="cursor:default;font-size:12px;padding:2px 10px">${esc(c.p)}</span>` : ''}${c.n ? `<div class="sub" style="margin-top:4px">📝 ${esc(c.n)}</div>` : ''}
         ${enlace ? `<div class="cl-url">${esc(enlace.replace(/^https?:\/\//, '').slice(0, 60))}</div>` : '<div class="cl-warn" style="font-size:13px">⚠ Sin link</div>'}</div>
@@ -220,7 +221,7 @@
     el.innerHTML = `${secH('tareas', 'Clases', 'Fecha, hora, tema y link de tus clases en un solo lugar', '<button class="btn btn-pri" id="cl-nuevo" style="white-space:nowrap">+ Clase</button>')}
     <div class="seg" id="cl-fq" style="margin-bottom:12px"><button data-q="todos" class="${filtroQ === 'todos' ? 'on' : ''}">Todos</button><button data-q="0" class="${filtroQ === '0' ? 'on' : ''}">${esc(pers()[0])}</button><button data-q="1" class="${filtroQ === '1' ? 'on' : ''}">${esc(pers()[1])}</button></div>
     <div class="card cl-panel"><div class="it-h"><b>📌 Clases a tener en cuenta</b><small>${fotos().length}/3 imágenes</small></div>
-      <div class="cl-3">${[0, 1, 2].map(k => { const u = fotos()[k]; if (u && !ve(fila(k).q)) return ''; if (!u && filtroQ !== 'todos') return ''; return u ? `<div class="cl-slot ${fila(k).ok ? 'cl-hecha' : ''}"><img src="${esc(u)}" alt="Imagen ${k + 1}" data-fv="${k}">${slotDatos(k)}<div class="cl-slot-b"><button class="btn btn-sm" data-fs="${k}">Cambiar imagen</button><button class="btn btn-sm" data-fq="${k}">Quitar</button></div></div>` : `<button class="cl-slot cl-vacio" id="cl-nf${k}" data-nf>＋<span>Subir o pegar imagen</span></button>`; }).join('')}</div></div>
+      <div class="cl-3">${[0, 1, 2].map(k => { const u = fotos()[k]; if (u && !ve(fila(k).q)) return ''; if (!u && filtroQ !== 'todos') return ''; return u ? `<div class="cl-slot ${fila(k).ok ? 'cl-hecha' : ''}">${etq(fila(k).q)}<img src="${esc(u)}" alt="Imagen ${k + 1}" data-fv="${k}">${slotDatos(k)}<div class="cl-slot-b"><button class="btn btn-sm" data-fs="${k}">Cambiar imagen</button><button class="btn btn-sm" data-fq="${k}">Quitar</button></div></div>` : `<button class="cl-slot cl-vacio" id="cl-nf${k}" data-nf>＋<span>Subir o pegar imagen</span></button>`; }).join('')}</div></div>
     <div class="card"><h3>Pega el mensaje de la clase</h3>
       <p class="sub">Pega el mensaje tal como te lo mandaron (WhatsApp, correo, Zoom…). Reconozco solo la <b>fecha</b>, el <b>día</b>, la <b>hora</b>, el <b>tema</b> y el <b>link</b>. Puedes pegar varias clases juntas.<br>📷 Pega también el <b>link</b> y la <b>imagen</b> (Ctrl+V o arrastrar). Cuando tengas todo, toca <b>«Reconocer y agregar»</b> y se ordena junto: imagen, fecha, hora, tema y link.</p>
       <textarea id="cl-txt" rows="5" placeholder="Ejemplo:&#10;Clase de Meta Ads: cómo escalar campañas&#10;Jueves 6 de noviembre, 8:00 p. m.&#10;https://us02web.zoom.us/j/123456789" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;margin:8px 0"></textarea>
