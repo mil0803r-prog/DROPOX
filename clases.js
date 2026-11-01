@@ -77,7 +77,11 @@
       tema = r.length > 2 ? (may[0] || r.slice().sort((a, b) => b.length - a.length)[0]) : r.join(' · ');
     }
     tema = tema.replace(/\s+/g, ' ').replace(/^[\s\-–—:,.]+|[\s\-–—:,.]+$/g, '').slice(0, 160);
-    return { tema, link: url ? urlOk(url) : '', f: fh ? fh.f : '', h: hr ? hr.h : '', p: url ? plataforma(url) : '' };
+    const gr = /\b(gratis|gratuit[oa]|free|sin costo|cupo libre)\b/i.test(chunk);
+    const mm = chunk.match(/(?:S\/\.?|PEN|USD|US\$|\$)\s?(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)\s?(?:soles|d[oó]lares|usd)\b/i);
+    const pg = !gr && (mm || /\b(de pago|pagad[oa]|precio|inversi[oó]n|costo)\b/i.test(chunk));
+    const monto = pg && mm ? ((/\$|usd|d[oó]lar/i.test(mm[0]) ? '$ ' : 'S/ ') + (mm[1] || mm[2])) : '';
+    return { tema, link: url ? urlOk(url) : '', f: fh ? fh.f : '', h: hr ? hr.h : '', p: url ? plataforma(url) : '', pago: gr ? 'gratis' : pg ? 'paga' : '', monto };
   }
 
   // Parte el texto pegado en una o varias clases
@@ -146,6 +150,8 @@
   const pers = () => { const t = (S.tareas && S.tareas.personas) || ['Fray', 'Milner']; return { '': 'Sin asignar', 0: t[0] || 'Persona 1', 1: t[1] || 'Persona 2', 2: 'Ambos' }; };
   const selQ = (v, attr) => `<label class="cl-l">👤 Asignar a<select ${attr} class="cl-q">${Object.entries(pers()).map(([k, l]) => `<option value="${k}" ${String(v ?? '') === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
   const etq = q => `<div class="cl-tag cl-q${String(q ?? '') === '' ? 'n' : q}">👤 ${esc(pers()[String(q ?? '')] || 'Sin asignar')}</div>`;
+  const pagoEtq = x => (x.pago === 'gratis' ? '<div class="cl-tag cl-pg cl-gratis">🆓 GRATIS</div>' : x.pago === 'paga' ? `<div class="cl-tag cl-pg cl-paga">💳 DE PAGO${x.monto ? ' · ' + esc(x.monto) : ''}</div>` : '');
+  const selP = (x, attr) => `<div class="cl-fr"><label>💰 Costo<select ${attr} class="cl-q"><option value="" ${!x.pago ? 'selected' : ''}>Sin definir</option><option value="gratis" ${x.pago === 'gratis' ? 'selected' : ''}>Gratis</option><option value="paga" ${x.pago === 'paga' ? 'selected' : ''}>De pago</option></select></label>${x.pago === 'paga' ? `<label>Monto<input type="text" ${attr.replace('pg=', 'pm=')} value="${esc(x.monto || '')}" placeholder="S/ 50"></label>` : '<span></span>'}</div>`;
   const fila = k => E().fi[k] || {};
   function slotDatos(k) {
     const x = fila(k), d = x.f ? dif(x.f) : null, enlace = segura(x.link);
@@ -157,6 +163,7 @@
       <div class="cl-fr"><label>Fecha<input type="date" data-fd="${k}|f" value="${esc(x.f || '')}"></label><label>Hora<input type="time" data-fd="${k}|h" value="${esc(x.h || '')}"></label></div>
       <label class="cl-l">Tema<input type="text" data-fd="${k}|tema" value="${esc(x.tema || '')}" placeholder="Tema de la clase"></label>
       ${selQ(x.q, `data-fq2="${k}"`)}
+      ${selP(x, `data-pg="${k}"`)}
       <label class="cl-l">Link<input type="text" data-fd="${k}|link" value="${esc(x.link || '')}" placeholder="https://…"></label>
       <div class="cl-bot">${enlace ? `${botonLink(enlace, 'btn-pri')}<button class="btn" data-fc="${k}">📋 Copiar link</button>` : `<button class="btn btn-pri" data-fsl="${k}">🎥 Entrar / Registrarme</button><button class="btn" data-fsl="${k}">📋 Copiar link</button><div class="cl-warn" style="flex-basis:100%;font-size:13px">⚠ Pega el link en la casilla «Link»: si es Zoom o Meet dirá «Entrar», si es de inscripción dirá «Registrarme»</div>`}</div>
       <label class="cl-ck"><input type="checkbox" data-fk="${k}" ${x.ok ? 'checked' : ''}> ${x.ok ? '✅ Completada' : 'Marcar como completada'}</label></div>`;
@@ -179,7 +186,7 @@
       const tx = await ocr(u);
       if (!tx) { ultimo = 'No vi texto en la imagen. Escribe la fecha, hora y link debajo de la imagen.'; return; }
       const x = reconocer(tx), f = E().fi.find(y => y.u === u);
-      if (f) { if (x.f) f.f = x.f; if (x.h) f.h = x.h; if (x.link) f.link = x.link; if (x.tema) f.tema = x.tema; if (x.p) f.p = x.p; Store.save(); }
+      if (f) { if (x.f) f.f = x.f; if (x.h) f.h = x.h; if (x.link) f.link = x.link; if (x.tema) f.tema = x.tema; if (x.p) f.p = x.p; if (x.pago) { f.pago = x.pago; f.monto = x.monto; } Store.save(); }
       ultimo = x.f || x.link ? '✅ Leí la imagen y llené la fecha, hora, tema y link. Revísalos debajo de la imagen.' : 'Leí la imagen pero no encontré fecha ni link. Escríbelos debajo de la imagen.';
     } catch (e) { ultimo = '⚠ ' + (e.message || 'No pude leer la imagen.') + ' Escribe los datos debajo de la imagen.'; }
     finally { leyendo = false; if (vista === 'clases') render(); }
@@ -202,13 +209,14 @@
     const dd = c.f ? new Date(c.f + 'T12:00:00') : null;
     return `<div class="card cl-item ${d === 0 ? 'cl-now' : ''} ${c.ok ? 'cl-ok' : ''}">
       <div class="cl-fecha">${dd ? `<small>${cap(dd.toLocaleDateString('es-PE', { weekday: 'short' }).replace('.', ''))}</small><b>${dd.getDate()}</b><small>${cap(dd.toLocaleDateString('es-PE', { month: 'short' }).replace('.', ''))}</small>` : '<b>?</b>'}</div>
-      <div class="cl-med">${c.q !== undefined && c.q !== '' ? `<span class="cl-tag cl-tag-s cl-q${c.q}">👤 ${esc(pers()[c.q])}</span> ` : ''}<b class="cl-tema">${esc(c.tema || 'Clase sin tema')}</b>
+      <div class="cl-med">${c.pago ? `<span class="cl-tag cl-tag-s ${c.pago === 'gratis' ? 'cl-gratis' : 'cl-paga'}">${c.pago === 'gratis' ? '🆓 Gratis' : '💳 De pago' + (c.monto ? ' · ' + esc(c.monto) : '')}</span> ` : ''}${c.q !== undefined && c.q !== '' ? `<span class="cl-tag cl-tag-s cl-q${c.q}">👤 ${esc(pers()[c.q])}</span> ` : ''}<b class="cl-tema">${esc(c.tema || 'Clase sin tema')}</b>
         <div class="sub">${c.f ? esc(cap(fechaCorta(c.f))) : '<span class="cl-warn">⚠ Falta la fecha</span>'} · ${c.h ? '🕒 ' + esc(hFmt(c.h)) : '<span class="cl-warn">⚠ Falta la hora</span>'} · ${cuando}</div>
         ${c.p ? `<span class="chip on" style="cursor:default;font-size:12px;padding:2px 10px">${esc(c.p)}</span>` : ''}${c.n ? `<div class="sub" style="margin-top:4px">📝 ${esc(c.n)}</div>` : ''}
         ${enlace ? `<div class="cl-url">${esc(enlace.replace(/^https?:\/\//, '').slice(0, 60))}</div>` : '<div class="cl-warn" style="font-size:13px">⚠ Sin link</div>'}</div>
       <div class="cl-acc">
         ${enlace ? `${botonLink(enlace, 'btn-pri btn-sm').replace('Entrar a la clase', 'Entrar').replace('Registrarme', 'Registrarme')}<button class="btn btn-sm" data-cp="${esc(c.id)}">Copiar link</button>` : ''}
         ${selQ(c.q, `data-lq="${esc(c.id)}"`)}
+        ${selP(c, `data-lpg="${esc(c.id)}"`)}
         <label class="chk"><input type="checkbox" data-ok="${esc(c.id)}" ${c.ok ? 'checked' : ''}> Asistí</label>
         <span><button class="btn btn-sm" data-e="${esc(c.id)}">Editar</button> <button class="btn btn-sm" data-d="${esc(c.id)}">Quitar</button></span>
       </div></div>`;
@@ -221,7 +229,7 @@
     el.innerHTML = `${secH('tareas', 'Clases', 'Fecha, hora, tema y link de tus clases en un solo lugar', '<button class="btn btn-pri" id="cl-nuevo" style="white-space:nowrap">+ Clase</button>')}
     <div class="seg" id="cl-fq" style="margin-bottom:12px"><button data-q="todos" class="${filtroQ === 'todos' ? 'on' : ''}">Todos</button><button data-q="0" class="${filtroQ === '0' ? 'on' : ''}">${esc(pers()[0])}</button><button data-q="1" class="${filtroQ === '1' ? 'on' : ''}">${esc(pers()[1])}</button></div>
     <div class="card cl-panel"><div class="it-h"><b>📌 Clases a tener en cuenta</b><small>${fotos().length}/3 imágenes</small></div>
-      <div class="cl-3">${[0, 1, 2].map(k => { const u = fotos()[k]; if (u && !ve(fila(k).q)) return ''; if (!u && filtroQ !== 'todos') return ''; return u ? `<div class="cl-slot ${fila(k).ok ? 'cl-hecha' : ''}">${etq(fila(k).q)}<img src="${esc(u)}" alt="Imagen ${k + 1}" data-fv="${k}">${slotDatos(k)}<div class="cl-slot-b"><button class="btn btn-sm" data-fs="${k}">Cambiar imagen</button><button class="btn btn-sm" data-fq="${k}">Quitar</button></div></div>` : `<button class="cl-slot cl-vacio" id="cl-nf${k}" data-nf>＋<span>Subir o pegar imagen</span></button>`; }).join('')}</div></div>
+      <div class="cl-3">${[0, 1, 2].map(k => { const u = fotos()[k]; if (u && !ve(fila(k).q)) return ''; if (!u && filtroQ !== 'todos') return ''; return u ? `<div class="cl-slot ${fila(k).ok ? 'cl-hecha' : ''}">${etq(fila(k).q)}${pagoEtq(fila(k))}<img src="${esc(u)}" alt="Imagen ${k + 1}" data-fv="${k}">${slotDatos(k)}<div class="cl-slot-b"><button class="btn btn-sm" data-fs="${k}">Cambiar imagen</button><button class="btn btn-sm" data-fq="${k}">Quitar</button></div></div>` : `<button class="cl-slot cl-vacio" id="cl-nf${k}" data-nf>＋<span>Subir o pegar imagen</span></button>`; }).join('')}</div></div>
     <div class="card"><h3>Pega el mensaje de la clase</h3>
       <p class="sub">Pega el mensaje tal como te lo mandaron (WhatsApp, correo, Zoom…). Reconozco solo la <b>fecha</b>, el <b>día</b>, la <b>hora</b>, el <b>tema</b> y el <b>link</b>. Puedes pegar varias clases juntas.<br>📷 Pega también el <b>link</b> y la <b>imagen</b> (Ctrl+V o arrastrar). Cuando tengas todo, toca <b>«Reconocer y agregar»</b> y se ordena junto: imagen, fecha, hora, tema y link.</p>
       <textarea id="cl-txt" rows="5" placeholder="Ejemplo:&#10;Clase de Meta Ads: cómo escalar campañas&#10;Jueves 6 de noviembre, 8:00 p. m.&#10;https://us02web.zoom.us/j/123456789" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;margin:8px 0"></textarea>
@@ -244,6 +252,11 @@
     el.querySelectorAll('#cl-fq [data-q]').forEach(b => b.onclick = () => { filtroQ = b.dataset.q; render(); });
     el.querySelectorAll('[data-fq2]').forEach(i => i.onchange = () => { const r = E().fi[+i.dataset.fq2]; if (r) { r.q = i.value; Store.save(); toast('Asignada a ' + pers()[i.value]); render(); } });
     el.querySelectorAll('[data-lq]').forEach(i => i.onchange = () => { const r = c.lista.find(y => y.id === i.dataset.lq); if (r) { r.q = i.value; Store.save(); toast('Asignada a ' + pers()[i.value]); render(); } });
+    el.querySelectorAll('[data-pg],[data-pm],[data-lpg],[data-lpm]').forEach(i => i.onchange = () => {
+      const d = i.dataset, esL = d.lpg !== undefined || d.lpm !== undefined, id = d.pg ?? d.pm ?? d.lpg ?? d.lpm, r = esL ? c.lista.find(y => y.id === id) : E().fi[+id]; if (!r) return;
+      if (d.pg !== undefined || d.lpg !== undefined) { r.pago = i.value; if (i.value !== 'paga') r.monto = ''; } else r.monto = i.value.trim();
+      Store.save(); render();
+    });
     el.querySelectorAll('[data-fk]').forEach(i => i.onchange = () => { const r = E().fi[+i.dataset.fk]; if (r) { r.ok = i.checked; Store.save(); render(); } });
     el.querySelectorAll('[data-fc]').forEach(b => b.onclick = () => { const r = E().fi[+b.dataset.fc]; if (r && r.link && navigator.clipboard) navigator.clipboard.writeText(r.link).then(() => toast('Link copiado'), () => toast('No se pudo copiar')); });
     el.querySelectorAll('[data-fsl]').forEach(b => b.onclick = () => { const i = el.querySelector(`[data-fd="${b.dataset.fsl}|link"]`); toast('Primero pega el link de la clase'); if (i) { i.focus(); i.scrollIntoView({ block: 'center' }); } });
@@ -257,11 +270,11 @@
         if (fotos().length >= 3) { toast('Ya tienes 3 imágenes. Quita una para poner otra.'); return; }
         const u = imgPend; let x = reconocer(tx), aviso = '';
         ultimo = '🔎 Leyendo la imagen y ordenando los datos…'; leyendo = true; render();
-        try { const t2 = await ocr(u); if (t2) { const y = reconocer(t2); const buenoT = x.tema && x.tema.length >= 10 && !/^(de |del |la |el |los |las )/i.test(x.tema); x = { tema: buenoT ? x.tema : (y.tema || x.tema), f: x.f || y.f, h: x.h || y.h, link: x.link || y.link, p: x.p || y.p }; } else aviso = ' No vi texto en la imagen.'; }
+        try { const t2 = await ocr(u); if (t2) { const y = reconocer(t2); const buenoT = x.tema && x.tema.length >= 10 && !/^(de |del |la |el |los |las )/i.test(x.tema); x = { tema: buenoT ? x.tema : (y.tema || x.tema), f: x.f || y.f, h: x.h || y.h, link: x.link || y.link, p: x.p || y.p, pago: x.pago || y.pago, monto: x.monto || y.monto }; } else aviso = ' No vi texto en la imagen.'; }
         catch (e) { aviso = ' ⚠ ' + (e.message || 'No pude leer la imagen.'); }
         leyendo = false;
         if (!x.link) { const l = extraerUrl(tx); if (l) { x.link = urlOk(l); x.p = plataforma(l); } }
-        if (colocar(u)) { Object.assign(E().fi.find(y => y.u === u) || {}, { tema: x.tema, f: x.f, h: x.h, link: x.link, p: x.p }); }
+        if (colocar(u)) { Object.assign(E().fi.find(y => y.u === u) || {}, { tema: x.tema, f: x.f, h: x.h, link: x.link, p: x.p, pago: x.pago, monto: x.monto }); }
         const falt = (!x.f) + (!x.h) + (!x.link);
         ultimo = '✅ Ordené los datos debajo de la imagen.' + (falt ? ' Completa lo que tiene ⚠.' : ' Todo reconocido.') + aviso;
         imgPend = ''; window._clTxt = ''; Store.save(); render(); return;

@@ -792,3 +792,5 @@ body.wa-full .wa+.note,body.wa-full #view>p.note{display:none}
 .cl-tag.cl-q0{background:linear-gradient(135deg,#7c5cff,#5b3df5)}.cl-tag.cl-q1{background:linear-gradient(135deg,#0ea5a4,#0b7f7e)}
 .cl-tag.cl-q2{background:linear-gradient(135deg,#f59e0b,#d97706)}.cl-tag.cl-qn{background:#94a3b8}
 .cl-tag-s{display:inline-block;font-size:12px;padding:3px 10px;border-radius:999px;margin-right:6px;vertical-align:middle}
+.cl-tag.cl-pg{font-size:clamp(15px,1.8vw,20px);padding:6px 12px}
+.cl-tag.cl-gratis{background:linear-gradient(135deg,#22c55e,#15803d)}.cl-tag.cl-paga{background:linear-gradient(135deg,#ef4444,#b91c1c)}
