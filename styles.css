@@ -787,3 +787,4 @@ body.wa-full .wa+.note,body.wa-full #view>p.note{display:none}
 .cl-hecha{border-color:#16a34a}.cl-hecha img,.cl-hecha .cl-bigf{opacity:.55}
 .cl-pend{display:flex;gap:12px;align-items:center;margin-top:12px;padding:10px;border:1px dashed var(--acc);border-radius:12px}
 .cl-pend img{width:160px;max-height:100px;object-fit:contain;border-radius:8px;background:#0001}
+.cl-q{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit}

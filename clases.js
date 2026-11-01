@@ -135,10 +135,13 @@
     document.addEventListener('keydown', tecla); document.body.appendChild(ov); pintarV();
   }
 
-  let tab = 'prox', ultimo = '', leyendo = false, imgPend = '';
+  let tab = 'prox', ultimo = '', leyendo = false, imgPend = '', filtroQ = 'todos';
+  const ve = q => filtroQ === 'todos' || String(q ?? '') === filtroQ || String(q ?? '') === '2';
   // las 3 imágenes grandes de la pantalla (guardadas aparte de las clases)
   const PANEL = { get tema() { return 'Clases a tener en cuenta'; }, get imgs() { return E().fi.map(x => x.u); }, set imgs(v) { const o = E().fi; E().fi = v.map(u => o.find(x => x.u === u) || { u }); delete E().fotos; } };
   const fotos = () => imgsDe(PANEL);
+  const pers = () => { const t = (S.tareas && S.tareas.personas) || ['Fray', 'Milner']; return { '': 'Sin asignar', 0: t[0] || 'Persona 1', 1: t[1] || 'Persona 2', 2: 'Ambos' }; };
+  const selQ = (v, attr) => `<label class="cl-l">👤 Asignar a<select ${attr} class="cl-q">${Object.entries(pers()).map(([k, l]) => `<option value="${k}" ${String(v ?? '') === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
   const fila = k => E().fi[k] || {};
   function slotDatos(k) {
     const x = fila(k), d = x.f ? dif(x.f) : null, enlace = segura(x.link);
@@ -149,6 +152,7 @@
       ${cuando ? `<div class="cl-cuando">${cuando}</div>` : ''}
       <div class="cl-fr"><label>Fecha<input type="date" data-fd="${k}|f" value="${esc(x.f || '')}"></label><label>Hora<input type="time" data-fd="${k}|h" value="${esc(x.h || '')}"></label></div>
       <label class="cl-l">Tema<input type="text" data-fd="${k}|tema" value="${esc(x.tema || '')}" placeholder="Tema de la clase"></label>
+      ${selQ(x.q, `data-fq2="${k}"`)}
       <label class="cl-l">Link<input type="text" data-fd="${k}|link" value="${esc(x.link || '')}" placeholder="https://…"></label>
       <div class="cl-bot">${enlace ? `<a class="btn btn-pri" href="${esc(enlace)}" target="_blank" rel="noopener noreferrer">🎥 Entrar a la clase</a><button class="btn" data-fc="${k}">📋 Copiar link</button>` : `<button class="btn btn-pri" data-fsl="${k}">🎥 Entrar a la clase</button><button class="btn" data-fsl="${k}">📋 Copiar link</button><div class="cl-warn" style="flex-basis:100%;font-size:13px">⚠ Pega el link en la casilla «Link» para activar el botón</div>`}</div>
       <label class="cl-ck"><input type="checkbox" data-fk="${k}" ${x.ok ? 'checked' : ''}> ${x.ok ? '✅ Completada' : 'Marcar como completada'}</label></div>`;
@@ -200,6 +204,7 @@
         ${enlace ? `<div class="cl-url">${esc(enlace.replace(/^https?:\/\//, '').slice(0, 60))}</div>` : '<div class="cl-warn" style="font-size:13px">⚠ Sin link</div>'}</div>
       <div class="cl-acc">
         ${enlace ? `<a class="btn btn-pri btn-sm" href="${esc(enlace)}" target="_blank" rel="noopener noreferrer">Entrar</a><button class="btn btn-sm" data-cp="${esc(c.id)}">Copiar link</button>` : ''}
+        ${selQ(c.q, `data-lq="${esc(c.id)}"`)}
         <label class="chk"><input type="checkbox" data-ok="${esc(c.id)}" ${c.ok ? 'checked' : ''}> Asistí</label>
         <span><button class="btn btn-sm" data-e="${esc(c.id)}">Editar</button> <button class="btn btn-sm" data-d="${esc(c.id)}">Quitar</button></span>
       </div></div>`;
@@ -208,10 +213,11 @@
   function pintar(el) {
     const c = E(), h = hoy();
     const prox = c.lista.filter(x => !x.f || x.f >= h).sort(ordenar), pas = c.lista.filter(x => x.f && x.f < h).sort((a, b) => ordenar(b, a));
-    const L = tab === 'prox' ? prox : pas;
+    const L = (tab === 'prox' ? prox : pas).filter(x => ve(x.q));
     el.innerHTML = `${secH('tareas', 'Clases', 'Fecha, hora, tema y link de tus clases en un solo lugar', '<button class="btn btn-pri" id="cl-nuevo" style="white-space:nowrap">+ Clase</button>')}
+    <div class="seg" id="cl-fq" style="margin-bottom:12px"><button data-q="todos" class="${filtroQ === 'todos' ? 'on' : ''}">Todos</button><button data-q="0" class="${filtroQ === '0' ? 'on' : ''}">${esc(pers()[0])}</button><button data-q="1" class="${filtroQ === '1' ? 'on' : ''}">${esc(pers()[1])}</button></div>
     <div class="card cl-panel"><div class="it-h"><b>📌 Clases a tener en cuenta</b><small>${fotos().length}/3 imágenes</small></div>
-      <div class="cl-3">${[0, 1, 2].map(k => { const u = fotos()[k]; return u ? `<div class="cl-slot ${fila(k).ok ? 'cl-hecha' : ''}"><img src="${esc(u)}" alt="Imagen ${k + 1}" data-fv="${k}">${slotDatos(k)}<div class="cl-slot-b"><button class="btn btn-sm" data-fs="${k}">Cambiar imagen</button><button class="btn btn-sm" data-fq="${k}">Quitar</button></div></div>` : `<button class="cl-slot cl-vacio" id="cl-nf${k}" data-nf>＋<span>Subir o pegar imagen</span></button>`; }).join('')}</div></div>
+      <div class="cl-3">${[0, 1, 2].map(k => { const u = fotos()[k]; if (u && !ve(fila(k).q)) return ''; if (!u && filtroQ !== 'todos') return ''; return u ? `<div class="cl-slot ${fila(k).ok ? 'cl-hecha' : ''}"><img src="${esc(u)}" alt="Imagen ${k + 1}" data-fv="${k}">${slotDatos(k)}<div class="cl-slot-b"><button class="btn btn-sm" data-fs="${k}">Cambiar imagen</button><button class="btn btn-sm" data-fq="${k}">Quitar</button></div></div>` : `<button class="cl-slot cl-vacio" id="cl-nf${k}" data-nf>＋<span>Subir o pegar imagen</span></button>`; }).join('')}</div></div>
     <div class="card"><h3>Pega el mensaje de la clase</h3>
       <p class="sub">Pega el mensaje tal como te lo mandaron (WhatsApp, correo, Zoom…). Reconozco solo la <b>fecha</b>, el <b>día</b>, la <b>hora</b>, el <b>tema</b> y el <b>link</b>. Puedes pegar varias clases juntas.<br>📷 Pega también el <b>link</b> y la <b>imagen</b> (Ctrl+V o arrastrar). Cuando tengas todo, toca <b>«Reconocer y agregar»</b> y se ordena junto: imagen, fecha, hora, tema y link.</p>
       <textarea id="cl-txt" rows="5" placeholder="Ejemplo:&#10;Clase de Meta Ads: cómo escalar campañas&#10;Jueves 6 de noviembre, 8:00 p. m.&#10;https://us02web.zoom.us/j/123456789" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;margin:8px 0"></textarea>
@@ -231,6 +237,9 @@
     $('#cl-img').onclick = () => { guardarTxt(); elegir(u => { imgPend = u; ultimo = '📎 Imagen lista. Toca «Reconocer y agregar» cuando termines.'; render(); }); };
     const qp = $('#cl-qp'); if (qp) qp.onclick = () => { guardarTxt(); imgPend = ''; ultimo = ''; render(); };
     el.querySelectorAll('[data-fd]').forEach(i => i.onchange = () => { const [k, c2] = i.dataset.fd.split('|'), r = E().fi[+k]; if (!r) return; r[c2] = c2 === 'link' ? (extraerUrl(i.value) ? urlOk(extraerUrl(i.value)) : i.value.trim()) : i.value.trim(); if (c2 === 'link' && r.link) r.p = plataforma(r.link); Store.save(); render(); });
+    el.querySelectorAll('#cl-fq [data-q]').forEach(b => b.onclick = () => { filtroQ = b.dataset.q; render(); });
+    el.querySelectorAll('[data-fq2]').forEach(i => i.onchange = () => { const r = E().fi[+i.dataset.fq2]; if (r) { r.q = i.value; Store.save(); toast('Asignada a ' + pers()[i.value]); render(); } });
+    el.querySelectorAll('[data-lq]').forEach(i => i.onchange = () => { const r = c.lista.find(y => y.id === i.dataset.lq); if (r) { r.q = i.value; Store.save(); toast('Asignada a ' + pers()[i.value]); render(); } });
     el.querySelectorAll('[data-fk]').forEach(i => i.onchange = () => { const r = E().fi[+i.dataset.fk]; if (r) { r.ok = i.checked; Store.save(); render(); } });
     el.querySelectorAll('[data-fc]').forEach(b => b.onclick = () => { const r = E().fi[+b.dataset.fc]; if (r && r.link && navigator.clipboard) navigator.clipboard.writeText(r.link).then(() => toast('Link copiado'), () => toast('No se pudo copiar')); });
     el.querySelectorAll('[data-fsl]').forEach(b => b.onclick = () => { const i = el.querySelector(`[data-fd="${b.dataset.fsl}|link"]`); toast('Primero pega el link de la clase'); if (i) { i.focus(); i.scrollIntoView({ block: 'center' }); } });
