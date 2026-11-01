@@ -67,7 +67,8 @@
           .replace(/\b\d{1,2}[\/\-.]\d{1,2}([\/\-.]\d{2,4})?\b/g, ' ').replace(/[:|•·➡️📅🕒🕐⏰🔗📌✅]+|^[\s\-–—*]+/g, ' ').replace(/\s+/g, ' ').trim();
         return x;
       }).filter(x => x && x.length > 2);
-      tema = r.join(' · ');
+      const may = r.filter(l => l === l.toUpperCase() && /[A-ZÁÉÍÓÚÑ]{3}/.test(l) && !/PR[ÓO]XIMA CLASE|CLASE ABIERTA|INSCRIB/.test(l));
+      tema = r.length > 2 ? (may[0] || r.slice().sort((a, b) => b.length - a.length)[0]) : r.join(' · ');
     }
     tema = tema.replace(/\s+/g, ' ').replace(/^[\s\-–—:,.]+|[\s\-–—:,.]+$/g, '').slice(0, 160);
     return { tema, link: url ? urlOk(url) : '', f: fh ? fh.f : '', h: hr ? hr.h : '', p: url ? plataforma(url) : '' };
@@ -146,7 +147,7 @@
       <div class="cl-fr"><label>Fecha<input type="date" data-fd="${k}|f" value="${esc(x.f || '')}"></label><label>Hora<input type="time" data-fd="${k}|h" value="${esc(x.h || '')}"></label></div>
       <label class="cl-l">Tema<input type="text" data-fd="${k}|tema" value="${esc(x.tema || '')}" placeholder="Tema de la clase"></label>
       <label class="cl-l">Link<input type="text" data-fd="${k}|link" value="${esc(x.link || '')}" placeholder="https://…"></label>
-      <div class="cl-bot">${enlace ? `<a class="btn btn-pri" href="${esc(enlace)}" target="_blank" rel="noopener noreferrer">🎥 Entrar a la clase</a><button class="btn" data-fc="${k}">📋 Copiar link</button>` : '<span class="cl-warn">⚠ Falta el link para poder entrar</span>'}</div>
+      <div class="cl-bot">${enlace ? `<a class="btn btn-pri" href="${esc(enlace)}" target="_blank" rel="noopener noreferrer">🎥 Entrar a la clase</a><button class="btn" data-fc="${k}">📋 Copiar link</button>` : `<button class="btn btn-pri" data-fsl="${k}">🎥 Entrar a la clase</button><button class="btn" data-fsl="${k}">📋 Copiar link</button><div class="cl-warn" style="flex-basis:100%;font-size:13px">⚠ Pega el link en la casilla «Link» para activar el botón</div>`}</div>
       <label class="cl-ck"><input type="checkbox" data-fk="${k}" ${x.ok ? 'checked' : ''}> ${x.ok ? '✅ Completada' : 'Marcar como completada'}</label></div>`;
   }
   const colocar = u => { const a = fotos(); if (a.length >= 3) { toast('Ya tienes 3 imágenes. Quita una para poner otra.'); return false; } guardarImgs(PANEL, a.concat(u)); Store.save(); return true; };
@@ -223,6 +224,7 @@
     el.querySelectorAll('[data-fd]').forEach(i => i.onchange = () => { const [k, c2] = i.dataset.fd.split('|'), r = E().fi[+k]; if (!r) return; r[c2] = c2 === 'link' && i.value.trim() ? urlOk(i.value.trim()) : i.value.trim(); Store.save(); render(); });
     el.querySelectorAll('[data-fk]').forEach(i => i.onchange = () => { const r = E().fi[+i.dataset.fk]; if (r) { r.ok = i.checked; Store.save(); render(); } });
     el.querySelectorAll('[data-fc]').forEach(b => b.onclick = () => { const r = E().fi[+b.dataset.fc]; if (r && r.link && navigator.clipboard) navigator.clipboard.writeText(r.link).then(() => toast('Link copiado'), () => toast('No se pudo copiar')); });
+    el.querySelectorAll('[data-fsl]').forEach(b => b.onclick = () => { const i = el.querySelector(`[data-fd="${b.dataset.fsl}|link"]`); toast('Primero pega el link de la clase'); if (i) { i.focus(); i.scrollIntoView({ block: 'center' }); } });
     el.querySelectorAll('[data-fv]').forEach(i => i.onclick = () => visor(PANEL, +i.dataset.fv));
     el.querySelectorAll('[data-fq]').forEach(b => b.onclick = () => { const a = fotos(); a.splice(+b.dataset.fq, 1); guardarImgs(PANEL, a); Store.save(); render(); });
     el.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => elegir(u => { const a = fotos(); a[+b.dataset.fs] = u; guardarImgs(PANEL, a); Store.save(); render(); }));
