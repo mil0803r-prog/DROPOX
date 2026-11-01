@@ -110,7 +110,32 @@
   const elegir = cb => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.onchange = () => { const f = i.files && i.files[0]; if (f) reducir(f).then(cb, e => toast(e.message)); }; i.click(); };
   const imgSeg = u => (/^data:image\/(jpeg|png|webp);base64,/.test(u || '') ? u : '');
 
-  let tab = 'prox', ultimo = '', imgPend = '';
+  let tab = 'prox', ultimo = '', imgPend = '', leyendo = false;
+
+  // lee el texto de la imagen con la IA y lo mete en el cuadro; si encuentra fecha o link, agrega la clase sola
+  async function leerImagen(u) {
+    leyendo = true; ultimo = '🔎 Leyendo la imagen…'; render();
+    try {
+      const tk = window.Nube && Nube.activo ? await Nube.token() : null;
+      if (!tk) throw new Error('Inicia sesión para que lea el texto de la imagen.');
+      const r = await fetch('/api/clase-imagen', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk }, body: JSON.stringify({ imagen: u }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'No pude leer la imagen.');
+      const tx = (d.texto || '').trim();
+      if (!tx) { ultimo = 'No vi texto en la imagen. Llena los datos con «Editar» o escríbelos arriba.'; return; }
+      window._clTxt = ((window._clTxt || '') + '\n' + tx).trim();
+      const hay = separar(window._clTxt).map(reconocer).filter(x => x.f || x.link);
+      if (hay.length) { leyendo = false; agregar(window._clTxt); return; }
+      ultimo = 'Leí la imagen pero no encontré fecha ni link. Revisa el texto de arriba y toca «Reconocer y agregar».';
+    } catch (e) { ultimo = '⚠ ' + (e.message || 'No pude leer la imagen.') + ' La imagen quedó lista para guardarla igual.'; }
+    finally { leyendo = false; if (vista === 'clases') render(); }
+  }
+  const nuevaImagen = file => reducir(file).then(u => { imgPend = u; leerImagen(u); }, e => toast(e.message));
+  // pegar (Ctrl+V) o arrastrar una imagen en cualquier parte de la sección
+  document.addEventListener('paste', e => { if (vista !== 'clases') return; const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); const t = $('#cl-txt'); if (t) window._clTxt = t.value; nuevaImagen(f); } });
+  document.addEventListener('dragover', e => { if (vista === 'clases' && e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
+  document.addEventListener('drop', e => { if (vista !== 'clases') return; const f = [...(e.dataTransfer && e.dataTransfer.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); const t = $('#cl-txt'); if (t) window._clTxt = t.value; nuevaImagen(f); } });
+  let agregar = () => {};
   const campos = () => [{ k: 'tema', l: 'Tema', req: 1, full: 1 }, { k: 'f', l: 'Fecha', t: 'date' }, { k: 'h', l: 'Hora', t: 'time' }, { k: 'link', l: 'Link de la clase', full: 1 }, { k: 'n', l: 'Nota (opcional)', full: 1 }];
 
   function tarjeta(c) {
@@ -132,16 +157,16 @@
       </div></div>`;
   }
 
-  function vista(el) {
+  function pintar(el) {
     const c = E(), h = hoy();
     const prox = c.lista.filter(x => !x.f || x.f >= h).sort(ordenar), pas = c.lista.filter(x => x.f && x.f < h).sort((a, b) => ordenar(b, a));
     const L = tab === 'prox' ? prox : pas;
     el.innerHTML = `${secH('tareas', 'Clases', 'Fecha, hora, tema y link de tus clases en un solo lugar', '<button class="btn btn-pri" id="cl-nuevo" style="white-space:nowrap">+ Clase</button>')}
     <div class="card"><h3>Pega el mensaje de la clase</h3>
-      <p class="sub">Pega el mensaje tal como te lo mandaron (WhatsApp, correo, Zoom…). Reconozco solo la <b>fecha</b>, el <b>día</b>, la <b>hora</b>, el <b>tema</b> y el <b>link</b>. Puedes pegar varias clases juntas.</p>
+      <p class="sub">Pega el mensaje tal como te lo mandaron (WhatsApp, correo, Zoom…). Reconozco solo la <b>fecha</b>, el <b>día</b>, la <b>hora</b>, el <b>tema</b> y el <b>link</b>. Puedes pegar varias clases juntas.<br>📷 También puedes <b>copiar una imagen o captura y pegarla con Ctrl+V</b> (o arrastrarla aquí): leo el texto de la imagen y agrego la clase sola, sin subir nada desde tu dispositivo.</p>
       <textarea id="cl-txt" rows="5" placeholder="Ejemplo:&#10;Clase de Meta Ads: cómo escalar campañas&#10;Jueves 6 de noviembre, 8:00 p. m.&#10;https://us02web.zoom.us/j/123456789" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;margin:8px 0"></textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-pri" id="cl-add">Reconocer y agregar</button><button class="btn" id="cl-img">📷 Subir imagen</button><button class="btn" id="cl-lim">Limpiar</button></div>
-      ${imgPend ? `<div style="margin-top:10px;display:flex;gap:10px;align-items:center"><img class="cl-img" src="${esc(imgPend)}" alt="" style="max-height:90px"><button class="btn btn-sm" id="cl-qimg">Quitar imagen</button></div><p class="sub">La imagen se guardará con la clase. Tip: también puedes pegar una captura con Ctrl+V.</p>` : ''}
+      ${imgPend ? `<div style="margin-top:10px;display:flex;gap:10px;align-items:center"><img class="cl-img" src="${esc(imgPend)}" alt="" style="max-height:90px"><button class="btn btn-sm" id="cl-qimg">Quitar imagen</button></div><p class="sub">La imagen se guardará con la clase. </p>` : ''}
       ${ultimo ? `<p class="sub" style="margin-top:8px">${ultimo}</p>` : ''}</div>
     <div class="chips" id="cl-t"><button class="chip ${tab === 'prox' ? 'on' : ''}" data-t="prox">Próximas (${prox.length})</button><button class="chip ${tab === 'pas' ? 'on' : ''}" data-t="pas">Pasadas (${pas.length})</button></div>
     ${L.length ? L.map(tarjeta).join('') : `<div class="empty">${tab === 'prox' ? 'Aún no hay clases próximas. Pega arriba el mensaje de la clase.' : 'Aquí aparecerán las clases que ya pasaron.'}</div>`}`;
@@ -150,13 +175,14 @@
     $('#cl-lim').onclick = () => { $('#cl-txt').value = ''; ultimo = ''; imgPend = ''; render(); };
     const guardarTxt = () => { window._clTxt = $('#cl-txt').value; };
     $('#cl-txt').value = window._clTxt || ''; $('#cl-txt').oninput = guardarTxt;
-    $('#cl-img').onclick = () => { guardarTxt(); elegir(u => { imgPend = u; render(); }); };
+    $('#cl-add').onclick = () => agregar();
+    $('#cl-img').onclick = () => { guardarTxt(); elegir(u => { imgPend = u; leerImagen(u); }); };
     const qi = $('#cl-qimg'); if (qi) qi.onclick = () => { guardarTxt(); imgPend = ''; render(); };
-    $('#cl-txt').onpaste = e => { const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); guardarTxt(); reducir(f).then(u => { imgPend = u; render(); }, er => toast(er.message)); } };
+    $('#cl-txt').onpaste = e => { const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); guardarTxt(); nuevaImagen(f); } };
     el.querySelectorAll('[data-im]').forEach(b => b.onclick = () => elegir(u => { const x = c.lista.find(y => y.id === b.dataset.im); if (x) { x.img = u; Store.save(); render(); } }));
     el.querySelectorAll('[data-ver]').forEach(i => i.onclick = () => { const x = c.lista.find(y => y.id === i.dataset.ver); if (x && imgSeg(x.img)) openInfo(`<h2>${esc(x.tema || 'Clase')}</h2><img src="${esc(x.img)}" alt="" style="width:100%;border-radius:12px"><div class="dlg-foot"><button class="btn" id="cl-qx">Quitar imagen</button></div>`); const q = $('#cl-qx'); if (q) q.onclick = () => { x.img = ''; Store.save(); $('#dlg').close(); render(); }; });
-    $('#cl-add').onclick = () => {
-      const tx = $('#cl-txt').value.trim(); if (!tx && !imgPend) { toast('Pega el mensaje o sube una imagen'); return; }
+    agregar = tx0 => {
+      const tx = (typeof tx0 === 'string' ? tx0 : $('#cl-txt').value).trim(); if (!tx && !imgPend) { toast('Pega el mensaje o sube una imagen'); return; }
       let nuevos = separar(tx).map(reconocer).filter(x => x.tema || x.link || x.f);
       if (!nuevos.length && imgPend) nuevos = [{ tema: '', link: '', f: '', h: '', p: '' }];
       if (!nuevos.length) { toast('No encontré datos de una clase en ese texto'); return; }
@@ -173,6 +199,6 @@
     el.querySelectorAll('[data-cp]').forEach(b => b.onclick = () => { const x = c.lista.find(y => y.id === b.dataset.cp); if (x && navigator.clipboard) navigator.clipboard.writeText(x.link).then(() => toast('Link copiado'), () => toast('No se pudo copiar')); });
   }
 
-  window.Clases = { vista, reconocer, separar };
+  window.Clases = { vista: pintar, reconocer, separar };
   if ((location.hash || '').slice(1) === 'clases') render();
 })();
