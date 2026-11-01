@@ -155,11 +155,15 @@
     } catch (e) { ultimo = '⚠ ' + (e.message || 'No pude leer la imagen.') + ' La imagen quedó lista para guardarla igual.'; }
     finally { leyendo = false; if (vista === 'clases') render(); }
   }
-  const nuevaImagen = file => reducir(file).then(u => { colocar(u); leerImagen(u); }, e => toast(e.message));
+  let _ult = '', _ultT = 0;
+  const nuevaImagen = file => reducir(file).then(u => {
+    if (u === _ult && Date.now() - _ultT < 5000) return; // evita subir la misma imagen dos veces seguidas
+    _ult = u; _ultT = Date.now(); colocar(u); leerImagen(u);
+  }, e => toast(e.message));
   // pegar (Ctrl+V) o arrastrar una imagen en cualquier parte de la sección
-  document.addEventListener('paste', e => { if (vista !== 'clases') return; const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); const t = $('#cl-txt'); if (t) window._clTxt = t.value; nuevaImagen(f); } });
+  document.addEventListener('paste', e => { if (vista !== 'clases' || e.defaultPrevented) return; const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); const t = $('#cl-txt'); if (t) window._clTxt = t.value; nuevaImagen(f); } });
   document.addEventListener('dragover', e => { if (vista === 'clases' && e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
-  document.addEventListener('drop', e => { if (vista !== 'clases') return; const f = [...(e.dataTransfer && e.dataTransfer.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); const t = $('#cl-txt'); if (t) window._clTxt = t.value; nuevaImagen(f); } });
+  document.addEventListener('drop', e => { if (vista !== 'clases' || e.defaultPrevented) return; const f = [...(e.dataTransfer && e.dataTransfer.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); const t = $('#cl-txt'); if (t) window._clTxt = t.value; nuevaImagen(f); } });
   let agregar = () => {};
   const campos = () => [{ k: 'tema', l: 'Tema', req: 1, full: 1 }, { k: 'f', l: 'Fecha', t: 'date' }, { k: 'h', l: 'Hora', t: 'time' }, { k: 'link', l: 'Link de la clase', full: 1 }, { k: 'n', l: 'Nota (opcional)', full: 1 }];
 
@@ -203,7 +207,6 @@
     $('#cl-txt').value = window._clTxt || ''; $('#cl-txt').oninput = guardarTxt;
     $('#cl-add').onclick = () => agregar();
     $('#cl-img').onclick = () => { guardarTxt(); elegir(u => { colocar(u); leerImagen(u); }); };
-    $('#cl-txt').onpaste = e => { const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); guardarTxt(); nuevaImagen(f); } };
     el.querySelectorAll('[data-fv]').forEach(i => i.onclick = () => visor(PANEL, +i.dataset.fv));
     el.querySelectorAll('[data-fq]').forEach(b => b.onclick = () => { const a = fotos(); a.splice(+b.dataset.fq, 1); guardarImgs(PANEL, a); Store.save(); render(); });
     el.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => elegir(u => { const a = fotos(); a[+b.dataset.fs] = u; guardarImgs(PANEL, a); Store.save(); render(); }));
