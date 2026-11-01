@@ -21,6 +21,9 @@
   // saca el primer enlace de cualquier texto (con o sin https://)
   const extraerUrl = t => { const m = String(t || '').match(URL_RE); return m ? m[1].replace(/[.,;:!?)]+$/, '') : ''; };
   const plataforma = u => /zoom\.us|zoom\.com/i.test(u) ? 'Zoom' : /meet\.google/i.test(u) ? 'Google Meet' : /teams\.(microsoft|live)/i.test(u) ? 'Teams' : /youtu\.?be/i.test(u) ? 'YouTube' : /whatsapp|wa\.me|chat\.whatsapp/i.test(u) ? 'WhatsApp' : /drive\.google|docs\.google/i.test(u) ? 'Drive' : /vimeo/i.test(u) ? 'Vimeo' : /lu\.ma|luma\.com/i.test(u) ? 'Luma' : /discord/i.test(u) ? 'Discord' : /t\.me|telegram/i.test(u) ? 'Telegram' : 'Enlace';
+  // enlace directo a la sala (Zoom, Meet, Teams…) -> «Entrar»; cualquier otro (Luma, formularios, etc.) es de inscripción -> «Registrarme»
+  const esSala = u => /(^|\.)(zoom\.us|zoom\.com|zoomgov\.com|meet\.google\.com|teams\.microsoft\.com|teams\.live\.com|webex\.com|whereby\.com|meet\.jit\.si|gotomeeting\.com|gotowebinar\.com|skype\.com|discord\.gg|discord\.com|twitch\.tv|youtube\.com\/live|youtu\.be|youtube\.com\/watch|streamyard\.com|restream\.io|riverside\.fm|crowdcast\.io)(\/|$|\?)/i.test(String(u || '').replace(/^https?:\/\//i, '').replace(/^www\./i, ''));
+  const botonLink = (u, cl) => (esSala(u) ? `<a class="btn ${cl}" href="${esc(u)}" target="_blank" rel="noopener noreferrer">🎥 Entrar a la clase</a>` : `<a class="btn ${cl}" href="${esc(u)}" target="_blank" rel="noopener noreferrer">📝 Registrarme</a>`);
   const urlOk = u => (/^https?:\/\//i.test(u) ? u : 'https://' + u);
 
   function hora(t) {
@@ -154,7 +157,7 @@
       <label class="cl-l">Tema<input type="text" data-fd="${k}|tema" value="${esc(x.tema || '')}" placeholder="Tema de la clase"></label>
       ${selQ(x.q, `data-fq2="${k}"`)}
       <label class="cl-l">Link<input type="text" data-fd="${k}|link" value="${esc(x.link || '')}" placeholder="https://…"></label>
-      <div class="cl-bot">${enlace ? `<a class="btn btn-pri" href="${esc(enlace)}" target="_blank" rel="noopener noreferrer">🎥 Entrar a la clase</a><button class="btn" data-fc="${k}">📋 Copiar link</button>` : `<button class="btn btn-pri" data-fsl="${k}">🎥 Entrar a la clase</button><button class="btn" data-fsl="${k}">📋 Copiar link</button><div class="cl-warn" style="flex-basis:100%;font-size:13px">⚠ Pega el link en la casilla «Link» para activar el botón</div>`}</div>
+      <div class="cl-bot">${enlace ? `${botonLink(enlace, 'btn-pri')}<button class="btn" data-fc="${k}">📋 Copiar link</button>` : `<button class="btn btn-pri" data-fsl="${k}">🎥 Entrar / Registrarme</button><button class="btn" data-fsl="${k}">📋 Copiar link</button><div class="cl-warn" style="flex-basis:100%;font-size:13px">⚠ Pega el link en la casilla «Link»: si es Zoom o Meet dirá «Entrar», si es de inscripción dirá «Registrarme»</div>`}</div>
       <label class="cl-ck"><input type="checkbox" data-fk="${k}" ${x.ok ? 'checked' : ''}> ${x.ok ? '✅ Completada' : 'Marcar como completada'}</label></div>`;
   }
   const colocar = u => { const a = fotos(); if (a.length >= 3) { toast('Ya tienes 3 imágenes. Quita una para poner otra.'); return false; } guardarImgs(PANEL, a.concat(u)); Store.save(); return true; };
@@ -203,7 +206,7 @@
         ${c.p ? `<span class="chip on" style="cursor:default;font-size:12px;padding:2px 10px">${esc(c.p)}</span>` : ''}${c.n ? `<div class="sub" style="margin-top:4px">📝 ${esc(c.n)}</div>` : ''}
         ${enlace ? `<div class="cl-url">${esc(enlace.replace(/^https?:\/\//, '').slice(0, 60))}</div>` : '<div class="cl-warn" style="font-size:13px">⚠ Sin link</div>'}</div>
       <div class="cl-acc">
-        ${enlace ? `<a class="btn btn-pri btn-sm" href="${esc(enlace)}" target="_blank" rel="noopener noreferrer">Entrar</a><button class="btn btn-sm" data-cp="${esc(c.id)}">Copiar link</button>` : ''}
+        ${enlace ? `${botonLink(enlace, 'btn-pri btn-sm').replace('Entrar a la clase', 'Entrar').replace('Registrarme', 'Registrarme')}<button class="btn btn-sm" data-cp="${esc(c.id)}">Copiar link</button>` : ''}
         ${selQ(c.q, `data-lq="${esc(c.id)}"`)}
         <label class="chk"><input type="checkbox" data-ok="${esc(c.id)}" ${c.ok ? 'checked' : ''}> Asistí</label>
         <span><button class="btn btn-sm" data-e="${esc(c.id)}">Editar</button> <button class="btn btn-sm" data-d="${esc(c.id)}">Quitar</button></span>
