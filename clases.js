@@ -89,7 +89,7 @@
   }
 
   // ───── Datos ─────
-  const E = () => { const c = (S.clases = S.clases || { lista: [] }); c.lista = c.lista || []; return c; };
+  const E = () => { const c = (S.clases = S.clases || { lista: [] }); c.lista = c.lista || []; if (!Array.isArray(c.fi)) c.fi = (c.fotos || []).map(u => ({ u })); return c; };
   const fechaCorta = f => new Date(f + 'T12:00:00').toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' });
   const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
   const hFmt = h => { if (!h) return ''; const [a, b] = h.split(':').map(Number); return `${a % 12 || 12}:${z(b)} ${a < 12 ? 'a. m.' : 'p. m.'}`; };
@@ -133,8 +133,21 @@
 
   let tab = 'prox', ultimo = '', leyendo = false;
   // las 3 imágenes grandes de la pantalla (guardadas aparte de las clases)
-  const PANEL = { get tema() { return 'Clases a tener en cuenta'; }, get imgs() { return E().fotos || []; }, set imgs(v) { E().fotos = v; } };
+  const PANEL = { get tema() { return 'Clases a tener en cuenta'; }, get imgs() { return E().fi.map(x => x.u); }, set imgs(v) { const o = E().fi; E().fi = v.map(u => o.find(x => x.u === u) || { u }); delete E().fotos; } };
   const fotos = () => imgsDe(PANEL);
+  const fila = k => E().fi[k] || {};
+  function slotDatos(k) {
+    const x = fila(k), d = x.f ? dif(x.f) : null, enlace = segura(x.link);
+    const dd = x.f ? new Date(x.f + 'T12:00:00') : null;
+    const cuando = d === null ? '' : d === 0 ? 'HOY' : d === 1 ? 'MAÑANA' : d > 1 ? `EN ${d} DÍAS` : `HACE ${-d} DÍA${d === -1 ? '' : 'S'}`;
+    return `<div class="cl-sd">
+      <div class="cl-bigf ${d === 0 ? 'cl-hoy' : ''}">${dd ? esc(cap(dd.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' }))) : '<span class="cl-warn">📅 Pon la fecha</span>'}</div>
+      ${cuando ? `<div class="cl-cuando">${cuando}</div>` : ''}
+      <div class="cl-fr"><label>Fecha<input type="date" data-fd="${k}|f" value="${esc(x.f || '')}"></label><label>Hora<input type="time" data-fd="${k}|h" value="${esc(x.h || '')}"></label></div>
+      <label class="cl-l">Tema<input type="text" data-fd="${k}|tema" value="${esc(x.tema || '')}" placeholder="Tema de la clase"></label>
+      <label class="cl-l">Link<input type="text" data-fd="${k}|link" value="${esc(x.link || '')}" placeholder="https://…"></label>
+      ${enlace ? `<a class="btn btn-pri btn-sm" href="${esc(enlace)}" target="_blank" rel="noopener noreferrer">Entrar a la clase</a>` : ''}</div>`;
+  }
   const colocar = u => { const a = fotos(); if (a.length >= 3) { toast('Ya tienes 3 imágenes. Quita una para poner otra.'); return false; } guardarImgs(PANEL, a.concat(u)); Store.save(); return true; };
 
   // lee el texto de la imagen con la IA y lo mete en el cuadro; si encuentra fecha o link, agrega la clase sola
@@ -147,12 +160,11 @@
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || 'No pude leer la imagen.');
       const tx = (d.texto || '').trim();
-      if (!tx) { ultimo = 'No vi texto en la imagen. Llena los datos con «Editar» o escríbelos arriba.'; return; }
-      window._clTxt = ((window._clTxt || '') + '\n' + tx).trim();
-      const hay = separar(window._clTxt).map(reconocer).filter(x => x.f || x.link);
-      if (hay.length) { leyendo = false; agregar(window._clTxt); return; }
-      ultimo = 'Leí la imagen pero no encontré fecha ni link. Revisa el texto de arriba y toca «Reconocer y agregar».';
-    } catch (e) { ultimo = '⚠ ' + (e.message || 'No pude leer la imagen.') + ' La imagen quedó lista para guardarla igual.'; }
+      if (!tx) { ultimo = 'No vi texto en la imagen. Escribe la fecha, hora y link debajo de la imagen.'; return; }
+      const x = reconocer(tx), f = E().fi.find(y => y.u === u);
+      if (f) { if (x.f) f.f = x.f; if (x.h) f.h = x.h; if (x.link) f.link = x.link; if (x.tema) f.tema = x.tema; Store.save(); }
+      ultimo = x.f || x.link ? '✅ Leí la imagen y llené la fecha, hora, tema y link. Revísalos debajo de la imagen.' : 'Leí la imagen pero no encontré fecha ni link. Escríbelos debajo de la imagen.';
+    } catch (e) { ultimo = '⚠ ' + (e.message || 'No pude leer la imagen.') + ' Escribe los datos debajo de la imagen.'; }
     finally { leyendo = false; if (vista === 'clases') render(); }
   }
   let _ult = '', _ultT = 0;
@@ -190,7 +202,7 @@
     const L = tab === 'prox' ? prox : pas;
     el.innerHTML = `${secH('tareas', 'Clases', 'Fecha, hora, tema y link de tus clases en un solo lugar', '<button class="btn btn-pri" id="cl-nuevo" style="white-space:nowrap">+ Clase</button>')}
     <div class="card cl-panel"><div class="it-h"><b>📌 Clases a tener en cuenta</b><small>${fotos().length}/3 imágenes</small></div>
-      <div class="cl-3">${[0, 1, 2].map(k => { const u = fotos()[k]; return u ? `<div class="cl-slot"><img src="${esc(u)}" alt="Imagen ${k + 1}" data-fv="${k}"><div class="cl-slot-b"><button class="btn btn-sm" data-fs="${k}">Cambiar</button><button class="btn btn-sm" data-fq="${k}">Quitar</button></div></div>` : `<button class="cl-slot cl-vacio" id="cl-nf${k}" data-nf>＋<span>Subir o pegar imagen</span></button>`; }).join('')}</div></div>
+      <div class="cl-3">${[0, 1, 2].map(k => { const u = fotos()[k]; return u ? `<div class="cl-slot"><img src="${esc(u)}" alt="Imagen ${k + 1}" data-fv="${k}">${slotDatos(k)}<div class="cl-slot-b"><button class="btn btn-sm" data-fs="${k}">Cambiar imagen</button><button class="btn btn-sm" data-fq="${k}">Quitar</button></div></div>` : `<button class="cl-slot cl-vacio" id="cl-nf${k}" data-nf>＋<span>Subir o pegar imagen</span></button>`; }).join('')}</div></div>
     <div class="card"><h3>Pega el mensaje de la clase</h3>
       <p class="sub">Pega el mensaje tal como te lo mandaron (WhatsApp, correo, Zoom…). Reconozco solo la <b>fecha</b>, el <b>día</b>, la <b>hora</b>, el <b>tema</b> y el <b>link</b>. Puedes pegar varias clases juntas.<br>📷 También puedes <b>copiar una imagen o captura y pegarla con Ctrl+V</b> (o arrastrarla aquí): leo el texto de la imagen y agrego la clase sola, sin subir nada desde tu dispositivo.</p>
       <textarea id="cl-txt" rows="5" placeholder="Ejemplo:&#10;Clase de Meta Ads: cómo escalar campañas&#10;Jueves 6 de noviembre, 8:00 p. m.&#10;https://us02web.zoom.us/j/123456789" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;margin:8px 0"></textarea>
@@ -207,6 +219,7 @@
     $('#cl-txt').value = window._clTxt || ''; $('#cl-txt').oninput = guardarTxt;
     $('#cl-add').onclick = () => agregar();
     $('#cl-img').onclick = () => { guardarTxt(); elegir(u => { colocar(u); leerImagen(u); }); };
+    el.querySelectorAll('[data-fd]').forEach(i => i.onchange = () => { const [k, c2] = i.dataset.fd.split('|'), r = E().fi[+k]; if (!r) return; r[c2] = c2 === 'link' && i.value.trim() ? urlOk(i.value.trim()) : i.value.trim(); Store.save(); render(); });
     el.querySelectorAll('[data-fv]').forEach(i => i.onclick = () => visor(PANEL, +i.dataset.fv));
     el.querySelectorAll('[data-fq]').forEach(b => b.onclick = () => { const a = fotos(); a.splice(+b.dataset.fq, 1); guardarImgs(PANEL, a); Store.save(); render(); });
     el.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => elegir(u => { const a = fotos(); a[+b.dataset.fs] = u; guardarImgs(PANEL, a); Store.save(); render(); }));
