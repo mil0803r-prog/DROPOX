@@ -110,6 +110,27 @@
   const elegir = cb => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.onchange = () => { const f = i.files && i.files[0]; if (f) reducir(f).then(cb, e => toast(e.message)); }; i.click(); };
   const imgSeg = u => (/^data:image\/(jpeg|png|webp);base64,/.test(u || '') ? u : '');
 
+  const imgsDe = c => (Array.isArray(c.imgs) ? c.imgs : c.img ? [c.img] : []).filter(imgSeg).slice(0, 3);
+  const guardarImgs = (c, a) => { c.imgs = a.slice(0, 3); delete c.img; };
+
+  // visor a pantalla completa (hasta 3 imágenes por clase)
+  function visor(c, i0) {
+    let i = i0; const cerrar = () => { document.removeEventListener('keydown', tecla); ov.remove(); document.body.style.overflow = ''; };
+    const ov = document.createElement('div'); ov.className = 'cl-visor'; document.body.style.overflow = 'hidden';
+    const pintarV = () => {
+      const a = imgsDe(c); if (!a.length) { cerrar(); render(); return; } i = Math.max(0, Math.min(i, a.length - 1));
+      ov.innerHTML = `<div class="cl-vtop"><b>${esc(c.tema || 'Clase')}</b><span>${i + 1} / ${a.length}</span><button class="btn btn-sm" data-q>🗑 Quitar esta imagen</button><button class="btn btn-sm btn-pri" data-x>✕ Cerrar</button></div>
+        <img src="${esc(a[i])}" alt=""><button class="cl-nav cl-ant" data-a ${a.length < 2 ? 'hidden' : ''}>‹</button><button class="cl-nav cl-sig" data-s ${a.length < 2 ? 'hidden' : ''}>›</button>`;
+      ov.querySelector('[data-x]').onclick = () => { cerrar(); render(); };
+      ov.querySelector('[data-q]').onclick = () => { const n = imgsDe(c); n.splice(i, 1); guardarImgs(c, n); Store.save(); pintarV(); };
+      ov.querySelector('[data-a]').onclick = () => { i = (i - 1 + a.length) % a.length; pintarV(); };
+      ov.querySelector('[data-s]').onclick = () => { i = (i + 1) % a.length; pintarV(); };
+    };
+    const tecla = e => { const n = imgsDe(c).length; if (e.key === 'Escape') { cerrar(); render(); } else if (e.key === 'ArrowLeft' && n > 1) { i = (i - 1 + n) % n; pintarV(); } else if (e.key === 'ArrowRight' && n > 1) { i = (i + 1) % n; pintarV(); } };
+    ov.onclick = e => { if (e.target === ov) { cerrar(); render(); } };
+    document.addEventListener('keydown', tecla); document.body.appendChild(ov); pintarV();
+  }
+
   let tab = 'prox', ultimo = '', imgPend = '', leyendo = false;
 
   // lee el texto de la imagen con la IA y lo mete en el cuadro; si encuentra fecha o link, agrega la clase sola
@@ -147,11 +168,11 @@
       <div class="cl-med"><b class="cl-tema">${esc(c.tema || 'Clase sin tema')}</b>
         <div class="sub">${c.f ? esc(cap(fechaCorta(c.f))) : '<span class="cl-warn">⚠ Falta la fecha</span>'} · ${c.h ? '🕒 ' + esc(hFmt(c.h)) : '<span class="cl-warn">⚠ Falta la hora</span>'} · ${cuando}</div>
         ${c.p ? `<span class="chip on" style="cursor:default;font-size:12px;padding:2px 10px">${esc(c.p)}</span>` : ''}${c.n ? `<div class="sub" style="margin-top:4px">📝 ${esc(c.n)}</div>` : ''}
-        ${imgSeg(c.img) ? `<img class="cl-img" data-ver="${esc(c.id)}" src="${esc(c.img)}" alt="Imagen de la clase">` : ''}
+        ${imgsDe(c).length ? `<div class="cl-gal">${imgsDe(c).map((u, k) => `<img class="cl-img" data-ver="${esc(c.id)}" data-k="${k}" src="${esc(u)}" alt="Imagen ${k + 1} de la clase">`).join('')}</div>` : ''}
         ${enlace ? `<div class="cl-url">${esc(enlace.replace(/^https?:\/\//, '').slice(0, 60))}</div>` : '<div class="cl-warn" style="font-size:13px">⚠ Sin link</div>'}</div>
       <div class="cl-acc">
         ${enlace ? `<a class="btn btn-pri btn-sm" href="${esc(enlace)}" target="_blank" rel="noopener noreferrer">Entrar</a><button class="btn btn-sm" data-cp="${esc(c.id)}">Copiar link</button>` : ''}
-        <button class="btn btn-sm" data-im="${esc(c.id)}">${imgSeg(c.img) ? '📷 Cambiar imagen' : '📷 Subir imagen'}</button>
+        ${imgsDe(c).length < 3 ? `<button class="btn btn-sm" data-im="${esc(c.id)}">📷 Agregar imagen (${imgsDe(c).length}/3)</button>` : ''}
         <label class="chk"><input type="checkbox" data-ok="${esc(c.id)}" ${c.ok ? 'checked' : ''}> Asistí</label>
         <span><button class="btn btn-sm" data-e="${esc(c.id)}">Editar</button> <button class="btn btn-sm" data-d="${esc(c.id)}">Quitar</button></span>
       </div></div>`;
@@ -179,14 +200,14 @@
     $('#cl-img').onclick = () => { guardarTxt(); elegir(u => { imgPend = u; leerImagen(u); }); };
     const qi = $('#cl-qimg'); if (qi) qi.onclick = () => { guardarTxt(); imgPend = ''; render(); };
     $('#cl-txt').onpaste = e => { const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); guardarTxt(); nuevaImagen(f); } };
-    el.querySelectorAll('[data-im]').forEach(b => b.onclick = () => elegir(u => { const x = c.lista.find(y => y.id === b.dataset.im); if (x) { x.img = u; Store.save(); render(); } }));
-    el.querySelectorAll('[data-ver]').forEach(i => i.onclick = () => { const x = c.lista.find(y => y.id === i.dataset.ver); if (x && imgSeg(x.img)) openInfo(`<h2>${esc(x.tema || 'Clase')}</h2><img src="${esc(x.img)}" alt="" style="width:100%;border-radius:12px"><div class="dlg-foot"><button class="btn" id="cl-qx">Quitar imagen</button></div>`); const q = $('#cl-qx'); if (q) q.onclick = () => { x.img = ''; Store.save(); $('#dlg').close(); render(); }; });
+    el.querySelectorAll('[data-im]').forEach(b => b.onclick = () => elegir(u => { const x = c.lista.find(y => y.id === b.dataset.im); if (x) { guardarImgs(x, imgsDe(x).concat(u)); Store.save(); render(); } }));
+    el.querySelectorAll('[data-ver]').forEach(i => i.onclick = () => { const x = c.lista.find(y => y.id === i.dataset.ver); if (x) visor(x, +i.dataset.k || 0); });
     agregar = tx0 => {
       const tx = (typeof tx0 === 'string' ? tx0 : $('#cl-txt').value).trim(); if (!tx && !imgPend) { toast('Pega el mensaje o sube una imagen'); return; }
       let nuevos = separar(tx).map(reconocer).filter(x => x.tema || x.link || x.f);
       if (!nuevos.length && imgPend) nuevos = [{ tema: '', link: '', f: '', h: '', p: '' }];
       if (!nuevos.length) { toast('No encontré datos de una clase en ese texto'); return; }
-      nuevos.forEach(x => c.lista.push({ id: uid(), ...x, n: '', ok: false, img: imgPend }));
+      nuevos.forEach(x => c.lista.push({ id: uid(), ...x, n: '', ok: false, imgs: imgPend ? [imgPend] : [] }));
       imgPend = ''; window._clTxt = '';
       const falt = nuevos.reduce((a, x) => a + (!x.f) + (!x.h) + (!x.link), 0);
       ultimo = `✅ Agregué ${nuevos.length} clase${nuevos.length > 1 ? 's' : ''}.` + (falt ? ' Revisa las que tienen ⚠ y complétalas con «Editar».' : ' Todo reconocido.');

@@ -761,3 +761,9 @@ body.wa-full .wa+.note,body.wa-full #view>p.note{display:none}
 .cl-ok{opacity:.65}
 .cl-acc a.btn{text-decoration:none}
 .cl-img{display:block;max-width:100%;max-height:140px;border-radius:10px;margin-top:8px;cursor:zoom-in;border:1px solid var(--line)}
+.cl-gal{display:flex;gap:8px;flex-wrap:wrap}.cl-gal .cl-img{max-height:110px;width:auto;max-width:48%}
+.cl-visor{position:fixed;inset:0;z-index:9999;background:#08080e;display:flex;align-items:center;justify-content:center}
+.cl-visor>img{width:96vw;height:86vh;margin-top:44px;object-fit:contain;border-radius:8px}
+.cl-vtop{position:absolute;top:0;left:0;right:0;display:flex;gap:10px;align-items:center;padding:12px 16px;color:#fff;flex-wrap:wrap}.cl-vtop b{flex:1;min-width:140px}
+.cl-nav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:64px;border:0;border-radius:12px;background:rgba(255,255,255,.18);color:#fff;font-size:36px;cursor:pointer}
+.cl-ant{left:12px}.cl-sig{right:12px}.cl-nav[hidden]{display:none}
