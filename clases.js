@@ -146,7 +146,8 @@
       <div class="cl-fr"><label>Fecha<input type="date" data-fd="${k}|f" value="${esc(x.f || '')}"></label><label>Hora<input type="time" data-fd="${k}|h" value="${esc(x.h || '')}"></label></div>
       <label class="cl-l">Tema<input type="text" data-fd="${k}|tema" value="${esc(x.tema || '')}" placeholder="Tema de la clase"></label>
       <label class="cl-l">Link<input type="text" data-fd="${k}|link" value="${esc(x.link || '')}" placeholder="https://…"></label>
-      ${enlace ? `<a class="btn btn-pri btn-sm" href="${esc(enlace)}" target="_blank" rel="noopener noreferrer">Entrar a la clase</a>` : ''}</div>`;
+      <div class="cl-bot">${enlace ? `<a class="btn btn-pri" href="${esc(enlace)}" target="_blank" rel="noopener noreferrer">🎥 Entrar a la clase</a><button class="btn" data-fc="${k}">📋 Copiar link</button>` : '<span class="cl-warn">⚠ Falta el link para poder entrar</span>'}</div>
+      <label class="cl-ck"><input type="checkbox" data-fk="${k}" ${x.ok ? 'checked' : ''}> ${x.ok ? '✅ Completada' : 'Marcar como completada'}</label></div>`;
   }
   const colocar = u => { const a = fotos(); if (a.length >= 3) { toast('Ya tienes 3 imágenes. Quita una para poner otra.'); return false; } guardarImgs(PANEL, a.concat(u)); Store.save(); return true; };
 
@@ -202,7 +203,7 @@
     const L = tab === 'prox' ? prox : pas;
     el.innerHTML = `${secH('tareas', 'Clases', 'Fecha, hora, tema y link de tus clases en un solo lugar', '<button class="btn btn-pri" id="cl-nuevo" style="white-space:nowrap">+ Clase</button>')}
     <div class="card cl-panel"><div class="it-h"><b>📌 Clases a tener en cuenta</b><small>${fotos().length}/3 imágenes</small></div>
-      <div class="cl-3">${[0, 1, 2].map(k => { const u = fotos()[k]; return u ? `<div class="cl-slot"><img src="${esc(u)}" alt="Imagen ${k + 1}" data-fv="${k}">${slotDatos(k)}<div class="cl-slot-b"><button class="btn btn-sm" data-fs="${k}">Cambiar imagen</button><button class="btn btn-sm" data-fq="${k}">Quitar</button></div></div>` : `<button class="cl-slot cl-vacio" id="cl-nf${k}" data-nf>＋<span>Subir o pegar imagen</span></button>`; }).join('')}</div></div>
+      <div class="cl-3">${[0, 1, 2].map(k => { const u = fotos()[k]; return u ? `<div class="cl-slot ${fila(k).ok ? 'cl-hecha' : ''}"><img src="${esc(u)}" alt="Imagen ${k + 1}" data-fv="${k}">${slotDatos(k)}<div class="cl-slot-b"><button class="btn btn-sm" data-fs="${k}">Cambiar imagen</button><button class="btn btn-sm" data-fq="${k}">Quitar</button></div></div>` : `<button class="cl-slot cl-vacio" id="cl-nf${k}" data-nf>＋<span>Subir o pegar imagen</span></button>`; }).join('')}</div></div>
     <div class="card"><h3>Pega el mensaje de la clase</h3>
       <p class="sub">Pega el mensaje tal como te lo mandaron (WhatsApp, correo, Zoom…). Reconozco solo la <b>fecha</b>, el <b>día</b>, la <b>hora</b>, el <b>tema</b> y el <b>link</b>. Puedes pegar varias clases juntas.<br>📷 También puedes <b>copiar una imagen o captura y pegarla con Ctrl+V</b> (o arrastrarla aquí): leo el texto de la imagen y agrego la clase sola, sin subir nada desde tu dispositivo.</p>
       <textarea id="cl-txt" rows="5" placeholder="Ejemplo:&#10;Clase de Meta Ads: cómo escalar campañas&#10;Jueves 6 de noviembre, 8:00 p. m.&#10;https://us02web.zoom.us/j/123456789" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;margin:8px 0"></textarea>
@@ -220,6 +221,8 @@
     $('#cl-add').onclick = () => agregar();
     $('#cl-img').onclick = () => { guardarTxt(); elegir(u => { colocar(u); leerImagen(u); }); };
     el.querySelectorAll('[data-fd]').forEach(i => i.onchange = () => { const [k, c2] = i.dataset.fd.split('|'), r = E().fi[+k]; if (!r) return; r[c2] = c2 === 'link' && i.value.trim() ? urlOk(i.value.trim()) : i.value.trim(); Store.save(); render(); });
+    el.querySelectorAll('[data-fk]').forEach(i => i.onchange = () => { const r = E().fi[+i.dataset.fk]; if (r) { r.ok = i.checked; Store.save(); render(); } });
+    el.querySelectorAll('[data-fc]').forEach(b => b.onclick = () => { const r = E().fi[+b.dataset.fc]; if (r && r.link && navigator.clipboard) navigator.clipboard.writeText(r.link).then(() => toast('Link copiado'), () => toast('No se pudo copiar')); });
     el.querySelectorAll('[data-fv]').forEach(i => i.onclick = () => visor(PANEL, +i.dataset.fv));
     el.querySelectorAll('[data-fq]').forEach(b => b.onclick = () => { const a = fotos(); a.splice(+b.dataset.fq, 1); guardarImgs(PANEL, a); Store.save(); render(); });
     el.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => elegir(u => { const a = fotos(); a[+b.dataset.fs] = u; guardarImgs(PANEL, a); Store.save(); render(); }));

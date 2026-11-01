@@ -781,3 +781,7 @@ body.wa-full .wa+.note,body.wa-full #view>p.note{display:none}
 .cl-sd input{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:14px}
 .cl-sd a.btn{text-decoration:none;text-align:center}
 @media(max-width:760px){.cl-3{grid-template-columns:1fr}}
+.cl-bot{display:flex;gap:8px;flex-wrap:wrap}.cl-bot .btn{flex:1;text-align:center;text-decoration:none;white-space:nowrap}
+.cl-sd label.cl-ck{flex-direction:row;align-items:center;gap:8px;font-size:15px;font-weight:700;cursor:pointer;padding:6px 0}
+.cl-sd label.cl-ck input{width:20px;height:20px}
+.cl-hecha{border-color:#16a34a}.cl-hecha img,.cl-hecha .cl-bigf{opacity:.55}
