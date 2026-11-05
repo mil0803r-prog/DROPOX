@@ -54,6 +54,20 @@
     return null;
   }
 
+  const MES_RE = 'enero|febrero|marzo|abril|mayo|junio|julio|agosto|setiembre|septiembre|octubre|noviembre|diciembre';
+  // «10 y 11 de noviembre», «10, 11 y 12 de noviembre», «del 10 al 12 de noviembre» -> varias fechas
+  function fechasVarias(t) {
+    const s = sin(t); let m;
+    if ((m = s.match(new RegExp('\\b(\\d{1,2})((?:\\s*(?:,|y|e)\\s*\\d{1,2})+)\\s*(?:de\\s+)?(' + MES_RE + ')\\b(?:\\s*(?:de|del)?\\s*(20\\d{2}))?')))) {
+      const dias = [+m[1]].concat((m[2].match(/\d{1,2}/g) || []).map(Number)), fs = dias.map(d => conAnio(MESES[m[3]], d, m[4] ? +m[4] : 0)).filter(Boolean);
+      if (fs.length > 1) return { fs: [...new Set(fs)], txt: m[0] };
+    }
+    if ((m = s.match(new RegExp('\\b(?:del\\s+)?(\\d{1,2})\\s*(?:al|a|-)\\s*(\\d{1,2})\\s*(?:de\\s+)?(' + MES_RE + ')\\b(?:\\s*(?:de|del)?\\s*(20\\d{2}))?')))) {
+      const a = +m[1], b = +m[2]; if (b > a && b - a <= 6) { const fs = []; for (let d = a; d <= b; d++) { const f = conAnio(MESES[m[3]], d, m[4] ? +m[4] : 0); if (f) fs.push(f); } if (fs.length > 1) return { fs, txt: m[0] }; }
+    }
+    return null;
+  }
+  const zonaMx = t => /m[eé]xico|🇲🇽|\bcdmx\b|\bmx\b/i.test(t) && !/lima|per[uú]\b/i.test(t);
   function reconocer(chunk) {
     let t = chunk, url = '';
     const mu = t.match(URL_RE); if (mu) { url = mu[1].replace(/[.,;]+$/, ''); t = t.replace(mu[0], ' '); }
@@ -61,8 +75,14 @@
     t = t.split('\n').filter(l => !/^\s*(id de reuni[oó]n|meeting id|passcode|c[oó]digo de acceso|contrase[nñ]a|password|clave)\b/i.test(l)).join('\n');
     // etiquetas tipo "Tema: ..."
     let tema = ''; const mt = t.match(/(?:^|\n)\s*(?:tema|titulo|título|clase|asunto|topic)\s*[:\-–]\s*(.+)/i); if (mt) tema = mt[1].trim();
-    const fh = fecha(t.replace(/\b(\d{1,2})\s*[:.]\s*(\d{2})\s*(a\.?\s?m\.?|p\.?\s?m\.?)?/gi, m => ' '.repeat(m.length))); // evita confundir la hora con una fecha
+    const fv = fechasVarias(t);
+    const fh = fv ? { f: fv.fs[0], txt: fv.txt } : fecha(t.replace(/\b(\d{1,2})\s*[:.]\s*(\d{2})\s*(a\.?\s?m\.?|p\.?\s?m\.?)?/gi, m => ' '.repeat(m.length))); // evita confundir la hora con una fecha
     const hr = hora(fh ? t.replace(new RegExp(fh.txt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), ' ') : t);
+    if (!tema) {
+      const mc = t.replace(/[*_]/g, '').match(/\b((?:clase|taller|bootcamp|webinar|masterclass|charla|workshop|curso)\s*\d*\s*(?:de|del|:|-|–)?\s*[^\n.,!¡:]{3,80}?)(?=\s+(?:vamos|donde|que|para|con el|el d[ií]a)\b|[\n.,!¡:]|$)/i);
+      const ma = t.replace(/[*_]/g, '').match(/de la mano de\s+([^\n.,!]+)/i);
+      if (mc) tema = mc[1].replace(/\s+/g, ' ').trim() + (ma ? ' · ' + ma[1].trim() : '');
+    }
     if (!tema) {
       let r = t.split('\n').map(l => {
         let x = l;
@@ -70,7 +90,7 @@
         if (hr) x = x.replace(hr.txt.trim(), ' ');
         x = x.replace(/\b(fecha|hora|d[ií]a|link|enlace|zoom|meet|teams|en vivo|hoy|ma[ñn]ana|pasado ma[ñn]ana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo|a las|hrs?|horas?|p\.?\s?m\.?|a\.?\s?m\.?|per[uú]|lima)\b\.?/gi, ' ')
           .replace(/\b(\d{1,2})\s*(de\s+)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|setiembre|septiembre|octubre|noviembre|diciembre)\b/gi, ' ')
-          .replace(/\b\d{1,2}[\/\-.]\d{1,2}([\/\-.]\d{2,4})?\b/g, ' ').replace(/[:|•·➡️📅🕒🕐⏰🔗📌✅]+|^[\s\-–—*]+/g, ' ').replace(/\s+/g, ' ').trim();
+          .replace(/\b\d{1,2}[\/\-.]\d{1,2}([\/\-.]\d{2,4})?\b/g, ' ').replace(/[:|•·]+|\p{Extended_Pictographic}|[\uFE0F\u200D]|[\u{1F1E6}-\u{1F1FF}]|^[\s\-–—*]+/gu, ' ').replace(/\s+/g, ' ').trim();
         return x;
       }).filter(x => x && x.length > 2);
       const may = r.filter(l => l === l.toUpperCase() && /[A-ZÁÉÍÓÚÑ]{3}/.test(l) && !/PR[ÓO]XIMA CLASE|CLASE ABIERTA|INSCRIB/.test(l));
@@ -81,12 +101,15 @@
     const mm = chunk.match(/(?:S\/\.?|PEN|USD|US\$|\$)\s?(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)\s?(?:soles|d[oó]lares|usd)\b/i);
     const pg = !gr && (mm || /\b(de pago|pagad[oa]|precio|inversi[oó]n|costo)\b/i.test(chunk));
     const monto = pg && mm ? ((/\$|usd|d[oó]lar/i.test(mm[0]) ? '$ ' : 'S/ ') + (mm[1] || mm[2])) : '';
-    return { tema, link: url ? urlOk(url) : '', f: fh ? fh.f : '', h: hr ? hr.h : '', p: url ? plataforma(url) : '', pago: gr ? 'gratis' : pg ? 'paga' : '', monto };
+    let hh = hr ? hr.h : '', hz = '';
+    if (hr && zonaMx(chunk)) { const [a, b] = hr.h.split(':').map(Number); hz = `${hFmt(hr.h)} hora México`; hh = `${z((a + 1) % 24)}:${z(b)}`; } // México (CDMX) va 1 hora detrás de Perú
+    return { tema, fs: fv ? fv.fs : [], hz, link: url ? urlOk(url) : '', f: fh ? fh.f : '', h: hh, p: url ? plataforma(url) : '', pago: gr ? 'gratis' : pg ? 'paga' : '', monto };
   }
 
   // Parte el texto pegado en una o varias clases
   function separar(texto) {
     const t = texto.replace(/\r/g, '').trim(); if (!t) return [];
+    if ((t.match(new RegExp(URL_RE.source, 'gi')) || []).length <= 1) return [t]; // un solo link: todo el mensaje es una sola clase
     let bloques = t.split(/\n\s*\n+/).map(b => b.trim()).filter(Boolean);
     const out = [];
     bloques.forEach(b => {
@@ -160,6 +183,7 @@
     return `<div class="cl-sd">
       <div class="cl-bigf ${d === 0 ? 'cl-hoy' : ''}">${dd ? esc(cap(dd.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' }))) : '<span class="cl-warn">📅 Pon la fecha</span>'}</div>
       ${cuando ? `<div class="cl-cuando">${cuando}</div>` : ''}
+      ${x.hz ? `<div class="sub">🕒 Hora Lima ${esc(hFmt(x.h))} · ${esc(x.hz)}</div>` : ''}
       <div class="cl-fr"><label>Fecha<input type="date" data-fd="${k}|f" value="${esc(x.f || '')}"></label><label>Hora<input type="time" data-fd="${k}|h" value="${esc(x.h || '')}"></label></div>
       <label class="cl-l">Tema<input type="text" data-fd="${k}|tema" value="${esc(x.tema || '')}" placeholder="Tema de la clase"></label>
       ${selQ(x.q, `data-fq2="${k}"`)}
@@ -270,21 +294,24 @@
         if (fotos().length >= 3) { toast('Ya tienes 3 imágenes. Quita una para poner otra.'); return; }
         const u = imgPend; let x = reconocer(tx), aviso = '';
         ultimo = '🔎 Leyendo la imagen y ordenando los datos…'; leyendo = true; render();
-        try { const t2 = await ocr(u); if (t2) { const y = reconocer(t2); const buenoT = x.tema && x.tema.length >= 10 && !/^(de |del |la |el |los |las )/i.test(x.tema); x = { tema: buenoT ? x.tema : (y.tema || x.tema), f: x.f || y.f, h: x.h || y.h, link: x.link || y.link, p: x.p || y.p, pago: x.pago || y.pago, monto: x.monto || y.monto }; } else aviso = ' No vi texto en la imagen.'; }
+        try { const t2 = await ocr(u); if (t2) { const y = reconocer(t2); const buenoT = x.tema && x.tema.length >= 10 && !/^(de |del |la |el |los |las )/i.test(x.tema); x = { fs: (x.fs && x.fs.length > 1) ? x.fs : (y.fs && y.fs.length > 1) ? y.fs : [], hz: x.hz || y.hz, tema: buenoT ? x.tema : (y.tema || x.tema), f: x.f || y.f, h: x.h || y.h, link: x.link || y.link, p: x.p || y.p, pago: x.pago || y.pago, monto: x.monto || y.monto }; } else aviso = ' No vi texto en la imagen.'; }
         catch (e) { aviso = ' ⚠ ' + (e.message || 'No pude leer la imagen.'); }
         leyendo = false;
         if (!x.link) { const l = extraerUrl(tx); if (l) { x.link = urlOk(l); x.p = plataforma(l); } }
-        if (colocar(u)) { Object.assign(E().fi.find(y => y.u === u) || {}, { tema: x.tema, f: x.f, h: x.h, link: x.link, p: x.p, pago: x.pago, monto: x.monto }); }
+        const fechas = x.fs && x.fs.length > 1 ? x.fs : [x.f], libres = 3 - fotos().length; let n = 0;
+        fechas.slice(0, Math.max(libres, 0)).forEach(f => { const u2 = n ? u + '#' + n : u; if (colocar(u2)) { Object.assign(E().fi.find(y => y.u === u2) || {}, { tema: x.tema, f, h: x.h, hz: x.hz, link: x.link, p: x.p, pago: x.pago, monto: x.monto }); n++; } });
+        if (fechas.length > n) aviso += ` Solo había lugar para ${n} de las ${fechas.length} fechas: quita una imagen y vuelve a pegar.`;
         const falt = (!x.f) + (!x.h) + (!x.link);
-        ultimo = '✅ Ordené los datos debajo de la imagen.' + (falt ? ' Completa lo que tiene ⚠.' : ' Todo reconocido.') + aviso;
+        ultimo = (n > 1 ? `✅ Agregué las ${n} fechas, cada una con su tarjeta.` : '✅ Ordené los datos debajo de la imagen.') + (falt ? ' Completa lo que tiene ⚠.' : ' Todo reconocido.') + aviso;
         imgPend = ''; window._clTxt = ''; Store.save(); render(); return;
       }
       const nuevos = separar(tx).map(reconocer).filter(x => x.tema || x.link || x.f);
       if (!nuevos.length) { toast('No encontré datos de una clase en ese texto'); return; }
-      nuevos.forEach(x => c.lista.push({ id: uid(), ...x, n: '', ok: false }));
+      let total = 0;
+      nuevos.forEach(x => { (x.fs && x.fs.length > 1 ? x.fs : [x.f]).forEach(f => { c.lista.push({ id: uid(), ...x, f, fs: undefined, n: x.hz ? '🕒 ' + x.hz : '', ok: false }); total++; }); });
       window._clTxt = '';
       const falt = nuevos.reduce((a, x) => a + (!x.f) + (!x.h) + (!x.link), 0);
-      ultimo = `✅ Agregué ${nuevos.length} clase${nuevos.length > 1 ? 's' : ''}.` + (falt ? ' Revisa las que tienen ⚠ y complétalas con «Editar».' : ' Todo reconocido.');
+      ultimo = `✅ Agregué ${total} clase${total > 1 ? 's' : ''}.` + (falt ? ' Revisa las que tienen ⚠ y complétalas con «Editar».' : ' Todo reconocido.');
       tab = 'prox'; Store.save(); render();
     };
     $('#cl-nuevo').onclick = () => openForm('Nueva clase', campos(), { f: hoy(), h: '20:00' }, v => { c.lista.push({ id: uid(), tema: v.tema, f: v.f, h: v.h, link: extraerUrl(v.link) ? urlOk(extraerUrl(v.link)) : '', p: extraerUrl(v.link) ? plataforma(v.link) : '', n: v.n, ok: false }); });
