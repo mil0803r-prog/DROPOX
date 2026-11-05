@@ -231,8 +231,8 @@
     if (!w.tabsV8) { w.tabsV8 = 1; const alf = [['devuelto', 'Devueltos', '#ef4444', 't7'], ['cancelado', 'Cancelados', '#94a3b8', 't8']]; alf.forEach(([e, n, c, id]) => { if (!w.tabs.some(t => t.e === e || String(t.n).toLowerCase().startsWith(n.toLowerCase().slice(0, 6)))) w.tabs.push({ id, n, c, e }); }); }
     return w.tabs; };
   const tabDe = c => tabs().find(t => t.id === c.tab);
-  const EOPTS = { '': 'Ninguno (no cambia pedidos)', pendiente: 'Pendiente', enruta: 'En ruta', enagencia: 'En agencia', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
-  const PED = { pendiente: 'Pendiente', enruta: 'En ruta', enagencia: 'En agencia', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
+  const EOPTS = { '': 'Estado nuevo con el nombre del tablero (recomendado)', pendiente: 'Pendiente', enruta: 'En ruta', enagencia: 'En agencia', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
+  const PED = ESTADOS; // los estados de Pedidos (incluye los que crean los tableros)
   // el pedido del chat: el que se creó desde el chat o, si no, el más reciente con el mismo celular (así también cuentan los que se crearon con «Pegar datos»)
   const pedidoDe = c => {
     if (c.pedidoId) { const x = S.pedidos.find(p => p.id === c.pedidoId); if (x) return x; }

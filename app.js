@@ -85,6 +85,33 @@ const mensualDe = f => f.frecuencia === 'unico' ? 0 : num(f.monto) * (FREQ[f.fre
 // gasto único: cuenta solo en el mes (o rango) de su fecha
 const unicosEn = (a, b) => S.fijos.filter(f => f.activo && f.frecuencia === 'unico' && (f.fecha || hoy()) >= a && (f.fecha || hoy()) <= b).reduce((s, f) => s + num(f.monto), 0);
 const ESTADOS = { pendiente: 'Pendiente', enruta: 'En ruta', enagencia: 'En agencia', entregado: 'Entregado', devuelto: 'Devuelto', cancelado: 'Cancelado' };
+// Cada tablero de WhatsApp (que es también una etiqueta) es un estado en «Pedidos»: los que se llaman como un estado fijo usan ese,
+// y todos los demás (Ya pagó, Recompra, Datos completados…) crean su propio estado con su nombre y su color.
+const ESTADOS_FIJOS = Object.keys(ESTADOS);
+function sincEstados() {
+  const w = S.wa; if (!w || !Array.isArray(w.tabs)) return;
+  const nz = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const fijo = n => { const t = nz(n); return /^en ruta/.test(t) ? 'enruta' : /^en agencia/.test(t) ? 'enagencia' : /^entregad/.test(t) ? 'entregado' : /^devuelt/.test(t) ? 'devuelto' : /^cancelad/.test(t) ? 'cancelado' : /^pendiente/.test(t) ? 'pendiente' : null; };
+  let cambio = false;
+  if (!w.estV1) { // una sola vez: cada tablero toma el estado que le corresponde y los pedidos que ya estaban en él lo siguen
+    w.estV1 = 1; cambio = true;
+    w.tabs.forEach(t => {
+      const viejo = t.e || '', nuevo = fijo(t.n) || 'x_' + t.id; if (viejo === nuevo) return; t.e = nuevo;
+      (w.chats || []).forEach(c => { if (c.tab !== t.id) return; const p = c.pedidoId && S.pedidos.find(x => x.id === c.pedidoId); if (p && (p.estado === viejo || !viejo)) { p.estado = nuevo; c.lastPed = nuevo; } });
+    });
+  }
+  w.tabs.forEach(t => { if (!t.e) { t.e = fijo(t.n) || 'x_' + t.id; cambio = true; } });
+  Object.keys(ESTADOS).forEach(k => { if (k.startsWith('x_')) delete ESTADOS[k]; });
+  let css = '';
+  w.tabs.forEach(t => {
+    if (!String(t.e).startsWith('x_')) return;
+    ESTADOS[t.e] = t.n; const k = t.e, c = /^#[0-9a-f]{3,8}$/i.test(t.c || '') ? t.c : '#7a8794';
+    css += `:root{--e-${k}:${c};--et-${k}:${c}}.t-${k}{background:color-mix(in srgb,${c} 18%,transparent);color:${c}}.it.e-${k}{border-left:5px solid ${c}}.pd-r.e-${k},.pd-col.e-${k},.pd-c.e-${k}{--c:${c};--ct:${c}}`;
+  });
+  let st = document.getElementById('est-x'); if (!st) { st = document.createElement('style'); st.id = 'est-x'; document.head.appendChild(st); } if (st.textContent !== css) st.textContent = css;
+  (S.pedidos || []).forEach(p => { if (String(p.estado).startsWith('x_') && !ESTADOS[p.estado]) { p.estado = 'pendiente'; cambio = true; } }); // el tablero se borró
+  if (cambio) Store.save();
+}
 const SIG = { pendiente: ['enruta', 'Despachar'], enruta: ['enagencia', 'En agencia'], enagencia: ['entregado', 'Entregado'] };
 const TIPOS = { suscripcion: 'Suscripción mensual (S/)', porcentaje: 'Comisión % sobre venta', porPedido: 'Costo por pedido (S/)', gasto: 'Gasto variable mensual (S/)' };
 const CATS = ['Alquiler / Local', 'Sueldos', 'Servicios (luz, agua, internet)', 'Software / Herramientas', 'Contabilidad / Legal', 'Marketing fijo', 'Logística / Almacén', 'Otros'];
@@ -166,7 +193,7 @@ function desglose(p) {
 const utilPedido = p => { const z = desglose(p); return z.ventas - z.igv - z.producto - z.flete - z.otros - z.comis - z.renta; };
 // distrito de un pedido: el campo propio o, en pedidos viejos, el último tramo de «Departamento, provincia, distrito»
 const distritoDe = p => { if (p.distrito) return p.distrito; const z = String(p.ciudad || '').split(' · ')[0].split(',').map(x => x.trim()).filter(Boolean); return z.length >= 2 ? z[z.length - 1] : ''; };
-const enCurso = p => p.estado === 'pendiente' || p.estado === 'enruta' || p.estado === 'enagencia';
+const enCurso = p => p.estado === 'pendiente' || p.estado === 'enruta' || p.estado === 'enagencia' || String(p.estado).startsWith('x_');
 const cerrado = p => p.estado === 'entregado' || p.estado === 'devuelto';
 
 const PAUTA_PAT = { meta: /meta/i, tiktok: /tiktok/i, google: /google/i };
@@ -752,6 +779,7 @@ function aplicarTema() {
 }
 function render() {
   asegurarCuentas();
+  try { sincEstados(); } catch (e) { console.error(e); }
   const key = VIEWS[vista] ? vista : 'dashboard';
   marcarMenu(key);
   aplicarTema();
